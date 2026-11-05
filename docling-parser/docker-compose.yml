@@ -1,0 +1,48 @@
+services:
+  docling-parser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docling-parser
+    image: docling-parser:latest
+    ports:
+      - "8008:8008"  # FastAPI
+    environment:
+      - PORT=8008
+      - API_KEY=${API_KEY:-your-secret-api-key-here}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - DOCLING_CMD=${DOCLING_CMD:-docling}
+      - EXCEL_PARSER=${EXCEL_PARSER:-openpyxl}
+      - RESOURCE_DELIVERY=${RESOURCE_DELIVERY:-pull}
+      # 2026.08.27(sooyeon.choi) 추가 - parser resource를 backend staging으로 전송
+      - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
+      - BACKEND_INTERNAL_API_KEY=${RESOURCE_INTERNAL_API_KEY}
+      - BACKEND_CALLBACK_ALLOWLIST=${BACKEND_CALLBACK_ALLOWLIST}
+      - PARSER_RESOURCE_ROOT=${PARSER_RESOURCE_ROOT}
+      - PARSER_RESOURCE_TTL_HOURS=${PARSER_RESOURCE_TTL_HOURS}
+      - PARSER_RESOURCE_CLEANUP_INTERVAL_SECONDS=${PARSER_RESOURCE_CLEANUP_INTERVAL_SECONDS}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS}
+    volumes:
+      - .:/app
+      # 2026.08.18(sooyeon.choi) excel 후처리 로직 추가
+      # 실행 데이터와 테스트 결과의 호스트 저장 위치를 명시적으로 고정
+      - ./data/uploads:/app/data/uploads
+      - ./data/results:/app/data/results
+      - ./data/resources:/app/data/xl_res
+      - ./tests/data:/app/tests/data:ro
+      - ./tests/results:/app/tests/results
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - docling-network
+
+networks:
+  docling-network:
+    driver: bridge

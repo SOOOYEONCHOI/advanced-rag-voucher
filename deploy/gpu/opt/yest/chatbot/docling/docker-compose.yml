@@ -1,0 +1,47 @@
+# 운영(GPU 서버 yest-gpu)용 docling-parser compose
+# 2026.10.28(sooyeon.choi) 추가 - 개발용 docling-parser/docker-compose.yml 기준 운영판
+#   서버 위치: /opt/yest/chatbot/docling/docker-compose.yml (root:adrag 640)
+#   개발판과 다른 점
+#   - build 없음: 폐쇄망이라 서버에서 빌드 불가. PC에서 만든 이미지를 docker load 해서 사용
+#   - 소스 마운트(.:/app) 없음: 코드·모델은 이미지 안에 있음
+#   - tests 마운트 없음, API_KEY 기본값 없음
+#   - environment 나열 대신 env_file: 빈 값(LOG_LEVEL= 등)이 넘어가 기동 실패하는 것 방지
+#   - GPU 0번 고정(device_ids), 데이터·로그는 /mnt/a/chatbot/data 아래
+services:
+  docling-parser:
+    image: docling-parser:2026.12-offline
+    pull_policy: never
+    container_name: docling-parser
+    env_file:
+      - .env
+    environment:
+      - PORT=8008
+      - HF_HUB_OFFLINE=1
+      - CUDA_VISIBLE_DEVICES=0          # 컨테이너 안에서는 배정된 1장이 0번으로 보임
+      - PARSER_RESOURCE_ROOT=/app/data/xl_res
+    ports:
+      - "8108:8008"                   # 2026.10.30 수정 - 호스트 8108(MAIP 8000번대와 분리). 컨테이너 안은 PORT=8008 그대로
+    volumes:
+      - /mnt/a/chatbot/data/docling/uploads:/app/data/uploads
+      - /mnt/a/chatbot/data/docling/results:/app/data/results
+      - /mnt/a/chatbot/data/docling/xl_res:/app/data/xl_res
+      - /mnt/a/chatbot/data/log:/app/instance/log
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]           # 서버 GPU 0번 (1번은 vLLM 임베딩 등, 2~7번은 다른 팀)
+              capabilities: [gpu]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - docling-network
+
+networks:
+  docling-network:
+    driver: bridge

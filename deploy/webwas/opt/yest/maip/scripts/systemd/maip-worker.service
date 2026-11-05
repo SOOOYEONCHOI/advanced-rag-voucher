@@ -1,0 +1,20 @@
+# 제조AI플랫폼 워커(스냅샷 Export·DB 로그 보존 정리). 설치: docs/DEPLOYMENT.md §2-5
+# 경로(소스 /opt/yest/maip · venv /opt/envs/maip)·계정(maip)이 다르면 고친 뒤 /etc/systemd/system/ 에 복사한다.
+# 따로 enable 하지 않는다 — maip.service 가 띄우고(Wants), 멈추기·다시 시작은 따라간다(PartOf).
+[Unit]
+Description=ManufacturingAIPlatform Background Worker
+After=network.target
+PartOf=maip.service
+
+[Service]
+User=maip
+Group=maip
+WorkingDirectory=/opt/yest/maip
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONUTF8=1
+UMask=0027
+# 옵션: --interval(폴링 초, 기본 5) · --limit(한 번에 처리할 작업 수, 기본 20)
+ExecStart=/opt/envs/maip/bin/python manage.py run_worker --interval 5
+# DB 가 내려가 있을 때 재시작을 빠르게 반복하다 한도에 걸려 멈추지 않게 간격을 둔다.
+Restart=always
+RestartSec=3

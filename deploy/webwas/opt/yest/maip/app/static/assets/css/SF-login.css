@@ -1,0 +1,93 @@
+@charset "UTF-8";
+/*
+Template Name: SF ALL System 
+Version:2026.01.16
+*/
+
+/* 로고 파일은 2배로 내보냈다(고해상도 화면 대비). 표시 높이를 고정하지
+   않으면 자연 크기인 68px 로 뜬다. 셸 쪽 규칙은 SF-Custom.css 에 있다. */
+.brand-logo {
+    height: 34px;
+    width: auto;
+}
+
+*, html, body {
+    font-family:  'prentpretendard','Open Sans','Helvetica Neue', sans-serif;
+    color: #343434;
+ 
+}
+ body {
+    background: #f6f7fb;
+ }
+.login .card {
+    border-radius: 25px;
+    box-shadow: 0px 0px 15px 0px rgba(154, 161, 171, 0.2);
+}
+
+.login .card-header {
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+}
+.login .card-body {
+    padding: 0 30px 30px 30px;
+
+}
+.login .form-control {
+    color: #343434;
+    font-size: 14px;
+}
+.login .form-control::placeholder {
+    color: #9da0a8;
+}
+.login label {
+    font-size: 12px;
+    font-weight: 500;
+}
+.btn-login {
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: none;
+    width: 100%;
+    border-radius: .25rem;
+}
+.btn-login:hover {
+    background: #2e2e31;
+    border: 1px solid #2e2e31;
+    color: #fff;
+}
+.login .log-tit {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -1px;
+    color: #2e2e31;
+}
+.login .border-radius {
+    width: 100%;
+    text-align: center;
+    border-radius: 12px;
+    padding:10px 20px;
+    background: #f6f7fb;
+    
+}
+.login .border-radius p {
+    color: #9da0a8;
+    font-weight: 400;
+    font-size: 13px;
+}
+
+.login .form-check-input:checked {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+.login .footer {
+    color: #666;
+    font-size: 12px;
+}
+
+.login  .topbar-menu{
+    list-style: none;
+    margin-bottom: 0;
+}

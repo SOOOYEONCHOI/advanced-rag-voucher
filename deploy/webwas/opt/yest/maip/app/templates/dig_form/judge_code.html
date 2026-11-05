@@ -1,0 +1,283 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+</div>
+
+<!-- 검사양식 코드 관리 — 판정 칸 선택지(사용자코드). 그룹 → 결과 코드 2단계를 한 목록(트리)에 보인다.
+     공통 CRUD 화면(DESIGN §5.5): 등록은 목록 머리의 [그룹 등록]·[결과 코드 등록] 모달, 상세는 [수정]·[삭제] -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt" data-labelCd="판정 코드 목록">판정 코드 목록</span></div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-input y_write_auth" id="btnNewGroup" data-labelCd="그룹 등록">그룹 등록</button>
+        <button type="button" class="btn btn-input y_write_auth" id="btnNewOption" data-labelCd="결과 코드 등록">결과 코드 등록</button>
+    </div>
+</div>
+<div id="code-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit"><span id="detailTitle" data-commonCd="상세 정보">상세 정보</span></div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-dell y_write_auth" id="btnDelete" data-commonCd="삭제">삭제</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel" data-commonCd="취소">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave" data-commonCd="저장">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off">
+        <input type="hidden" id="id" name="id">
+        <input type="hidden" id="parent_id" name="parent_id">
+        <div class="card mb-0 p-15"><div class="row g-2 align-items-end">
+            <div class="col-12 col-lg-3 option-only"><label for="parent_name" class="form-label" data-labelCd="그룹">그룹</label>
+                <input type="text" class="form-control" id="parent_name" name="parent_name" disabled></div>
+            <div class="col-12 col-lg-3"><label for="code" class="form-label" data-commonCd="코드">코드</label>
+                <input type="text" class="form-control" id="code" name="code" maxlength="30" required></div>
+            <div class="col-12 col-lg-3"><label for="name" class="form-label" data-labelCd="코드명">코드명</label>
+                <input type="text" class="form-control" id="name" name="name" maxlength="100" required></div>
+            <!-- 결과 코드만: 판정 의미 — 자동 판정·결과 표시는 코드명이 아니라 이 의미로 본다 -->
+            <div class="col-12 col-lg-3 option-only"><label for="meaning" class="form-label" data-labelCd="판정 의미">판정 의미</label>
+                <select class="form-select" id="meaning" name="meaning">
+                    <option value=""></option>
+                    <option value="Y">합격</option>
+                    <option value="N">불합격</option>
+                    <option value="X">해당없음</option>
+                </select></div>
+            <div class="col-12 col-lg-3"><label for="sort_order" class="form-label" data-labelCd="순서">순서</label>
+                <input type="number" class="form-control" id="sort_order" name="sort_order"></div>
+            <!-- 설명은 순서 옆 남은 폭을 채운다(줄을 따로 쓰지 않는다) -->
+            <div class="col-12 col-lg"><label for="description" class="form-label" data-commonCd="설명">설명</label>
+                <input type="text" class="form-control" id="description" name="description" maxlength="500"></div>
+        </div></div>
+    </form>
+</div>
+
+<div class="modal fade" id="groupCreateModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="groupCreateTitle">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="groupCreateTitle">그룹 등록</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      <form id="groupCreateForm" autocomplete="off" onsubmit="return false">
+        <div class="mb-2"><label for="groupCode" class="form-label">코드 (필수)</label>
+          <input type="text" class="form-control" id="groupCode" name="code" maxlength="30" required
+                 placeholder="양식 칸이 쓰는 코드입니다. 예: dig_form_okng"></div>
+        <div class="mb-2"><label for="groupName" class="form-label">코드명 (필수)</label>
+          <input type="text" class="form-control" id="groupName" name="name" maxlength="100" required placeholder="예: OK / NG"></div>
+        <div class="mb-2"><label for="groupOrder" class="form-label">순서</label>
+          <input type="number" class="form-control" id="groupOrder" name="sort_order"></div>
+        <div class="mb-2"><label for="groupDescription" class="form-label">설명</label>
+          <textarea class="form-control" id="groupDescription" name="description" rows="2" maxlength="500"></textarea></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-input" data-bs-dismiss="modal">취소</button>
+      <button type="button" class="btn btn-band" id="btnCreateGroup">등록</button>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="optionCreateModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="optionCreateTitle">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="optionCreateTitle">결과 코드 등록</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      <form id="optionCreateForm" autocomplete="off" onsubmit="return false">
+        <div class="mb-2"><label for="optionGroup" class="form-label">그룹 (필수)</label>
+          <select class="form-select" id="optionGroup" name="parent_id" required></select></div>
+        <div class="mb-2"><label for="optionCode" class="form-label">코드 (필수)</label>
+          <input type="text" class="form-control" id="optionCode" name="code" maxlength="30" required
+                 placeholder="작성 결과에 저장되는 값입니다. 예: Y"></div>
+        <div class="mb-2"><label for="optionName" class="form-label">코드명 (필수)</label>
+          <input type="text" class="form-control" id="optionName" name="name" maxlength="100" required placeholder="화면에 보이는 이름입니다. 예: OK"></div>
+        <div class="mb-2"><label for="optionMeaning" class="form-label">판정 의미 (필수)</label>
+          <select class="form-select" id="optionMeaning" name="meaning" required>
+              <option value=""></option>
+              <option value="Y">합격</option>
+              <option value="N">불합격</option>
+              <option value="X">해당없음</option>
+          </select></div>
+        <div class="mb-2"><label for="optionOrder" class="form-label">순서</label>
+          <input type="number" class="form-control" id="optionOrder" name="sort_order"></div>
+        <div class="mb-2"><label for="optionDescription" class="form-label">설명</label>
+          <textarea class="form-control" id="optionDescription" name="description" rows="2" maxlength="500"></textarea></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-input" data-bs-dismiss="modal">취소</button>
+      <button type="button" class="btn btn-band" id="btnCreateOption">등록</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include '../common/columns_setting.html' %}
+<script type="text/javascript">
+    const JUDGE_MEANING_TEXT = { Y: '합격', N: '불합격', X: '해당없음' };
+
+    class JudgeCodePage {
+        constructor() {
+            this.url = '/api/dig_form/judge_code';
+            this.rows = [];
+        }
+
+        init() {
+            const _this = this;
+            this.grid = WeZonGrid.create('#code-grid', {
+                columnLayout: [
+                    { dataField: 'name', headerText: '코드명', width: 220, align: 'left' }
+                    , { dataField: 'code', headerText: '코드', width: 160, align: 'left' }
+                    , {
+                        dataField: 'meaning', headerText: '판정 의미', width: 100, align: 'center',
+                        labelFunction: function (rowIndex, columnIndex, value) { return JUDGE_MEANING_TEXT[value] || ''; }
+                    }
+                    , { dataField: 'sort_order', headerText: '순서', width: 60, align: 'center' }
+                    , { dataField: 'description', headerText: '설명', width: 350, align: 'left' }
+                ]
+                , props: { height: 400, enableSorting: false, selectionMode: 'singleRow', rowIdField: 'id' }
+            });
+            GridUtil.fitWidth(this.grid);
+
+            // 그룹·결과 코드가 한 상세를 쓴다. 판정 의미·그룹 칸은 결과 코드일 때만 보인다(bind 뒤 showKind)
+            this.detail = DetailForm.create({
+                form: '#detailForm', grid: this.grid, rowIdField: 'id',
+                fields: '#code, #name, #meaning, #sort_order, #description',
+                buttons: { edit: '#btnEdit', del: '#btnDelete', save: '#btnSave', cancel: '#btnCancel' },
+                onDelete: function (row) { _this.remove(row); },
+                onSave: function (row) { _this.save(row); }
+            });
+            this.grid.on('cellClick', function (e) {
+                _this.detail.select(e.item, function (row) { _this.showKind(row); });
+            });
+            // [취소]는 DetailForm 이 원래 값으로 되돌린다 — 그 뒤 칸 구성을 다시 맞춘다
+            $('#btnCancel').on('click', function () { _this.showKind(_this.detail.row); });
+
+            $('#btnNewGroup').on('click', function () { _this.openGroupCreate(); });
+            $('#btnNewOption').on('click', function () { _this.openOptionCreate(); });
+            $('#btnCreateGroup').on('click', function () { _this.create('#groupCreateForm', '#groupCreateModal'); });
+            $('#btnCreateOption').on('click', function () { _this.create('#optionCreateForm', '#optionCreateModal'); });
+            this.showKind(null);
+            this.searchMainData();
+        }
+
+        // 고른 행이 결과 코드면 그룹·판정 의미 칸을 보이고 필수로 둔다. 그룹이면 숨기고 필수를 푼다
+        showKind(row) {
+            const isOption = !!(row && row.parent_id);
+            $('#detailForm .option-only').toggleClass('d-none', !isOption);
+            $('#meaning').prop('required', isOption);
+            $('#detailTitle').text(row ? (isOption ? '결과 코드 상세' : '그룹 상세') : '상세 정보');
+        }
+
+        // select: 다시 읽은 뒤 고를 행 id. 그 행을 상세에 다시 넣는다(읽기 전용). 없으면 상세를 비운다.
+        searchMainData(select) {
+            const _this = this;
+            AjaxUtil.getAsyncData(_this.url, { action: 'read' }, function (result) {
+                if (result && result.success === false) {
+                    Alert.alert('', result.message);
+                    return;
+                }
+                const groups = {};
+                (result || []).forEach(function (r) { if (!r.parent_id) groups[r.id] = r; });
+                // 결과 코드 상세의 그룹 칸에 "이름 (코드)"를 보인다
+                _this.rows = (result || []).map(function (r) {
+                    const g = groups[r.parent_id];
+                    return Object.assign({}, r, { parent_id: r.parent_id || null, parent_name: g ? g.name + ' (' + g.code + ')' : '' });
+                });
+                _this.grid.setTreeData(_this.rows, { treeColumn: 'name', idField: 'id', parentField: 'parent_id', expandAll: true });
+                const row = _this.rows.find(function (r) { return r.id === select; });
+                if (row) {
+                    _this.grid.setSelectionByRowId(row.id);
+                    _this.detail.bind(row);
+                } else {
+                    _this.detail.clear();
+                }
+                _this.showKind(row || null);
+            });
+        }
+
+        groups() {
+            return this.rows.filter(function (r) { return !r.parent_id; });
+        }
+
+        resetModal(form) {
+            $(form)[0].reset();
+            $(form + ' .is-invalid').removeClass('is-invalid');
+        }
+
+        openGroupCreate() {
+            this.resetModal('#groupCreateForm');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('groupCreateModal')).show();
+        }
+
+        // 그룹은 고른 행으로 미리 채운다 — 그룹 행이면 그 그룹, 결과 코드 행이면 그 결과 코드의 그룹
+        openOptionCreate() {
+            const groups = this.groups();
+            if (!groups.length) {
+                Alert.alert('', '먼저 그룹을 등록해 주세요.');
+                return;
+            }
+            this.resetModal('#optionCreateForm');
+            const $group = $('#optionGroup').empty().append($('<option>').val('').text(''));
+            groups.forEach(function (g) { $group.append($('<option>').val(g.id).text(g.name + ' (' + g.code + ')')); });
+            const row = this.detail.row;
+            $group.val(row ? String(row.parent_id || row.id) : '');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('optionCreateModal')).show();
+        }
+
+        create(form, modal) {
+            const _this = this;
+            if (!DetailForm.requireFields($(form))) { return; }
+            const data = FormUtil.extractForm($(form));
+            AjaxUtil.postAsyncData(_this.url + '?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                bootstrap.Modal.getOrCreateInstance(document.getElementById(modal.slice(1))).hide();
+                Notify.success('등록되었습니다.');
+                _this.searchMainData(res.id);
+            });
+        }
+
+        // 소속 그룹은 바꾸지 않는다 — 원래 행의 parent_id 를 그대로 보낸다
+        save(row) {
+            const _this = this;
+            const data = {
+                id: row.id, parent_id: row.parent_id || '', code: $('#code').val(), name: $('#name').val(),
+                meaning: row.parent_id ? $('#meaning').val() : '', sort_order: $('#sort_order').val(),
+                description: $('#description').val()
+            };
+            AjaxUtil.postAsyncData(_this.url + '?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                Notify.success('저장되었습니다.');
+                _this.searchMainData(row.id);
+            });
+        }
+
+        remove(row) {
+            const _this = this;
+            const kind = row.parent_id ? '결과 코드를' : '그룹을';
+            Alert.confirm('', "'" + row.name + "' " + kind + ' 삭제하시겠습니까?', function () {
+                AjaxUtil.postAsyncData(_this.url + '?action=delete', { id: row.id }, function (res) {
+                    if (res && res.success === false) { Alert.alert('', res.message); return; }
+                    Notify.success('삭제되었습니다.');
+                    _this.searchMainData(row.parent_id || null);
+                });
+            });
+        }
+    }
+
+    let page = new JudgeCodePage();
+    $(document).ready(function () {
+        page.init();
+        // 저장된 컬럼 설정(머리 이름·순서)을 적용한다. 설정 버튼은 두지 않는다(사용자 결정 2026-10-19)
+        page.popColSetting = new popColSetting();
+        page.popColSetting.loadColumnData(gui.gui_code, gui.template_key, 'grid', page.grid);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,440 @@
+{
+  "dataset_records": 60,
+  "evaluated_records": 60,
+  "errors": [],
+  "top_k": 10,
+  "before": {
+    "k1": 1.5,
+    "b": 0.75,
+    "hits": 1,
+    "recall_at_k": 0.0167
+  },
+  "after": {
+    "k1": 1.2,
+    "b": 0.5,
+    "hits": 1,
+    "recall_at_k": 0.0167
+  },
+  "rows": [
+    {
+      "id": "cand_1d7d4568_4101",
+      "question": "위험성평가를 실시하는 주체는 누구인가요?",
+      "candidate_count": 2,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_1d7d4568_2758",
+      "question": "위험성평가의 대상에는 어떤 사항이 포함되나요?",
+      "candidate_count": 1,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0702703e_8460",
+      "question": "빈도·강도법은 어떤 목적을 가지고 사용되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0702703e_7394",
+      "question": "빈도·강도법을 사용할 때 위험성의 크기를 판단하기 위해 어떤 방법을 사용하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_444ad1f1_6550",
+      "question": "위험성 감소대책의 유효성에 대한 평가를 포함하는 항목은 무엇인가?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_444ad1f1_3289",
+      "question": "위험성평가 인정 신청이 가능한 사업장에 대한 제도는 어디에서 운영될 수 있나?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3ea03576_5149",
+      "question": "규칙제36조에 따른 개선 완료 일자는 언제인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3ea03576_8699",
+      "question": "규칙제92조에 따르면 정비작업 시 어떤 조치가 필요한가요?",
+      "candidate_count": 1,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3b252420_7144",
+      "question": "위험성의 수준과 그 판단기준을 미리 정하는 이유는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3b252420_2459",
+      "question": "사업장에서 허용 가능한 위험성의 수준은 어떻게 결정하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_22f849da_6177",
+      "question": "위험성평가 전문과정(이론편) 교육은 어디에서 제공되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_22f849da_8916",
+      "question": "위험성 평가의 수준을 5단계로 나누었을 때, '높음' 단계에 해당하는 위험은 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_1cb98154_4798",
+      "question": "위험성평가의 대상이 되는 유해·위험요인은 어떤 경우에 해당하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_1cb98154_1126",
+      "question": "위험성평가는 어떤 목적을 위해 실시되나요?",
+      "candidate_count": 3,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_82b3e06f_1408",
+      "question": "'가능성'이란 무엇을 의미합니까?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_82b3e06f_8961",
+      "question": "위험성과 유해·위험요인의 차이는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_194df1c1_3333",
+      "question": "위험성수준의 '높음'은 어떤 상황을 의미합니까?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_194df1c1_4334",
+      "question": "위험성수준의 '보통'은 어떤 휴업 기간을 나타내나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_694b8dbd_9192",
+      "question": "재해유형 중 '떨어짐'의 정의는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_694b8dbd_5485",
+      "question": "재해유형 '끼임'은 어떤 상황을 말하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0baf3440_8113",
+      "question": "독일에서 위험성평가를 실시하지 않은 사업장에 대한 직접적인 벌칙 규정은 어떻게 되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0baf3440_1122",
+      "question": "독일은 위험성평가 제도를 도입하면서 어떤 주요 정책을 시행하고 있나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0b9f02b5_5489",
+      "question": "위험성 수준을 판단하는 방법 중 하나는 무엇인가요?",
+      "candidate_count": 2,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_0b9f02b5_7233",
+      "question": "위험성 수준을 나누는 예시 기준은 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_198984aa_3832",
+      "question": "컨설팅지원을 받으려는 사업주는 어디에 지원 신청을 해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_198984aa_2411",
+      "question": "공단 광역본부장ㆍ지역본부장ㆍ지사장은 어떤 경우에 컨설팅을 지원할 수 있나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_39517494_1805",
+      "question": "위험성평가의 평가절차에서 '사전준비' 단계는 얼마나 지속되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_39517494_6653",
+      "question": "위험성평가의 평가절차에서 '위험성감소대책시행' 단계는 얼마나 지속되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3b477354_6406",
+      "question": "이 문서 청크에 포함된 숫자 중 하나는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_3b477354_1804",
+      "question": "이 문서 청크에 포함된 숫자 중 두 개의 예를 들어보세요.",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_7b0fbac1_3644",
+      "question": "'보완'으로 분류된 평가항목에 대해서는 어떤 조치를 취해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_7b0fbac1_4522",
+      "question": "위험성 결정 기록 예시에서 '적정'으로 분류된 경우는 어떤 상황인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_8909a7bf_5089",
+      "question": "공종별 협력업체 소장의 주요 역할은 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_8909a7bf_1017",
+      "question": "위험성 감소대책 수립 후 다음 단계는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_34d57e57_3374",
+      "question": "산업안전보건법 제36조는 어떤 의무를 사업주에게 부여합니까?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_34d57e57_4706",
+      "question": "위험성평가의 방법, 절차, 시기 등은 어디에 자세하게 규정되어 있습니까?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_68b2f277_5662",
+      "question": "유해요인에 해당하는 예시로 '산소결핍'은 어떤 유해요인에 포함되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_68b2f277_8423",
+      "question": "기계적인 위험성의 예시로 '전기톱'은 어떤 위험에 해당하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_39c798f2_7682",
+      "question": "이 문서 청크에 포함된 gid00042의 개수는 몇 개인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_39c798f2_9990",
+      "question": "이 문서 청크에 gid00001이 포함되어 있나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_70105119_7186",
+      "question": "싱가포르는 언제 작업장 안전보건법을 제정했나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_70105119_6507",
+      "question": "싱가포르의 위험성평가 제도에서 사업주에게 부여된 의무는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_4541908f_2566",
+      "question": "작업반장의 주요 역할 중 하나는 무엇인가요?",
+      "candidate_count": 4,
+      "before_hit": true,
+      "after_hit": true
+    },
+    {
+      "id": "cand_4541908f_2932",
+      "question": "위험성 감소대책 수립 단계에서 '상'등급 대책의 우선순위는 어떻게 되나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_02468cc6_1019",
+      "question": "'허용 가능한 위험성'이란 무엇인가요?",
+      "candidate_count": 4,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_02468cc6_5614",
+      "question": "사업장에서 '허용 가능한 위험성'에 안주해서는 안 되는 이유는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_5ed57d17_3803",
+      "question": "우리나라의 산업재해 사고사망자 수는 얼마나 감소했나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_5ed57d17_6075",
+      "question": "OECD 국가 중 우리나라의 사고사망만인율은 어느 수준인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_62f5d55b_4241",
+      "question": "위험성평가 기록은 몇 년간 보관해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_62f5d55b_3277",
+      "question": "위험성 평가 기록은 누가 승인해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_1875b1e9_6384",
+      "question": "우리 현장의 위험성평가 방법은 어떤 방법을 사용하나요?",
+      "candidate_count": 1,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_1875b1e9_8996",
+      "question": "임시·수시·비정형 작업의 위험성평가는 어떤 방법을 사용하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_58dd576d_9861",
+      "question": "중대재해가 발생했을 때 사업주는 어떤 조치를 해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_58dd576d_9217",
+      "question": "위험성평가를 실시할 때 근로자가 참여해야 하는 경우는 언제인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_384df9a5_1408",
+      "question": "수시평가를 실시해야 하는 경우는 어떤 경우인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_384df9a5_8724",
+      "question": "기록관리방법에 따르면 문서는 몇 년간 보관해야 하나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_295c4199_2979",
+      "question": "창고출입구에 지게차 통행시 어떤 안전보건조치가 시행되고 있나요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_295c4199_8706",
+      "question": "반응기 및 원료투입구에 설치된 안전보건조치는 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_8641e06a_8331",
+      "question": "위험성평가 담당자의 주요 역할은 무엇인가요?",
+      "candidate_count": 4,
+      "before_hit": false,
+      "after_hit": false
+    },
+    {
+      "id": "cand_8641e06a_8490",
+      "question": "공종별 협력업체 소장의 주요 역할은 무엇인가요?",
+      "candidate_count": 0,
+      "before_hit": false,
+      "after_hit": false
+    }
+  ]
+}

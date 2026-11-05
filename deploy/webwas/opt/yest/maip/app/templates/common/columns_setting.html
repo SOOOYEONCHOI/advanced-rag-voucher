@@ -1,0 +1,535 @@
+{% verbatim %}
+<script type="text/x-tmpl" id="gridColumnsSettingTemplate">
+    <div id="pop_col_setting" >
+        <!-- 타이틀 제목 영역 스크립트 다시 설정해주세요.
+       <div class="modal-header">
+            <h4 class="modal-title">컬럼설정</h4>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+       </div>-->
+
+            <form id="formColumnsSetting">
+                <div class="table_box search">
+                    <div class="row">
+                        <div class="col-xl-3 col-sm-6 col-lg-12" style="display:none">
+                            <div class="d-flex align-items-center">
+                                <input type="text"  class="form-control" id="gui_name" name="gui_name" value="{%=o.gui_name%}" readonly />
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-sm-6 col-lg-12" style="display:none">
+                            <div class="d-flex align-items-center">
+                                <input type="text" class="form-control" id="template_name" name="template_name" value="{%=o.template_name%}" readonly />
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-sm-6 col-lg-12" style="display:none">
+                            <div class="d-flex align-items-center">
+                                <input type="text" class="form-control" id="grid_name" name="grid_name" value="{%=o.grid_name%}" readonly />
+                            </div>
+                        </div>
+                        <div class="col-xl-4 col-sm-6 col-lg-12">
+                            <div class="d-flex align-items-center">
+                                <label class="form-label" data-commonCd="컬럼고정">컬럼고정</label>
+                                <input type="text" class="form-control" id="fix_cols" name="fix_cols" value="{%=o.fix_cols%}" readonly />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <button type="button" class="btn rounded-pill btn-icon" id="btnColUp" style="visibility:{%=o.order_visible%}" title="위로"><i class="uil-arrow-up"></i></button>
+                        <button type="button" class="btn rounded-pill btn-icon" id="btnColDown" style="visibility:{%=o.order_visible%}" title="아래로"><i class=" uil-arrow-down"></i></button>
+                    </div>
+
+                     <div class="flex-wrap gap-2">
+                        <select id="cboLangCode" hidden></select>
+                        <button type="button" class="btn btn-band" id="btnSettingSave" data-commonCd="저장">저장</button>
+                        <button type="button" class="btn btn-input" id="btnRefresh" data-commonCd="새로고침">새로고침</button>
+                        <button type="button" class="btn btn-outline-light" id="btnSettingDelete" data-commonCd="초기화">초기화</button>
+                        <button type="button" class="btn btn-dell" id="btnSettingClose" data-commonCd="닫기">닫기</button>
+                     </div>
+                </div>
+                <div class="grid-table-radius">
+                    <div id="columns_div">
+                        <div id="columns_grid_container" style="height:420px;"></div>
+                    </div>
+                </div>
+            </form>
+    </div>
+ </script>
+{% endverbatim %}
+<script type="text/javascript">
+    class popColSetting {
+        constructor() {
+            this.columns_grid = null;
+            this.callback = null;
+            this.modal = new PopupDraggable('컬럼 설정');
+
+            this.src_grid = null;
+            this.src_columns = null;
+            this.fix_cols = 0;
+            this._last_db_cols = [];
+        }
+
+        /* 
+        grid._default_columns = getAllColumns()  ← 원본 저장
+            ↓
+        config_defs = cloneColumns(grid._default_columns)  ← 복사본 만들어서
+            ↓
+        merged에서 width/visible/headerText 수정  ← 복사본 수정
+            ↓
+        grid.setColumnLayout(cloneColumns(returns))  ← 그리드에 적용
+        */        
+
+        cloneColumns(columns) {
+            // JSON.stringify/parse는 함수를 제거하므로, 함수 프로퍼티(styleFunction 등)는 별도 복원
+            const FN_PROPS = ['styleFunction', 'editableFunction', 'labelFunction', 'exportValue', 'validator'];
+            // renderer / editRenderer 는 함수가 아니라 onClick 등 함수를 '내부'에 가지는 객체다.
+            // JSON 복제 시 내부 함수(onClick 등)가 사라져 그리드 버튼이 죽으므로,
+            // 복제본 대신 원본 객체 참조를 그대로 복원한다. (DB 병합은 visible/width/headerText 만 수정)
+            const OBJ_PROPS = ['renderer', 'editRenderer'];
+            const arr = columns || [];
+            // 먼저 원본에서 함수 값 / 객체 참조를 수집
+            const fnMaps = arr.map(function(col) {
+                const map = {};
+                FN_PROPS.forEach(function(p) {
+                    if (typeof col[p] === 'function') map[p] = col[p];
+                });
+                OBJ_PROPS.forEach(function(p) {
+                    if (col[p] != null) map[p] = col[p];
+                });
+                return map;
+            });
+            const cloned = JSON.parse(JSON.stringify(arr));
+            cloned.forEach(function(col, i) {
+                FN_PROPS.forEach(function(p) {
+                    if (fnMaps[i][p]) col[p] = fnMaps[i][p];
+                });
+                OBJ_PROPS.forEach(function(p) {
+                    if (fnMaps[i][p]) col[p] = fnMaps[i][p];
+                });
+            });
+            return cloned;
+        }
+
+        sanitizeHeaderText(value) {
+            if (value === null || value === undefined) return value;
+            return String(value).replace(/<[^>]*>/g, '').trim();
+        }
+
+        toBoolean(value) {
+            return value === true || value === 'true' || value === 'True'
+                || value === 'Y' || value === 1 || value === '1';
+        }
+
+        // ---- 컬럼 순서 변경 (단일 선택) ----
+
+        changeOrder(direction) {
+            let colGrid = this.columns_grid;
+            let fix_cols = this.fix_cols;
+            if (!colGrid) return;
+
+            // 편집 중이면 먼저 저장
+            if (colGrid._editManager && colGrid._editManager.isEditing()) {
+                colGrid._editManager.endEdit(true);
+            }
+
+            let selected = colGrid.getSelectedIndex();
+            let self_index = Array.isArray(selected) ? selected[0] : selected;
+            if (self_index === undefined || self_index === null || self_index < 0) {
+                Alert.alert('', '순서 변경할 컬럼을 선택하세요.');
+                return;
+            }
+
+            let data = colGrid.getData();
+
+            if (direction === 'U') {
+                let upper_index = self_index - 1;
+                if (upper_index < 0) {
+                    Alert.alert('', '첫번째 컬럼이 선택되었습니다.');
+                    return;
+                }
+                if (fix_cols > 0 && upper_index < fix_cols) {
+                    Alert.alert('', fix_cols + ' 까지 고정컬럼입니다.');
+                    return;
+                }
+                colGrid.updateRow(upper_index, data[self_index]);
+                colGrid.updateRow(self_index, data[upper_index]);
+                colGrid.setSelectionByIndex(upper_index);
+            } else {
+                let under_index = self_index + 1;
+                if (under_index >= data.length) {
+                    Alert.alert('', '마지막 컬럼이 선택되었습니다.');
+                    return;
+                }
+                if (fix_cols > 0 && under_index === fix_cols) {
+                    Alert.alert('', fix_cols + ' 까지 고정컬럼입니다.');
+                    return;
+                }
+                colGrid.updateRow(under_index, data[self_index]);
+                colGrid.updateRow(self_index, data[under_index]);
+                colGrid.setSelectionByIndex(under_index);
+            }
+        }
+
+        // ---- DB 데이터 조회 ----
+
+        // fn_done(db_cols) 로 결과를 준다. 실패해도 빈 배열로 이어 간다 —
+        // 저장된 컬럼 설정이 없으면 그리드 기본 정의를 쓰면 되기 때문이다.
+        getDbColumnsData(gui_name, template_name, grid_name, lang_code, fn_done) {
+            let url = '/api/system/grid_setting?action=load_columns';
+            let param = {
+                module_name: gui_name,
+                template_name: template_name,
+                grid_name: grid_name,
+                lang_code: lang_code,
+            };
+            AjaxUtil.getAsyncData(url, param, function (rows) {
+                fn_done(rows || []);
+            }, function () {
+                fn_done([]);
+            });
+        }
+
+        getGridColumnLayout(grid) {
+            if (!grid || typeof grid.setColumnLayout !== 'function') {
+                return [];
+            }
+
+            if (typeof grid.getColumnLayout === 'function') {
+                // 폭은 표시 폭이 아니라 정의 폭이다. GridUtil.fitWidth 가 늘린 폭을 기본값으로 저장하지 않는다.
+                return grid.getColumnLayout().filter(function(c) { return !c._extra; }).map(function (c) {
+                    const col = grid._columnManager.getColumn(c.dataField);
+                    return (col && typeof col._widthRaw === 'number') ? $.extend({}, c, { width: col._widthRaw }) : c;
+                });
+            }
+
+            return [];
+        }
+
+        // ---- DB 컬럼 로드 및 WeZonGrid 적용 ----
+
+        // 컬럼 설정을 받아 그리드에 적용한다. 적용은 setColumnLayout 부수효과이고,
+        // 반환값을 쓰는 호출부가 없어 fn_done 만 선택적으로 받는다.
+        loadColumnData(gui_name, template_name, grid_name, grid, fn_done) {
+            let _this = this;
+            let lang_code = i18n.getLanguageCode();
+            _this.getDbColumnsData(gui_name, template_name, grid_name, lang_code, function (db_cols) {
+                _this._applyColumnData(db_cols, gui_name, template_name, grid_name, grid, fn_done);
+            });
+        }
+
+        _applyColumnData(db_cols, gui_name, template_name, grid_name, grid, fn_done) {
+            let _this = this;
+
+            if (!grid || typeof grid.setColumnLayout !== 'function') {
+                this._last_db_cols = db_cols;
+                if (fn_done) fn_done([]);
+                return;
+            }
+
+            // 이 그리드의 설정 키 기억
+            grid._grid_setting_info = {
+                gui_name: gui_name,
+                template_name: template_name,
+                grid_name: grid_name,
+            };
+
+            // WeZonGrid에서 현재 컬럼 정의 가져오기 (extra 컬럼 제외, 최초 1회만)
+            // 기존 ax5ui grid는 페이지마다 전역변수로 직접 선언해서 소유. WeZonGrid는 여기서 선언 
+            if (!Array.isArray(grid._default_columns) || grid._default_columns.length === 0) {
+                let allCols = _this.getGridColumnLayout(grid);
+                grid._default_columns = _this.cloneColumns(allCols);
+            }
+
+            this._last_db_cols = db_cols;
+            let config_defs = _this.cloneColumns(grid._default_columns);
+            let returns = _this.cloneColumns(config_defs);
+
+            if (db_cols && db_cols.length > 0) {
+                let merged = [];
+
+                db_cols.forEach(function(db_item) {
+                    db_item = Object.assign({}, db_item);
+                    let matches = config_defs.filter(function(c) { return c.dataField === db_item.dataField; });
+                    if (matches.length > 0) {
+                        let base = _this.cloneColumns([matches[0]])[0];
+                        // DB 설정 적용
+                        base.visible = _this.toBoolean(db_item.visible);
+                        if (db_item.width !== null && db_item.width !== undefined && db_item.width !== '') {
+                            let w = parseInt(db_item.width, 10);
+                            if (!isNaN(w)) base.width = w;
+                        }
+                        // headerText: 사용자 설정 텍스트(text) 우선, 없으면 DB headerText
+                        if (db_item.text) {
+                            base.headerText = _this.sanitizeHeaderText(db_item.text);
+                        } else if (db_item.headerText) {
+                            base.headerText = _this.sanitizeHeaderText(db_item.headerText);
+                        } else {
+                            base.headerText = _this.sanitizeHeaderText(base.headerText);
+                        }
+                        merged.push(base);
+                    }
+                });
+
+                // config_defs에 있고 db_cols에 없는 컬럼 추가
+                config_defs.forEach(function(def) {
+                    let exists = merged.filter(function(c) { return c.dataField === def.dataField; });
+                    if (exists.length === 0) {
+                        merged.push(_this.cloneColumns([def])[0]);
+                    }
+                });
+
+                returns = merged;
+            }
+
+            grid.setColumnLayout(_this.cloneColumns(returns));
+            if (fn_done) fn_done(returns);
+        }
+
+        // ---- 팝업 열기 ----
+
+        show(gui_name, template_name, grid_name, src_columns, grid, option, callback) {
+            let _this = this;
+
+            // 이미 loadColumnData로 초기화된 그리드면 해당 키 사용
+            if (grid && grid._grid_setting_info) {
+                gui_name = grid._grid_setting_info.gui_name || gui_name;
+                template_name = grid._grid_setting_info.template_name || template_name;
+                grid_name = grid._grid_setting_info.grid_name || grid_name;
+            }
+
+            // 최신 DB 설정 재적용
+            if (grid) {
+                _this.loadColumnData(gui_name, template_name, grid_name, grid);
+            }
+
+            _this.src_grid = grid;
+            _this.callback = callback;
+
+            // src_columns: WeZonGrid _default_columns 우선
+            if (grid && Array.isArray(grid._default_columns) && grid._default_columns.length > 0) {
+                _this.src_columns = _this.cloneColumns(grid._default_columns);
+            } else {
+                _this.src_columns = _this.cloneColumns(src_columns || []);
+            }
+
+            let order_visible = 'visible';
+            if (option) {
+                if (option.order_fix === true) order_visible = 'hidden';
+                if (option.fix_cols) _this.fix_cols = option.fix_cols;
+            }
+
+            let data = {
+                'gui_name': gui_name,
+                'template_name': template_name,
+                'grid_name': grid_name,
+                'order_visible': order_visible,
+                'fix_cols': _this.fix_cols,
+            };
+
+            let content = tmpl('gridColumnsSettingTemplate', data);
+            let $content = $(content);
+            _this.modal.open({ width: 820, height: 730, $content: $content });
+
+            let lang_code = i18n.getLanguageCode();
+            AjaxUtil.fillSelectOptions($content.find('#cboLangCode'), 'system_code', 'choose', lang_code, 'lang_code');
+
+            // 팝업 내부 그리드 데이터 구성 (DB 순서 우선, 나머지 src 순서)
+            let db_cols = _this._last_db_cols || [];
+            let db_map = {};
+            db_cols.forEach(function(c) { db_map[c.dataField] = c; });
+
+            let src_defs = _this.src_columns;
+            let src_map = {};
+            src_defs.forEach(function(c) { src_map[c.dataField] = c; });
+
+            let popup_rows = [];
+            if (db_cols.length > 0) {
+                db_cols.forEach(function(db_item) {
+                    let src = src_map[db_item.dataField];
+                    if (!src) return;
+                    popup_rows.push({
+                        dataField: db_item.dataField,
+                        src_header_text: _this.sanitizeHeaderText(src.headerText),
+                        visible: _this.toBoolean(db_item.visible),
+                        width: db_item.width || src.width,
+                        text: db_item.text || '',
+                    });
+                });
+                // DB에 없고 src에 있는 컬럼 추가
+                src_defs.forEach(function(src) {
+                    if (!popup_rows.find(function(r) { return r.dataField === src.dataField; })) {
+                        popup_rows.push({
+                            dataField: src.dataField,
+                            src_header_text: _this.sanitizeHeaderText(src.headerText),
+                            visible: src.visible !== false,
+                            width: src.width,
+                            text: '',
+                        });
+                    }
+                });
+            } else {
+                src_defs.forEach(function(src) {
+                    popup_rows.push({
+                        dataField: src.dataField,
+                        src_header_text: _this.sanitizeHeaderText(src.headerText),
+                        visible: src.visible !== false,
+                        width: src.width,
+                        text: '',
+                    });
+                });
+            }
+
+            // ---- WeZonGrid 내부 그리드 생성 ----
+            let containerEl = $content.find('#columns_grid_container')[0];
+            _this.columns_grid = WeZonGrid.create(containerEl, {
+                columnLayout: [
+                    { dataField: 'dataField',      headerText: '데이터필드', width: 150, align: 'left',   editable: false },
+                    { dataField: 'src_header_text', headerText: '헤더텍스트', width: 150, align: 'left',   editable: false },
+                    { dataField: 'visible',         headerText: '표시',       width: 60,  align: 'center', editable: true,
+                      dataType: 'boolean', renderer: { type: 'switch' } },
+                    { dataField: 'width',           headerText: '너비',       width: 80,  align: 'right',  editable: true,
+                      headerStyle: 'editable-header', editRenderer: { type: 'number' } },
+                    { dataField: 'text',            headerText: '설정텍스트', width: 140, align: 'left',   editable: true },
+                ],
+                props: {
+                    height: 420,
+                    editable: true,
+                    selectionMode: 'singleRow',
+                    showRowNumColumn: true,
+                    editOnClick: true,
+                },
+            });
+
+            _this.columns_grid.setData(popup_rows);
+
+            // ---- 버튼 핸들러 ----
+
+            $content.find('#btnColUp').on('click', function() { _this.changeOrder('U'); });
+            $content.find('#btnColDown').on('click', function() { _this.changeOrder('D'); });
+
+            $content.find('#cboLangCode').on('change', function() {
+                let lc = $content.find('#cboLangCode').val();
+                _this.getDbColumnsData(gui_name, template_name, grid_name, lc,
+                        function (fresh_db) {
+                    let db_m = {};
+                    fresh_db.forEach(function(c) { db_m[c.dataField] = c; });
+
+                    let rows = _this.columns_grid.getData();
+                    rows.forEach(function(item) {
+                        let db_c = db_m[item.dataField];
+                        item.text = db_c ? (db_c.text || '') : '';
+                    });
+                    _this.columns_grid.setData(rows);
+                });
+            });
+
+            $content.find('#btnSettingSave').on('click', function() {
+                // 편집 중이면 먼저 커밋
+                if (_this.columns_grid._editManager && _this.columns_grid._editManager.isEditing()) {
+                    _this.columns_grid._editManager.endEdit(true);
+                }
+
+                let returns = _this.columns_grid.getData();
+
+                let ok = returns.every(function(item) {
+                    return item.width !== '' && item.width != null;
+                });
+                if (!ok) {
+                    Alert.alert('', '너비를 입력해야 합니다.');
+                    return;
+                }
+
+                let gn  = $content.find('#gui_name').val();
+                let tn  = $content.find('#template_name').val();
+                let grn = $content.find('#grid_name').val();
+                let lc  = $content.find('#cboLangCode').val();
+
+                let param = {
+                    module_name: gn,
+                    template_name: tn,
+                    grid_name: grn,
+                    Q: JSON.stringify(returns),
+                    lang_code: lc,
+                };
+
+                // 동기 Ajax 는 쓰지 않는다(AGENTS.md [5]). 실패는 AjaxUtil 기본 처리가 알린다.
+                AjaxUtil.postAsyncData('/api/system/grid_setting?action=save_columns', param, function () {
+                    // 원본 _default_columns 기반으로 WeZonGrid 레이아웃 구성
+                    let orig_defs = _this.cloneColumns((_this.src_grid && _this.src_grid._default_columns) || []);
+                    let orig_map = {};
+                    orig_defs.forEach(function(d) { orig_map[d.dataField] = d; });
+
+                    let merged_layout = [];
+                    returns.forEach(function(item) {
+                        let base = Object.assign({}, orig_map[item.dataField] || {});
+                        if (!base.dataField) return;
+                        base.visible = _this.toBoolean(item.visible);
+                        let w = parseInt(item.width, 10);
+                        if (!isNaN(w)) base.width = w;
+                        if (item.text && item.text.trim() !== '') base.headerText = _this.sanitizeHeaderText(item.text);
+                        else base.headerText = _this.sanitizeHeaderText(base.headerText);
+                        merged_layout.push(base);
+                    });
+                    // orig_defs에 있고 returns에 없는 컬럼 추가
+                    orig_defs.forEach(function(d) {
+                        if (!merged_layout.find(function(c) { return c.dataField === d.dataField; })) {
+                            merged_layout.push(Object.assign({}, d));
+                        }
+                    });
+
+                    if (_this.src_grid) {
+                        _this.src_grid.setColumnLayout(merged_layout);
+                    }
+
+                    if (_this.callback) _this.callback(merged_layout);
+                    _this.modal.close();
+                });
+            });
+
+            $content.find('#btnSettingClose, #btnSettingClose2').on('click', function() {
+                _this.modal.close();
+            });
+
+            $content.find('#btnRefresh').on('click', function() {
+                let lc = $content.find('#cboLangCode').val() || lang_code;
+                _this.getDbColumnsData(gui_name, template_name, grid_name, lc,
+                        function (fresh_db) {
+                    let db_m = {};
+                    fresh_db.forEach(function(c) { db_m[c.dataField] = c; });
+
+                    let rows = _this.columns_grid.getData();
+                    rows.forEach(function(item) {
+                        let db_c = db_m[item.dataField];
+                        if (db_c) {
+                            item.text = db_c.text || '';
+                            let w = parseInt(db_c.width, 10);
+                            if (!isNaN(w)) item.width = w;
+                        }
+                    });
+                    _this.columns_grid.setData(rows);
+                });
+            });
+
+            $content.find('#btnSettingDelete').on('click', function() {
+                let gn  = $content.find('#gui_name').val();
+                let tn  = $content.find('#template_name').val();
+                let grn = $content.find('#grid_name').val();
+
+                let param = { module_name: gn, template_name: tn, grid_name: grn };
+                AjaxUtil.postAsyncData('/api/system/grid_setting?action=delete', param, function (result) {
+                    if (!result || !result.success) return;
+                    let reset_layout = _this.cloneColumns(_this.src_grid._default_columns || _this.src_columns || []);
+                    // 초기화 시 모든 컬럼 visible
+                    reset_layout.forEach(function(c) { c.visible = true; });
+
+                    if (_this.src_grid) {
+                        _this.src_grid.setColumnLayout(reset_layout);
+                    }
+                    if (_this.callback) _this.callback(reset_layout);
+                    _this.modal.close();
+                });
+            });
+        }
+    }
+</script>

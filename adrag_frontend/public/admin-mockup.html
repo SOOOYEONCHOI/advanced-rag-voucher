@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Page Mockup – Advanced RAG Framework</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Apple SD Gothic Neo', sans-serif; background: #f1f5f9; }
+
+    .admin-layout { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: 240px; background: #1e293b; color: #e2e8f0;
+      display: flex; flex-direction: column; padding: 1.25rem 1rem; flex-shrink: 0;
+    }
+    .logo-area { display: flex; align-items: center; margin-bottom: 2rem; padding: 0 0.5rem; }
+    .logo-area h3 { font-weight: 600; font-size: 1rem; }
+    .logo-icon {
+      width: 30px; height: 30px; background: linear-gradient(135deg, #f59e0b, #ef4444);
+      border-radius: 8px; margin-right: 10px; flex-shrink: 0;
+    }
+    .nav-section-title {
+      font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 0 0.5rem; margin-bottom: 0.5rem;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 0.65rem 0.75rem;
+      border-radius: 8px; cursor: pointer; color: #94a3b8; font-size: 0.875rem;
+      margin-bottom: 2px;
+    }
+    .nav-item.active { background: #334155; color: white; }
+    .nav-item.disabled { opacity: 0.45; cursor: not-allowed; }
+    .badge-soon {
+      margin-left: auto; font-size: 0.65rem; background: #334155; color: #64748b;
+      padding: 2px 6px; border-radius: 10px;
+    }
+    .sidebar-footer { margin-top: auto; border-top: 1px solid #334155; padding-top: 1rem; }
+    .back-link {
+      display: flex; align-items: center; gap: 8px; padding: 0.6rem 0.5rem;
+      color: #94a3b8; text-decoration: none; font-size: 0.85rem; border-radius: 6px;
+    }
+    .back-link:hover { color: white; background: #334155; }
+
+    /* ── Main ────────────────────────────────────────────────── */
+    .admin-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .admin-header {
+      background: white; border-bottom: 1px solid #e2e8f0;
+      padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .admin-header h1 { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: 0.2rem; }
+    .admin-header p { font-size: 0.85rem; color: #64748b; }
+    .collections-badge {
+      display: flex; align-items: center; gap: 6px; background: #eff6ff;
+      color: #2563eb; padding: 0.4rem 0.85rem; border-radius: 20px; font-size: 0.82rem; font-weight: 500;
+    }
+    .admin-content {
+      flex: 1; overflow-y: auto; padding: 1.5rem 2rem;
+      display: flex; flex-direction: column; gap: 1.25rem;
+    }
+
+    /* ── Cards ───────────────────────────────────────────────── */
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; }
+    .card-title {
+      font-size: 0.95rem; font-weight: 600; color: #1e293b;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem;
+    }
+
+    /* ── Drop Zone ───────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed #cbd5e1; border-radius: 10px; padding: 2rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; background: #f8fafc; margin-bottom: 1.25rem; min-height: 120px;
+    }
+    .drop-placeholder { text-align: center; color: #94a3b8; }
+    .drop-icon { font-size: 2rem; margin-bottom: 0.5rem; color: #cbd5e1; }
+    .drop-placeholder p { font-size: 0.9rem; margin-bottom: 0.25rem; color: #64748b; }
+    .drop-placeholder span { font-size: 0.78rem; }
+
+    /* ── Form ────────────────────────────────────────────────── */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.82rem; font-weight: 500; color: #374151; }
+    .label-hint { font-weight: 400; color: #9ca3af; }
+    .form-group input, .form-group select {
+      border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.75rem;
+      font-size: 0.88rem; color: #374151; outline: none;
+    }
+    .btn-upload {
+      background: #2563eb; color: white; border: none; border-radius: 8px;
+      padding: 0.8rem 1.5rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Progress Steps ──────────────────────────────────────── */
+    .progress-section { border-top: 1px solid #f1f5f9; padding-top: 1.25rem; margin-top: 0.75rem; }
+    .step-list { display: flex; gap: 0; }
+    .step-item {
+      display: flex; align-items: center; gap: 8px; flex: 1;
+      font-size: 0.82rem; color: #9ca3af; position: relative;
+    }
+    .step-item:not(:last-child)::after {
+      content: ''; position: absolute; left: 120px; top: 50%;
+      width: calc(100% - 130px); height: 1px; background: #e5e7eb;
+    }
+    .step-icon {
+      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 0.75rem; flex-shrink: 0;
+      background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; z-index: 1;
+    }
+    .step-item.done .step-icon { background: #f0fdf4; color: #22c55e; border-color: #22c55e; }
+    .step-item.active .step-icon { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+    .step-item.done .step-label { color: #16a34a; }
+    .step-item.active .step-label { color: #2563eb; font-weight: 500; }
+
+    /* ── Result Card ─────────────────────────────────────────── */
+    .result-card { border-color: #bbf7d0; }
+    .result-title { color: #16a34a; }
+    .result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .result-item.full-width { grid-column: 1 / -1; }
+    .result-label { font-size: 0.78rem; color: #64748b; margin-bottom: 4px; }
+    .result-value { font-size: 0.95rem; font-weight: 500; color: #1e293b; }
+    .result-value.highlight { color: #2563eb; font-size: 1.1rem; font-weight: 700; }
+    .result-value.mono { font-family: monospace; font-size: 0.78rem; color: #64748b; }
+
+    /* ── Table Card ──────────────────────────────────────────── */
+    .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .table-filters { display: flex; align-items: center; gap: 0.5rem; }
+    .table-filters select { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.35rem 0.6rem; font-size: 0.82rem; color: #374151; }
+    .btn-refresh {
+      background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b;
+      width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+    }
+    .doc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .doc-table th {
+      background: #f8fafc; padding: 0.6rem 0.75rem; text-align: left;
+      font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; white-space: nowrap;
+    }
+    .doc-table td { padding: 0.7rem 0.75rem; border-bottom: 1px solid #f1f5f9; color: #374151; vertical-align: middle; }
+    .doc-table tr:last-child td { border-bottom: none; }
+    .td-filename { display: flex; align-items: center; gap: 6px; }
+    .td-chunks { font-weight: 600; color: #2563eb; }
+    .td-time { font-size: 0.78rem; color: #94a3b8; white-space: nowrap; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: #475569; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 500; }
+    .badge.law     { background: #fef3c7; color: #92400e; }
+    .badge.manual  { background: #ede9fe; color: #5b21b6; }
+    .badge.general { background: #f0f9ff; color: #075985; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo-icon"></div>
+      <h3>Safety AI</h3>
+    </div>
+    <div class="nav-section-title">관리</div>
+    <div class="nav-item active">
+      <i class="fa-solid fa-file-arrow-up"></i> 문서 관리
+    </div>
+    <div class="nav-item disabled">
+      <i class="fa-solid fa-magnifying-glass"></i> 검색 테스트
+      <span class="badge-soon">준비중</span>
+    </div>
+    <div class="nav-item disabled">
+      <i class="fa-solid fa-chart-bar"></i> 통계
+      <span class="badge-soon">준비중</span>
+    </div>
+    <div class="nav-item disabled">
+      <i class="fa-solid fa-gear"></i> 시스템 설정
+      <span class="badge-soon">준비중</span>
+    </div>
+    <div class="sidebar-footer">
+      <a href="/" class="back-link">
+        <i class="fa-solid fa-arrow-left"></i> 챗봇으로 돌아가기
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="admin-main">
+    <header class="admin-header">
+      <div>
+        <h1>문서 관리</h1>
+        <p>문서를 업로드하면 파싱 → 청킹 → 임베딩 → Qdrant 저장까지 자동으로 처리됩니다.</p>
+      </div>
+      <div class="collections-badge">
+        <i class="fa-solid fa-database"></i> 컬렉션 2개
+      </div>
+    </header>
+
+    <div class="admin-content">
+
+      <!-- ── Upload Card ── -->
+      <div class="card upload-card">
+        <div class="card-title">
+          <i class="fa-solid fa-cloud-arrow-up"></i> 문서 업로드
+        </div>
+
+        <!-- Drop Zone (파일 선택됨 상태) -->
+        <div class="drop-zone" style="border-color:#22c55e; background:#f0fdf4; border-style:solid;">
+          <div style="display:flex; align-items:center; gap:1rem; width:100%;">
+            <i class="fa-solid fa-file-check" style="font-size:2rem; color:#22c55e; flex-shrink:0;"></i>
+            <div style="flex:1;">
+              <div style="font-weight:500; color:#1e293b; font-size:0.9rem;">중대재해 처벌 등에 관한 법률.docx</div>
+              <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">1.2 MB</div>
+            </div>
+            <button style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:1.1rem; padding:4px;">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>컬렉션 이름</label>
+            <input type="text" value="legal_documents" />
+          </div>
+          <div class="form-group">
+            <label>파서 선택</label>
+            <select>
+              <option selected>Docling API (PDF·DOCX·PPTX·이미지)</option>
+              <option>pdfplumber (PDF 전용, 빠름)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>청크 크기 <span class="label-hint">(비우면 자동)</span></label>
+            <input type="number" placeholder="기본: 법령 800 / 매뉴얼 1200" />
+          </div>
+        </div>
+
+        <button class="btn-upload">
+          <i class="fa-solid fa-rocket"></i> 업로드 및 처리 시작
+        </button>
+
+        <!-- Progress Steps (완료 상태) -->
+        <div class="progress-section">
+          <div class="step-list">
+            <div class="step-item done">
+              <div class="step-icon"><i class="fa-solid fa-check"></i></div>
+              <div class="step-label">파싱 + 청킹</div>
+            </div>
+            <div class="step-item done">
+              <div class="step-icon"><i class="fa-solid fa-check"></i></div>
+              <div class="step-label">임베딩 생성</div>
+            </div>
+            <div class="step-item active">
+              <div class="step-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+              <div class="step-label">Qdrant 저장</div>
+            </div>
+            <div class="step-item">
+              <div class="step-icon"><i class="fa-regular fa-circle"></i></div>
+              <div class="step-label">완료</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Result Card ── -->
+      <div class="card result-card">
+        <div class="card-title result-title">
+          <i class="fa-solid fa-circle-check" style="color:#22c55e"></i>
+          처리 완료
+        </div>
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-label">문서 유형</div>
+            <div class="result-value"><span class="badge law">법령</span></div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">총 페이지</div>
+            <div class="result-value">24p</div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">생성된 청크</div>
+            <div class="result-value highlight">87개</div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">저장된 컬렉션</div>
+            <div class="result-value">legal_documents</div>
+          </div>
+          <div class="result-item full-width">
+            <div class="result-label">Document ID</div>
+            <div class="result-value mono">f47ac10b-58cc-4372-a567-0e02b2c3d479</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Documents Table ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title" style="margin-bottom:0;">
+            <i class="fa-solid fa-list"></i> 업로드된 문서
+          </div>
+          <div class="table-filters">
+            <select>
+              <option>전체 컬렉션</option>
+              <option>legal_documents</option>
+              <option>safety_manuals</option>
+            </select>
+            <button class="btn-refresh"><i class="fa-solid fa-rotate-right"></i></button>
+          </div>
+        </div>
+
+        <table class="doc-table" style="margin-top:1rem;">
+          <thead>
+            <tr>
+              <th>파일명</th>
+              <th>문서 유형</th>
+              <th>페이지</th>
+              <th>청크 수</th>
+              <th>컬렉션</th>
+              <th>파서</th>
+              <th>업로드 시각</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-filename"><i class="fa-regular fa-file-lines"></i> 중대재해 처벌 등에 관한 법률.docx</td>
+              <td><span class="badge law">법령</span></td>
+              <td>24</td>
+              <td class="td-chunks">87</td>
+              <td><code>legal_documents</code></td>
+              <td>docling</td>
+              <td class="td-time">2026-03-18 14:32:01</td>
+            </tr>
+            <tr>
+              <td class="td-filename"><i class="fa-regular fa-file-lines"></i> 2023 새로운 위험성평가 안내서.docx</td>
+              <td><span class="badge manual">매뉴얼</span></td>
+              <td>58</td>
+              <td class="td-chunks">124</td>
+              <td><code>safety_manuals</code></td>
+              <td>docling</td>
+              <td class="td-time">2026-03-18 13:10:45</td>
+            </tr>
+            <tr>
+              <td class="td-filename"><i class="fa-regular fa-file-lines"></i> 산업안전보건법 시행규칙.pdf</td>
+              <td><span class="badge law">법령</span></td>
+              <td>312</td>
+              <td class="td-chunks">441</td>
+              <td><code>legal_documents</code></td>
+              <td>pdfplumber</td>
+              <td class="td-time">2026-03-17 09:55:20</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

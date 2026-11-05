@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bubble" x1="0" y1="8" x2="0" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2B4A78"/>
+      <stop offset="1" stop-color="#14274A"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#bubble)">
+    <rect x="6" y="8" width="52" height="40" rx="12"/>
+    <path d="M15 44 V55.6 Q15 58.4 17.3 56.7 L30 47 Z"/>
+  </g>
+  <circle cx="21" cy="28" r="4.2" fill="#FFFFFF"/>
+  <circle cx="32" cy="28" r="4.2" fill="#FFFFFF"/>
+  <circle cx="43" cy="28" r="4.2" fill="#FBBC1E"/>
+</svg>

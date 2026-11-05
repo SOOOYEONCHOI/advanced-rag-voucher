@@ -1,0 +1,453 @@
+/* =========================
+   EQP → DST 레이아웃/테이블 오버라이드 (전체 교체본)
+   - 패딩 이중 적용 제거 (.eqp.eqp--dst는 0, .eqp-grid가 외곽 패딩 담당)
+   - 12그리드 + DST 테이블 룩 고정
+   - 모든 규칙은 .del-body .eqp 네임스페이스로 한정
+   ========================= */
+/* 전체 스크롤 크기 */
+/* 전체 스크롤 크기 */
+::-webkit-scrollbar {
+  width: 10px;   /* 세로 스크롤 */
+  height: 10px;  /* 가로 스크롤 */
+   border-radius: 6px; 
+}
+/* 스크롤 막대 */
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .4);
+    border-radius: 6px; 
+}
+/* 스크롤 배경 */
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255, .2);
+}
+/* 컨테이너: 배경/폰트 상속 + 패딩 제거 */
+.del-body .eqp {
+    background: transparent !important;
+    color: inherit !important;
+}
+.del-body .eqp.eqp--dst {
+    padding: 0 !important;
+    /* 이중 패딩 제거 */
+}
+
+/* 섹션 주변 간격은 grid gap만 사용 */
+.del-body .eqp .del-section {
+    padding: 16px;
+    margin: 0 !important;
+}
+
+/* 헤더 */
+.del-body .eqp .eqp-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.del-body .eqp .del-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+}
+.del-body .eqp .eqp-card-meta {
+    margin-left: auto;
+    font-size: 12px;
+    opacity: 0.85;
+}
+.del-body .eqp .eqp-card-tools {
+    margin-left: 8px;
+    display: flex;
+    gap: 6px;
+}
+
+/* 탭/버튼 */
+.del-body .eqp .eqp-ghost-btn,
+.del-body .eqp .eqp-tab {
+    border: 1px solid #444c5f;
+    color: #5c6373;
+    font-size: 12px;
+    background-color: #293042;
+}
+.del-body .eqp .eqp-ghost-btn {
+    border-radius: 4px;
+    padding: 3px 5px;
+}
+.del-body .eqp .eqp-tab {
+    border-radius: 999px;
+    padding: 4px 20px;
+}
+.del-body .eqp .eqp-tab.is-active {
+    background: rgba(63,128,234,0.12);
+    border-color: #3f80ea;
+    color: #cdd9ff;
+}
+
+/* ===== 12-그리드 ===== */
+.del-body .eqp .eqp-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 20px;
+}
+.del-body .eqp .eqp-span-4 {
+    grid-column: span 4;
+}
+.del-body .eqp .eqp-span-6 {
+    grid-column: span 6;
+}
+.del-body .eqp .eqp-span-12 {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 1400px) {
+    .del-body .eqp .eqp-span-4 {
+        grid-column: span 6;
+    }
+    .del-body .eqp .eqp-span-6 {
+        grid-column: span 12;
+    }
+}
+@media (max-width: 992px) {
+    .del-body .eqp .eqp-grid {
+        padding: 12px;
+    }
+    /* 외곽 패딩 축소 */
+    .del-body .eqp .eqp-span-4,
+    .del-body .eqp .eqp-span-6 {
+        grid-column: span 12;
+    }
+}
+
+/* KPI 카드 */
+.del-body .eqp .eqp-kpi {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 10px;
+}
+.del-body .eqp .eqp-kpi-item {
+    background: #202739;
+    border: 1px solid #1b1e27;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.del-body .eqp .eqp-kpi-label {
+    color: #cfd6e4;
+    font-size: 12px;
+}
+.del-body .eqp .eqp-kpi-value {
+    color: #f4f7f9;
+    font-size: 18px;
+    font-weight: 700;
+}
+.del-body .eqp .eqp-kpi-unit {
+    color: #cbd1df;
+    font-size: 12px;
+}
+
+/* 차트 placeholder */
+.del-body .eqp .eqp-chart {
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.del-body .eqp .eqp-chart-placeholder {
+    color: #9aa3b2;
+    font-size: 12px;
+}
+
+/* 리스트 (PM 일정) */
+.del-body .eqp .eqp-list {
+    border: 1px solid #495057;
+    border-radius: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+.del-body .eqp .eqp-list-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #495057;
+}
+.del-body .eqp .eqp-list-item:last-child {
+    border-bottom: 0;
+}
+.del-body .eqp .eqp-list-date {
+    color: #3f80ea;
+    font-weight: 700;
+    min-width: 42px;
+}
+.del-body .eqp .eqp-list-text {
+    color: #f4f7f9;
+}
+
+/* 배지 */
+.del-body .eqp .eqp-badge {
+    display: inline-block;
+    padding: 2px 20px;
+    border-radius: 999px;
+    background: #1f2937;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    font-size: 12px;
+    line-height: 1.6;
+}
+.del-body .eqp .eqp-badge--done {
+    background: rgba(16,185,129,0.12);
+    color: #34d399;
+    border-color: rgba(16,185,129,0.35);
+}
+.del-body .eqp .eqp-badge--progress {
+    background: rgba(245,158,11,0.12);
+    color: #fbbf24;
+    border-color: rgba(245,158,11,0.35);
+}
+
+/* ===== DST 테이블 룩 고정 ===== */
+.del-body .eqp .eqp-table-wrap {
+    overflow: auto;
+    border-radius: 10px;
+    padding: 0 !important;
+    max-height: 200px;
+    /* 내부 패딩 제거 */
+}
+.del-body .eqp .del-table {
+    width: 100%;
+    table-layout: fixed;
+    /* 컬럼 폭 안정화 */
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.del-body .eqp .del-td,
+.del-body .eqp .del-th {
+    vertical-align: middle;
+}
+.del-body .eqp .del-th {
+    font-weight: 600;
+    opacity: 0.95;
+}
+.del-body .eqp .del-table tr:last-child .del-td {
+    border-bottom: 0;
+}
+
+
+
+/* 컬럼 폭 & 정렬: 날짜/상태 고정폭, 내용 가변 */
+.del-body .eqp .del-table tbody td:nth-child(1),
+.del-body .eqp .del-table thead th:nth-child(1) {
+    width: 120px;
+}
+.del-body .eqp .del-table tbody td:nth-child(3),
+.del-body .eqp .del-table thead th:nth-child(3) {
+    width: 120px;
+    text-align: center;
+}
+
+/* 숫자 우측 정렬 유틸 */
+.del-body .eqp .del-table .is-right,
+.del-body .eqp .del-td.is-right {
+    text-align: right;
+}
+
+.del-body .eqp .eqp-table-wrap .del-td {
+    padding: 5px !important;
+}
+
+/* === 설비 점검 현황 전용 폭 조정 === */
+/* 수리내용(2열) 넓게, 요청일자(1열) 좁게 — 스페어파트 등 타 테이블 영향 없음 */
+.del-body .eqp .del-table.eqp-table--inspect {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* 1열: 요청일자 더 좁게 */
+.del-body .eqp .del-table.eqp-table--inspect tbody td:nth-child(1),
+.del-body .eqp .del-table.eqp-table--inspect thead th:nth-child(1) {
+    width: 96px;
+    /* 필요 시 90~110px 사이로 튜닝 */
+}
+
+/* 2열: 수리내용 자동 확장(남는 폭 전부) */
+.del-body .eqp .del-table.eqp-table--inspect tbody td:nth-child(2),
+.del-body .eqp .del-table.eqp-table--inspect thead th:nth-child(2) {
+    width: auto;
+    /* 한 줄만 보이고 말줄임(...) 원하면 아래 주석 해제
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  */
+}
+
+/* 3열: 상태 고정폭 + 중앙정렬(스페어파트와 분리) */
+.del-body .eqp .del-table.eqp-table--inspect tbody td:nth-child(3),
+.del-body .eqp .del-table.eqp-table--inspect thead th:nth-child(3) {
+    width: 110px;
+    text-align: center;
+}
+/* === 스페어파트 === */
+.del-body .eqp .del-table.eqp-table--spare {
+    table-layout: fixed;
+    width: 100%;
+    /* 기본값(필요시 아래 변수 값만 수정) */
+    --spare-id-col: 120px;
+    /* 1열: 품목번호 */
+    --spare-qty-col: 60px;
+    /* 3열: 수량 */
+    --spare-amt-col: 110px;
+    /* 4열: 금액 */
+}
+
+/* 1열: 품목번호 */
+.del-body .eqp .del-table.eqp-table--spare tbody td:nth-child(1),
+.del-body .eqp .del-table.eqp-table--spare thead th:nth-child(1) {
+    width: var(--spare-id-col);
+}
+
+/* 2열: 품목명(남는 폭 자동 흡수) */
+.del-body .eqp .del-table.eqp-table--spare tbody td:nth-child(2),
+.del-body .eqp .del-table.eqp-table--spare thead th:nth-child(2) {
+    width: auto;
+    white-space: nowrap;
+    /* 한 줄 유지 (말줄임) */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 3열: 수량 */
+.del-body .eqp .del-table.eqp-table--spare tbody td:nth-child(3),
+.del-body .eqp .del-table.eqp-table--spare thead th:nth-child(3) {
+    width: var(--spare-qty-col);
+    text-align: right;
+}
+
+/* 4열: 금액 */
+.del-body .eqp .del-table.eqp-table--spare tbody td:nth-child(4),
+.del-body .eqp .del-table.eqp-table--spare thead th:nth-child(4) {
+    width: var(--spare-amt-col);
+    text-align: right;
+}
+/* 수리내용/품목명만 왼쪽 정렬 */
+.del-body .eqp .del-table.eqp-table--inspect tbody td:nth-child(2),
+.del-body .eqp .del-table.eqp-table--spare tbody td:nth-child(2) {
+    text-align: left;
+}
+/* ========================
+   WO 리디자인 (섹션 한정)
+   ======================== */
+
+/* 공통 도트/칩 */
+.del-body .eqp .wo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+.del-body .eqp .wo-dot--done {
+    background: #24db64;
+}
+/* 완료 메인 */
+.del-body .eqp .wo-dot--open {
+    background: #4bbf734d;
+}
+/* 진행중 투명톤 */
+.del-body .eqp .wo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #cfd6e4;
+}
+
+/* === A. 금주의 WO 현황 카드 === */
+.del-body .eqp .wo-card {
+    border: 1px solid #495057;
+    border-radius: 12px;
+    padding: 14px;
+    display: grid;
+    gap: 18px;
+}
+.del-body .eqp .wo-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.del-body .eqp .wo-card__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e9edf7;
+    letter-spacing: -0.2px;
+}
+.del-body .eqp .wo-card__meta {
+    font-size: 12px;
+    color: #9aa3b2;
+}
+
+/* KPI(폰트 대비/여백 강화) */
+.del-body .eqp .wo-kpi {
+    gap: 20px;
+}
+.del-body .eqp .wo-kpi .eqp-kpi-item {
+    padding: 12px;
+}
+.del-body .eqp .wo-kpi .eqp-kpi-label {
+    font-size: 14px;
+    color: #cfd6e4;
+    margin-bottom: 20px;
+}
+.del-body .eqp .wo-kpi .eqp-kpi-value {
+    font-size: 30px;
+    color: #f4f7f9;
+}
+.del-body .eqp .wo-kpi .eqp-kpi-unit {
+    font-size: 12px;
+    color: #cbd1df;
+}
+
+/* 진행 바(완료/진행중) – 변수로 길이 제어 */
+.del-body .eqp .wo-bar {
+    --wo-done: 0;
+    --wo-open: calc(100% - var(--wo-done));
+    height: 8px;
+    width: 100%;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255,255,255,.06);
+    position: relative;
+}
+.del-body .eqp .wo-bar__seg {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+}
+.del-body .eqp .wo-bar__seg--done {
+    left: 0;
+    width: var(--wo-done);
+    background: #24db64;
+}
+.del-body .eqp .wo-bar__seg--open {
+    right: 0;
+    width: var(--wo-open);
+    background: #4bbf734d;
+}
+.del-body .eqp .wo-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+/* 섹션 헤더 대비감(해당 섹션만 키움) */
+.del-body .eqp .del-section .del-section-title {
+    letter-spacing: -0.2px;
+}
+.del-body .eqp section.eqp-span-4 .del-section-title {
+    font-size: 17px;
+}
+/* 카드형 섹션 타이틀 살짝 업 */
+
+.eqp-card-tools .material-icons {
+    font-size: 20px;
+    /* 버튼 안에서 적절한 크기 */
+    vertical-align: middle;
+}

@@ -1,0 +1,450 @@
+* {
+    box-sizing: border-box;
+}
+/* 전체 스크롤 크기 */
+::-webkit-scrollbar {
+  width: 10px;   /* 세로 스크롤 */
+  height: 10px;  /* 가로 스크롤 */
+   border-radius: 6px; 
+}
+/* 스크롤 막대 */
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .4);
+    border-radius: 6px; 
+}
+/* 스크롤 배경 */
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255, .2);
+}
+.dst-root .dst-container {
+    display: flex;
+    gap: 20px;
+    padding-bottom: 20px;
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.dst-root .dst-circle-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 45px;
+    justify-content: center;
+}
+
+.dst-circle-group.dst-circle-center {
+    gap: 90px;
+}
+
+.dst-root .dst-circle-box {
+    padding: 10x;
+    text-align: center;
+    width: 150px;
+}
+
+.dst-root .dst-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    border: 18px solid #3f80ea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin: 0 auto 15px;
+}
+
+.dst-root .dst-label {
+    font-size: 16px;
+    color: #aaa;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    flex-direction: column;
+}
+
+.dst-root .dst-label-sm {
+    font-size: 18px;
+    color: #ffffff;
+    margin-top: 5px;
+}
+
+.dst-root .flex-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+}
+
+.dst-root .del-card-section {
+    background-color: #293042;
+    padding: 20px;
+    flex: 1;
+    min-width: 300px;
+    border-radius: 10px;
+}
+
+.dst-root .del-section-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: -20px;
+}
+
+.dst-root .timestamp {
+    font-size: 12px;
+    color: #bbb;
+}
+
+.dst-root .dst-card-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.dst-root .value-with-unit {
+    display: flex;
+    font-size: 18px;
+    color: #f4f7f9;
+    align-items: center;
+}
+
+    .dst-root .value-with-unit .unit {
+        font-size: 16px;
+        color: #ccc;
+        margin-left: 4px;
+    }
+
+.dst-root .dst-status-card {
+    background-color: #343a4b;
+    padding: 20px 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 25px;
+    border-radius: 5px;
+    align-items: center;
+}
+
+.dst-root .dst-status {
+    background-color: #4bbf734d;
+    color: #24db64;
+    padding: 6px 16px;
+    font-size: 12px;
+    border-radius: 26px;
+}
+
+    .dst-root .dst-status.dst-status-ng {
+        background: #9a474b7a;
+        color: #f51511;
+    }
+
+.dst-root .card-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+}
+
+.dst-root .top-info {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+}
+
+.dst-root .dst-text-title {
+    font-size: 18px;
+    color: #d9dde9;
+}
+
+.dst-root .temp-value-txt {
+    font-size: 16px;
+    font-weight: 300;
+    color: #d9dde9;
+    margin: 0 10px 0 10px;
+}
+
+.dst-root .temp-value {
+    font-size: 40px;
+    color: #f4f7f9;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-direction: row;
+}
+
+.dst-root .unit {
+    font-size: 13px;
+    color: #ccc;
+    margin-left: 3px;
+}
+
+.dst-root .table-title {
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: #f4f7f9;
+    text-align: right;
+}
+
+.dst-root .dashboard-wrapper {
+    background-color: #293042;
+    padding: 20px;
+    max-width: 100%;
+}
+
+.dst-root .title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 24px;
+    color: #ffffff;
+    text-align: left;
+}
+
+.dst-root .dashboard {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 20px;
+}
+
+.dst-root .drum-container {
+    position: relative;
+    text-align: center;
+}
+
+    .dst-root .drum-container img.drum {
+        width: 100%;
+        max-width: 120px;
+        height: auto;
+    }
+
+span.drum-unit {
+    font-size: 16px;
+    color: #fff;
+}
+
+.dst-root .bottom-label,
+.top-label {
+    font-size: 14px;
+    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #dfe6ee;
+}
+
+.dst-root .center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: #f4f7f9;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dst-root .dst-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.dst-root .mt-30 {
+    margin-top: 30px;
+}
+
+.dst-root .gap-20 {
+    gap: 20px;
+}
+/* 상단 타이틀 + 상태 같은 라인 */
+.top-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.dst-text-title {
+    font-size: 14px;
+    color: #d9dde9;
+    font-weight: 500;
+}
+
+.dst-status {
+    background-color: #4bbf734d;
+    color: #24db64;
+    padding: 6px 16px;
+    font-size: 12px;
+    border-radius: 26px;
+}
+
+/* 온도/농도 블록 */
+.dst-status-card .temp-block {
+    width: 100%;
+}
+
+.dst-status-card .temp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.dst-status-card .temp-label {
+    font-size: 14px;
+    color: #cfd6e4;
+    font-weight: 500;
+}
+
+.dst-status-card .temp-percent {
+    font-size: 12px;
+    color: #cbcfdf;
+    font-weight: 600;
+}
+
+/* 바형 그래프 (풀폭 + 트랙 색상 밝기) */
+.dst-progress.dst-progress--full {
+    width: 100%;
+    height: 12px;
+    background-color: #4a5163; /* 원래보다 조금 밝게 */
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.15);
+}
+
+    .dst-progress.dst-progress--full .dst-progress-bar {
+        height: 100%;
+        width: calc(var(--percent, 0) * 1%);
+        background-color: #3f80ea;
+        border-radius: 999px;
+        transition: width 0.35s ease;
+    }
+/* === 저장조 입고/출고 라벨 + 미니 바 === */
+.dst-root .stock-block {
+    width: 100%;
+    margin: 6px 0;
+}
+
+.dst-root .stock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    margin-bottom: 6px;
+    font-size: 18px;
+    color: #cbcfdf;
+}
+
+.dst-root .stock-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dst-root .stock-right {
+    font-weight: 600;
+    color: #cbcfdf;
+}
+
+.dst-root .dst-mini-progress {
+    width: 70%;
+    margin: 0 auto;
+    height: 8px;
+    background: #434a5c;
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), inset 0 1px 3px rgba(0,0,0,.2);
+}
+
+.dst-root .dst-mini-progress-bar {
+    height: 100%;
+    width: calc(var(--percent, 0) * 1%);
+    border-radius: 999px;
+    transition: width .3s ease;
+}
+
+.dst-root .stock-block.in .dst-mini-progress-bar {
+    background: #3f80ea;
+}
+/* 입고: 블루 */
+.dst-root .stock-block.out .dst-mini-progress-bar {
+    background: #24db64;
+}
+/* 출고: 옐로우 */
+.dst-root .drum-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 제품 노드 현황 좌우 영역 */
+.del-table-container {
+    flex: 1;
+    min-width: 420px;
+}
+
+.del-chart-container {
+    flex: 1;
+    min-width: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 테이블 스크롤: 기본 높이 유지, 내용 초과 시 세로 스크롤 */
+:root {
+    --gc-table-height: 260px;
+}
+/* 필요 시 값만 조정 */
+.del-table-scroll {
+    max-height: var(--gc-table-height);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 차트 자리(플레이스홀더) */
+.chart-placeholder {
+    width: 100%;
+    height: 250px;
+    background: #2f3646;
+    border: 1px dashed #555;
+    color: #9aa3b2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+/* 증류기 카드용 반원 차트 자리 */
+.dst-root .dst-gauge-container {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.dst-root .dst-gauge-placeholder {
+    width: 100%;
+    height: 150px; /* 필요 시 높이만 조정 */
+    background: #2f3646;
+    border: 1px dashed #555;
+    border-radius: 6px;
+    color: #9aa3b2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+/* 측정값 그룹 헤더(7:00/15:00/23:00를 감싸는 colspan=3 셀)만 색 변경 */
+:root {
+    --gc-measure-bg: #445468;
+}
+/* 원하는 색으로 교체 */
+
+/* .del-section .del-table thead tr:first-child th[colspan="3"] {
+    background-color: #222939 !important;
+    color: #fff;
+} */
+
+/* .del-section .del-table thead tr:nth-child(2) th {
+    background-color: #293042; 
+    color: #fff;
+}
+ */

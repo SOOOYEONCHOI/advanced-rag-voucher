@@ -1,0 +1,643 @@
+{
+  "results": [
+    {
+      "test": "health",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "models",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "chat_models",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "collections_anonymous",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "collections",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "resource_no_token",
+      "pass": true,
+      "status": 401
+    },
+    {
+      "test": "resource_missing",
+      "pass": true,
+      "status": 404
+    },
+    {
+      "test": "document_missing",
+      "pass": true,
+      "status": 404
+    },
+    {
+      "test": "stream_forbidden",
+      "pass": true,
+      "status": 403
+    },
+    {
+      "test": "stream_invalid",
+      "pass": true,
+      "status": 422
+    },
+    {
+      "test": "feedback_missing",
+      "pass": true,
+      "status": 404
+    },
+    {
+      "test": "feedback_invalid",
+      "pass": true,
+      "status": 422
+    },
+    {
+      "test": "voice_no_token",
+      "pass": true,
+      "status": 401
+    },
+    {
+      "test": "voice_empty",
+      "pass": true,
+      "status": 400
+    },
+    {
+      "test": "voice_invalid_type",
+      "pass": true,
+      "status": 415
+    },
+    {
+      "test": "history_empty",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "setting_empty",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "setting_save",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "setting_get",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "stream_http",
+      "pass": true,
+      "status": 200,
+      "seconds": 8.26
+    },
+    {
+      "test": "stream_completed",
+      "pass": true,
+      "events": [
+        "progress",
+        "token",
+        "citations",
+        "images",
+        "meta",
+        "done"
+      ]
+    },
+    {
+      "test": "stream_image_count",
+      "pass": true,
+      "count": 2,
+      "citations": 2
+    },
+    {
+      "test": "image_citation_link",
+      "pass": true
+    },
+    {
+      "test": "image_citation_link",
+      "pass": true
+    },
+    {
+      "test": "citation_document_resources",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "citation_resource_ids_resolve",
+      "pass": true,
+      "linked_displayable": 1
+    },
+    {
+      "test": "citation_document_resources",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "citation_resource_ids_resolve",
+      "pass": true,
+      "linked_displayable": 4
+    },
+    {
+      "test": "resource_list",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "resource_list_fields",
+      "pass": true,
+      "count": 53
+    },
+    {
+      "test": "image_document_resources",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "image_resource_consistency",
+      "pass": true
+    },
+    {
+      "test": "image_document_resources",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "image_resource_consistency",
+      "pass": true
+    },
+    {
+      "test": "image_download",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "image_binary",
+      "pass": true,
+      "bytes": 463011,
+      "content_type": "image/png"
+    },
+    {
+      "test": "image_download",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "image_binary",
+      "pass": true,
+      "bytes": 342074,
+      "content_type": "image/png"
+    },
+    {
+      "test": "resource_forbidden",
+      "pass": true,
+      "status": 403
+    },
+    {
+      "test": "image_forbidden",
+      "pass": true,
+      "status": 403
+    },
+    {
+      "test": "history_after_revoke",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "history_hides_revoked_content",
+      "pass": false
+    },
+    {
+      "test": "history_restore",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "history_images_match",
+      "pass": true
+    },
+    {
+      "test": "feedback_like",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "feedback_dislike",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "feedback_None",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "query_json",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "query_json_fields",
+      "pass": true
+    },
+    {
+      "test": "reset",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "history_reset",
+      "pass": true,
+      "status": 200
+    },
+    {
+      "test": "reset_clears_history",
+      "pass": true
+    }
+  ],
+  "response_shapes": {
+    "health": {
+      "status": "healthy",
+      "database": "<database>",
+      "vector_store": "<vector_store>"
+    },
+    "models": {
+      "models": [
+        {
+          "model_id": "<model_id>",
+          "model_name": "<model_name>",
+          "provider": "local",
+          "requires_api_key": false,
+          "is_enabled": true,
+          "sort_order": 0
+        }
+      ]
+    },
+    "chat_models": {
+      "model": "<model>",
+      "embedding_model": "<embedding_model>"
+    },
+    "collections_anonymous": {
+      "collections": [],
+      "user_id": "<user_id>"
+    },
+    "collections": {
+      "collections": [
+        {
+          "collection_name": "<collection_name>",
+          "qdrant_name": "<qdrant_name>"
+        }
+      ],
+      "user_id": "<user_id>"
+    },
+    "resource_no_token": {
+      "detail": "<detail>"
+    },
+    "resource_missing": {
+      "detail": "<detail>"
+    },
+    "document_missing": {
+      "detail": "<detail>"
+    },
+    "stream_forbidden": {
+      "detail": "<detail>"
+    },
+    "stream_invalid": {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "<loc>"
+          ],
+          "msg": "<msg>",
+          "input": {}
+        }
+      ]
+    },
+    "feedback_missing": {
+      "detail": "<detail>"
+    },
+    "feedback_invalid": {
+      "detail": [
+        {
+          "type": "literal_error",
+          "loc": [
+            "<loc>"
+          ],
+          "msg": "<msg>",
+          "input": "<input>",
+          "ctx": {
+            "expected": "<expected>"
+          }
+        }
+      ]
+    },
+    "voice_no_token": {
+      "detail": "<detail>"
+    },
+    "voice_empty": {
+      "detail": "<detail>"
+    },
+    "voice_invalid_type": {
+      "detail": "<detail>"
+    },
+    "history_empty": {
+      "history": [],
+      "collection_name": "<collection_name>"
+    },
+    "setting_empty": {
+      "setting": null
+    },
+    "setting_save": {
+      "collection_name": "<collection_name>",
+      "model_id": "<model_id>",
+      "has_api_key": false
+    },
+    "setting_get": {
+      "setting": {
+        "collection_name": "<collection_name>",
+        "model_id": "<model_id>",
+        "has_api_key": false
+      }
+    },
+    "stream": [
+      {
+        "type": "progress",
+        "stage": "searching"
+      },
+      {
+        "type": "progress",
+        "stage": "generating"
+      },
+      {
+        "type": "token",
+        "content": "<content>"
+      },
+      {
+        "type": "citations",
+        "data": [
+          {
+            "citation_id": 1,
+            "chunk_id": "<chunk_id>",
+            "document_id": "<document_id>",
+            "original_filename": "<original_filename>",
+            "section_name": "<section_name>",
+            "header_path": [],
+            "page_number": null,
+            "chunk_text": "<chunk_text>",
+            "score": 0.1885787844657898,
+            "referenced_in_answer": true,
+            "title": "<title>",
+            "document_type": "spreadsheet",
+            "sheet_name": "<sheet_name>",
+            "source_range": null,
+            "display_markdown": "<display_markdown>",
+            "resource_ids": [
+              "<resource_ids>"
+            ],
+            "highlight_text": "<highlight_text>"
+          }
+        ]
+      },
+      {
+        "type": "images",
+        "data": [
+          {
+            "ref": "<ref>",
+            "resource_id": "<resource_id>",
+            "document_id": "<document_id>",
+            "title": "<title>",
+            "role": "step_photo",
+            "sheet_name": "<sheet_name>",
+            "from_cell": "<from_cell>",
+            "to_cell": "<to_cell>",
+            "step_no": 1,
+            "step_title": "<step_title>",
+            "surrounding_text": "<surrounding_text>",
+            "original_filename": "<original_filename>",
+            "context_no": 1,
+            "cited": true
+          }
+        ]
+      },
+      {
+        "type": "meta",
+        "log_id": 5
+      },
+      {
+        "type": "done"
+      }
+    ],
+    "citation_document_resources": {
+      "document_id": "<document_id>",
+      "total": 190,
+      "resources": [
+        {
+          "resource_id": "<resource_id>",
+          "document_id": "<document_id>",
+          "resource_type": "image",
+          "content_hash": "<content_hash>",
+          "mime_type": "image/png",
+          "file_size": 8638,
+          "sheet_id": null,
+          "sheet_name": "<sheet_name>",
+          "from_cell": "<from_cell>",
+          "to_cell": "<to_cell>",
+          "linked_block_id": null,
+          "linked_record_ids": [],
+          "surrounding_range": "<surrounding_range>",
+          "surrounding_text": "<surrounding_text>",
+          "status": "committed",
+          "created_at": "<created_at>",
+          "download_url": "<download_url>",
+          "title": "<title>",
+          "role": "form_header",
+          "step_no": null,
+          "step_title": null,
+          "version_no": 1,
+          "in_print_area": true,
+          "review_status": "auto",
+          "displayable": false
+        }
+      ]
+    },
+    "resource_list": {
+      "document_id": "<document_id>",
+      "total": 53,
+      "resources": [
+        {
+          "resource_id": "<resource_id>",
+          "document_id": "<document_id>",
+          "resource_type": "image",
+          "content_hash": "<content_hash>",
+          "mime_type": "image/png",
+          "file_size": 2701135,
+          "sheet_id": null,
+          "sheet_name": "<sheet_name>",
+          "from_cell": "<from_cell>",
+          "to_cell": "<to_cell>",
+          "linked_block_id": null,
+          "linked_record_ids": [],
+          "surrounding_range": "<surrounding_range>",
+          "surrounding_text": "<surrounding_text>",
+          "status": "committed",
+          "created_at": "<created_at>",
+          "download_url": "<download_url>",
+          "title": "<title>",
+          "role": "part_photo",
+          "step_no": null,
+          "step_title": null,
+          "version_no": 1,
+          "in_print_area": true,
+          "review_status": "auto",
+          "displayable": true
+        }
+      ]
+    },
+    "image_document_resources": {
+      "document_id": "<document_id>",
+      "total": 190,
+      "resources": [
+        {
+          "resource_id": "<resource_id>",
+          "document_id": "<document_id>",
+          "resource_type": "image",
+          "content_hash": "<content_hash>",
+          "mime_type": "image/png",
+          "file_size": 8638,
+          "sheet_id": null,
+          "sheet_name": "<sheet_name>",
+          "from_cell": "<from_cell>",
+          "to_cell": "<to_cell>",
+          "linked_block_id": null,
+          "linked_record_ids": [],
+          "surrounding_range": "<surrounding_range>",
+          "surrounding_text": "<surrounding_text>",
+          "status": "committed",
+          "created_at": "<created_at>",
+          "download_url": "<download_url>",
+          "title": "<title>",
+          "role": "form_header",
+          "step_no": null,
+          "step_title": null,
+          "version_no": 1,
+          "in_print_area": true,
+          "review_status": "auto",
+          "displayable": false
+        }
+      ]
+    },
+    "resource_forbidden": {
+      "detail": "<detail>"
+    },
+    "image_forbidden": {
+      "detail": "<detail>"
+    },
+    "history_after_revoke": {
+      "history": [
+        {
+          "role": "user",
+          "content": "<content>"
+        }
+      ],
+      "collection_name": "<collection_name>"
+    },
+    "history_restore": {
+      "history": [
+        {
+          "role": "user",
+          "content": "<content>"
+        }
+      ],
+      "collection_name": "<collection_name>"
+    },
+    "feedback_like": {
+      "log_id": 5,
+      "feedback": "like"
+    },
+    "feedback_dislike": {
+      "log_id": 5,
+      "feedback": "dislike"
+    },
+    "feedback_None": {
+      "log_id": 5,
+      "feedback": null
+    },
+    "query_json": {
+      "query": "<query>",
+      "answer": "<answer>",
+      "chunks": [
+        {
+          "chunk_id": "<chunk_id>",
+          "document_id": "<document_id>",
+          "document_name": "<document_name>",
+          "text": "<text>",
+          "score": 0.1885787844657898,
+          "section_name": null,
+          "page_number": null
+        }
+      ],
+      "citations": [
+        {
+          "citation_id": "<citation_id>",
+          "document_id": "<document_id>",
+          "original_filename": "<original_filename>",
+          "chunk_text": "<chunk_text>",
+          "chunk_id": null,
+          "section_name": "<section_name>",
+          "header_path": [],
+          "page_number": null,
+          "response_segment": null,
+          "title": "<title>",
+          "document_type": "spreadsheet",
+          "score": 0.1885787844657898,
+          "referenced_in_answer": true,
+          "collection_id": null,
+          "sheet_name": "<sheet_name>",
+          "source_range": null,
+          "display_markdown": "<display_markdown>",
+          "resource_ids": [
+            "<resource_ids>"
+          ]
+        }
+      ],
+      "processing_time_ms": 9274.837017059326,
+      "log_id": 6,
+      "images": [
+        {
+          "ref": "<ref>",
+          "resource_id": "<resource_id>",
+          "document_id": "<document_id>",
+          "title": "<title>",
+          "role": "step_photo",
+          "sheet_name": "<sheet_name>",
+          "from_cell": "<from_cell>",
+          "to_cell": "<to_cell>",
+          "step_no": 1,
+          "step_title": "<step_title>",
+          "surrounding_text": "<surrounding_text>",
+          "original_filename": "<original_filename>",
+          "context_no": 1,
+          "cited": true
+        }
+      ]
+    },
+    "reset": {
+      "success": true,
+      "collection_name": "<collection_name>"
+    },
+    "history_reset": {
+      "history": [],
+      "collection_name": "<collection_name>"
+    }
+  }
+}

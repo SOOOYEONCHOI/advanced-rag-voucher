@@ -1,0 +1,132 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="메뉴명 설정">메뉴명 설정</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="userSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label for="cboMenuFolder" class="form-label" data-labelCd="메뉴폴더">메뉴폴더</label>
+                            <select class="form-select" id="cboMenuFolder" name="MenuFolder_id"></select>
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnMainSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#userSearchCollapse" role="button" aria-expanded="true" aria-controls="userSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<!-- 수정 전용 — 화면은 한국어만 쓰므로 언어별 등록·삭제 없이 표시값만 고친다(사용자 결정 2026-10-19, DESIGN §5.5) -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit">
+        <span class="right_align rpt" data-labelCd="메뉴 목록">메뉴 목록</span>
+    </div>
+</div>
+<div id="menu-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit" data-commonCd="상세 정보">상세 정보</div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel" data-commonCd="취소">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave" data-commonCd="저장">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off">
+        <input type="hidden" id="id" name="id">
+        <div class="card mb-0 p-15"><div class="row g-2 align-items-end">
+            <div class="col-12 col-lg-4"><label for="LabelCode" class="form-label" data-labelCd="메뉴">메뉴</label><input type="text" class="form-control" id="LabelCode" name="LabelCode" disabled></div>
+            <div class="col-12 col-lg-4"><label for="DispText" class="form-label" data-labelCd="표시값">표시값</label><input type="text" class="form-control" id="DispText" name="DispText" maxlength="500" required></div>
+        </div></div>
+    </form>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+
+<script type="text/javascript">
+    // 메뉴명 설정 — 메뉴(폴더)를 고르면 한국어 표시값을 보이고 [수정]으로 고친다. 표시값이 있으면 좌측 메뉴가 그 이름을 쓴다
+    class MenuLanguagePage {
+        constructor() {
+            this.url = '/api/system/menu_language';
+        }
+
+        init() {
+            const _this = this;
+            this.grid = WeZonGrid.create('#menu-grid', {
+                columnLayout: [
+                    { dataField: 'folder_name', headerText: '폴더', width: 150, align: 'left' }
+                    , { dataField: 'menu_name', headerText: '메뉴', width: 150, align: 'left' }
+                ]
+                , props: { height: 400, enablePaging: true, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.detail = DetailForm.create({
+                form: '#detailForm', fields: '#DispText',
+                buttons: { edit: '#btnEdit', save: '#btnSave', cancel: '#btnCancel' },
+                onSave: function (row) { _this.save(row); }
+            });
+            this.grid.on('cellClick', function (e) { _this.load(e.item.folder_name + e.item.menu_name); });
+
+            AjaxUtil.fillSelectOptions($('#cboMenuFolder'), 'menu_folder', 'all', '');
+            $('#cboMenuFolder').on('change', function () { _this.menuList(); });
+            $('#btnMainSearch').on('click', function () { _this.menuList(); });
+            this.menuList();
+        }
+
+        menuList() {
+            const _this = this;
+            AjaxUtil.getAsyncData(this.url, { action: 'read', MenuFolder_id: $('#cboMenuFolder').val() }, function (rows) {
+                _this.grid.setData(rows || []);
+                _this.detail.clear();
+            });
+        }
+
+        // 고른 메뉴의 한국어 표시값(없으면 메뉴 이름 그대로)을 상세에 넣는다.
+        // 목록에서 고를 때는 select(수정 중이면 묻는다), 저장 뒤 다시 읽을 때는 bind(읽기 전용으로 돌아온다)
+        load(label, afterSave) {
+            const _this = this;
+            const param = { action: 'menu_language_list', ModuleName: 'common', TemplateKey: 'menu', LabelCode: label };
+            AjaxUtil.getAsyncData(this.url, param, function (rows) {
+                const ko = (rows || [])[0];
+                const row = { id: ko ? ko.id : '', LabelCode: label, DispText: ko ? ko.DispText : label };
+                if (afterSave) { _this.detail.bind(row); } else { _this.detail.select(row); }
+            });
+        }
+
+        save(row) {
+            const _this = this;
+            const data = { id: row.id, ModuleName: 'common', TemplateKey: 'menu', LabelCode: row.LabelCode, DispText: $('#DispText').val() };
+            AjaxUtil.postAsyncData(this.url + '?action=labellang_save', data, function (res) {
+                if (!res || !res.success) { Alert.alert('', (res && res.message) || '저장하지 못했습니다.'); return; }
+                Notify.success('저장되었습니다.');
+                _this.load(row.LabelCode, true);
+            });
+        }
+    }
+
+    let page = new MenuLanguagePage();
+    $(document).ready(function () { page.init(); });
+</script>
+
+
+{% endblock %}

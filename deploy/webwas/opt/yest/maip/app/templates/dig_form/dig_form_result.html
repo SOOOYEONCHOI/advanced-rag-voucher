@@ -1,0 +1,344 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'assets/vendor/daterangepicker/daterangepicker.css' %}" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="digFormSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="작성일">작성일</label>
+                            <input type="text" class="form-control date" id="daterange" data-toggle="date-picker" data-cancel-class="btn-warning" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="양식">양식</label>
+                            <select class="form-select" id="cboForm" name="cboForm"></select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <!-- 메뉴 params form_type: INCOMING(수입검사)=입고번호, 그 외=WO. 작성일·양식과 AND, 일부만 맞아도 찾는다 -->
+                            {% if gparam.form_type == 'INCOMING' %}
+                            <label class="form-label" data-labelCd="입고번호">입고번호</label>
+                            {% else %}
+                            <label class="form-label" data-labelCd="WO">WO</label>
+                            {% endif %}
+                            <input type="text" class="form-control" id="txtWorkOrder" name="txtWorkOrder" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-end">
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#digFormSearchCollapse" role="button" aria-expanded="true" aria-controls="digFormSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit">
+        <span data-labelCd="완료 목록">완료 목록</span>
+    </div>
+</div>
+<div id="resultGrid"></div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'dig_form/dig_form_renderer.html' %}
+<!-- 검사 결과 보기 모달 — 목록 행의 [조회]. 공통 렌더러 view 모드 -->
+<script type="text/x-tmpl" id="digFormResultTemplate">
+<div class="content_wrap popup p-2">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><span id="formInfo" class="fw-bold"></span><span id="resultInfo"></span>
+        <button type="button" class="btn btn-input ms-auto dig-form-print-skip" id="btnPdf" data-commonCd="PDF 저장" disabled>PDF 저장</button>
+    </div>
+    <div class="table-responsive mb-3">
+        <div class="dig-form-grid"><table class="dig-form-table" id="digFormTopTable"></table></div>
+    </div>
+    <div id="digFormTable"></div>
+</div>
+</script>
+<script type="text/javascript">
+    // [PDF 저장] 인쇄 문서 서식 — 화면용 스크롤·모서리·hover 를 풀어 내용이 잘리지 않고 다음 쪽으로 이어지게 한다
+    // 용지 방향은 정하지 않는다(@page size 없음) — 인쇄창에서 세로·가로를 고른다(사용자 결정 2026-10-27)
+    const PRINT_CSS = `
+        @page { margin: 10mm; }
+        html, body { height: auto; overflow: visible; margin: 0; padding: 0; background: #fff; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .content_wrap.popup { padding: 0 !important; }
+        .table-responsive, .dig-form-grid { overflow: visible !important; }
+        .dig-form-grid { border-radius: 0; }
+        .dig-form-table tbody tr:hover > td { background: none; }
+        .dig-form-table tr { break-inside: avoid; }
+        .row > [class*="col-"] > div:first-child { break-after: avoid; }
+        /* 섹션 한 줄은 같은 쪽에 두거나 통째로 다음 쪽으로 — 사진·표가 쪽 경계에서 갈라지지 않게 한다 */
+        .dig-form-print-line { break-inside: avoid; }
+        .dig-form-print-line + .dig-form-print-line { margin-top: 0; }
+        /* 인쇄 중 orientation 은 용지 방향이다 — 인쇄창에서 방향을 바꾸면 그 방향의 배치로 바뀐다 */
+        .dig-form-print-portrait { display: none; }
+        @media (orientation: portrait) {
+            .dig-form-print-landscape { display: none; }
+            .dig-form-print-portrait { display: block; }
+        }
+        .dig-form-print-photo { display: block; width: auto; height: auto; max-width: 100%; max-height: 60mm; margin: 2px auto; object-fit: contain; }
+    `;
+
+    // 검사결과: 이 구분의 완료된 검사를 작성일·양식·WO 로 찾고, 행의 [조회]로 양식 모양 그대로 모달에서 본다(공통 렌더러 view 모드)
+    // 작성 중인 검사는 검사작성에 있다(사용자 결정 2026-10-16)
+    class DigFormResultPage {
+        constructor() {
+            this.renderer = new DigFormRenderer();
+            this.url = this.renderer.url;
+            this.grid = null;
+            this.popup = null;
+            this.init();
+        }
+
+        init() {
+            let _this = this;
+            // 1024 폭(탭 930px)에서 넘치지 않게 칸 정의 폭 합을 줄인다 — 넓은 화면은 fitWidth 가 늘린다
+            let columnLayout = [
+                {
+                    dataField: 'id', headerText: '상세', width: 60,
+                    renderer: { type: 'button', labelText: '조회', className: 'btn btn-input py-0 px-2', onClick: function (item) { _this.showResult(item); } }
+                },
+                { dataField: 'write_date', headerText: '작성일', width: 90, align: 'center' },
+                { dataField: 'form_code', headerText: '양식코드', width: 75, align: 'center' },
+                { dataField: 'form_version', headerText: '개정', width: 45, align: 'center' },
+                { dataField: 'form_title', headerText: '양식', width: 160, align: 'left' },
+                { dataField: 'work_order_number', headerText: '{% if gparam.form_type == "INCOMING" %}입고번호{% else %}WO{% endif %}', width: 110, align: 'left' },
+                { dataField: 'round', headerText: '차수', width: 45, align: 'center' },
+                {
+                    dataField: 'value_count', headerText: '입력', width: 65, align: 'right',
+                    labelFunction: function (rowIndex, columnIndex, value, item) { return value + ' / ' + item.input_count; }
+                },
+                { dataField: 'creater_name', headerText: '작성자', width: 70, align: 'center' },
+                { dataField: 'created', headerText: '작성일시', width: 105, align: 'center' },
+            ];
+            _this.grid = WeZonGrid.create('#resultGrid', {
+                columnLayout: columnLayout,
+                props: {
+                    // 아래 작성 내용 영역이 없으므로 목록이 창 아래까지 쓴다
+                    height: Math.max(300, $(window).height() - $('#resultGrid').offset().top - 40),
+                    enableSorting: true,
+                    selectionMode: 'singleRow',
+                    enablePaging: true,
+                }
+            });
+            GridUtil.fitWidth(_this.grid);
+        }
+
+        // 양식 고르기 — 이 구분의 모든 버전(완료된 검사가 옛 버전·미사용 양식에 달려 있을 수 있다)
+        loadForms() {
+            let $cbo = $('#cboForm').empty().append($('<option>').val('').text('전체'));
+            AjaxUtil.getAsyncData(this.url, { action: 'form_list', form_type: '{{ gparam.form_type }}' }, function (rows) {
+                (rows || []).forEach(function (f) {
+                    $cbo.append($('<option>').val(f.id).text(f.code + ' Rev.' + f.version + ' ' + f.title));
+                });
+            });
+        }
+
+        search() {
+            let _this = this;
+            let picker = $('#daterange').data('daterangepicker');
+            let param = {
+                action: 'result_search',
+                form_type: '{{ gparam.form_type }}',
+                state: 'done',
+                date_from: picker ? picker.startDate.format('YYYY-MM-DD') : '',
+                date_to: picker ? picker.endDate.format('YYYY-MM-DD') : '',
+                form_id: $('#cboForm').val(),
+                work_order_number: $('#txtWorkOrder').val(),
+            };
+            AjaxUtil.getAsyncData(_this.url, param, function (result) {
+                _this.grid.setData(result || []);
+            });
+        }
+
+        // 행의 [조회] — 화면 폭 최대 모달(검사양식 상세 조회와 같은 크기 규칙), 보기만
+        showResult(row) {
+            let _this = this;
+            _this.renderer.loadDetail(row.form_id, function () {
+                AjaxUtil.getAsyncData(_this.url, { action: 'result_values', result_id: row.id }, function (values) {
+                    let f = _this.renderer.form;
+                    let $content = $(tmpl('digFormResultTemplate', {}));
+                    let scrollbar = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+                    let popup = _this.popup = new PopupDraggable('검사 결과');
+                    popup.open({ width: document.documentElement.clientWidth - scrollbar - 32, height: $(window).height() - 64, $content },
+                        function () {
+                            if (_this.popup === popup) _this.popup = null;
+                            $('#digFormPrintFrame').remove();
+                        });
+                    $content.find('#formInfo').text(f.code + ' Rev.' + f.version + ' · ' + f.title);
+                    $content.find('#resultInfo').text((row.work_order_number || '-') + ' · ' + row.round + '차 · 입력 ' + row.value_count + ' / ' + row.input_count + '칸');
+                    _this.renderer.render(values || [], row);
+                    $content.find('#btnPdf').prop('disabled', false).on('click', function () { _this.savePdf($content, row); });
+                });
+            });
+        }
+
+        // [PDF 저장] — 결과 모달 내용만 숨긴 iframe 에 옮겨 인쇄창을 연다(대상 "PDF로 저장"). 목록·메뉴 등 다른 화면은 들어가지 않는다
+        // 사진 보기 아이콘은 사진으로 바꾸고, 스타일·사진을 다 받은 뒤 인쇄한다(사용자 결정 2026-10-27)
+        savePdf($content, row) {
+            let _this = this;
+            let f = _this.renderer.form;
+            let $btn = $content.find('#btnPdf').prop('disabled', true);
+            $('#digFormPrintFrame').remove();
+            let frame = $('<iframe id="digFormPrintFrame" aria-hidden="true" tabindex="-1">')
+                .css({ position: 'fixed', right: 0, bottom: 0, width: 0, height: 0, border: 0 }).appendTo('body')[0];
+            let doc = frame.contentDocument;
+            // 빈 iframe(about:blank)은 quirks 모드라 표 모양이 달라진다 — 표준 모드 문서로 연다
+            doc.open();
+            doc.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"></head><body></body></html>');
+            doc.close();
+            // 문서 제목이 저장 파일명 기본값이 된다 — 파일명에 못 쓰는 글자는 '-'
+            doc.title = [f.code, 'Rev' + f.version, row.work_order_number, row.round + '차']
+                .filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '-');
+
+            // 화면과 같은 모양 — 이 화면의 스타일시트·<style>(공통 렌더러 포함)을 그대로 옮기고 인쇄 서식을 덧붙인다
+            let styleLoads = [];
+            $('link[rel="stylesheet"]').each(function () {
+                let link = doc.createElement('link');
+                link.rel = 'stylesheet';
+                styleLoads.push(_this.whenLoaded(link));
+                link.href = this.href;
+                doc.head.appendChild(link);
+            });
+            $('style').each(function () { doc.head.appendChild(doc.importNode(this, true)); });
+            let print = doc.createElement('style');
+            print.textContent = PRINT_CSS;
+            doc.head.appendChild(print);
+
+            // 모달 내용 복사본 — 버튼은 빼고, 사진 보기 아이콘은 그 사진으로. iframe 문서에서 만들어 이 화면이 원본을 다시 받지 않게 한다
+            let body = doc.importNode($content[0], true);
+            body.querySelectorAll('.dig-form-print-skip').forEach(function (el) { el.remove(); });
+            body.querySelectorAll('.dig-form-image-show[data-url]').forEach(function (btn) {
+                let img = doc.createElement('img');
+                img.className = 'dig-form-print-photo';
+                img.alt = '';
+                img.src = btn.getAttribute('data-url');
+                btn.replaceWith(img);
+            });
+            // 섹션 배치를 가로용·세로용 두 벌로 — 인쇄창에서 고른 방향을 JS 가 알 수 없어 CSS(orientation)로 하나만 보인다
+            // 가로는 화면 폭(col-xl-N) 그대로, 세로는 폭 6 이하를 6(한 줄 둘)·7 이상을 12로 넓힌다(사용자 결정 2026-10-27)
+            let sections = body.querySelector('#digFormTable');
+            let sectionRow = sections && sections.querySelector(':scope > .row');
+            if (sectionRow) {
+                let portrait = sectionRow.cloneNode(true);
+                sections.replaceChildren(
+                    _this.printLines(doc, sectionRow, 'dig-form-print-landscape', function (n) { return n; }),
+                    _this.printLines(doc, portrait, 'dig-form-print-portrait', function (n) { return n <= 6 ? 6 : 12; }));
+            }
+            doc.body.appendChild(body);
+            // 두 벌의 같은 사진은 한 번만 받는다 — 못 받은 사진은 주소로 센다
+            let imageLoads = Array.from(doc.images).map(function (img) {
+                return _this.whenLoaded(img).then(function (ok) { return ok ? null : img.src; });
+            });
+
+            Promise.all(styleLoads).then(function () {
+                return doc.fonts ? doc.fonts.ready : null;
+            }).then(function () {
+                return Promise.all(imageLoads);
+            }).then(function (images) {
+                let failed = new Set(images.filter(Boolean)).size;
+                let done = function () {
+                    $btn.prop('disabled', false);
+                    frame.contentWindow.addEventListener('afterprint', function () { $(frame).remove(); });
+                    _this.printFrame(frame);
+                };
+                if (failed) Alert.alert('', '사진 ' + failed + '장을 불러오지 못했습니다. 빈칸으로 저장합니다.', done);
+                else done();
+            });
+        }
+
+        // 섹션을 화면의 한 줄 단위(폭 합 12)로 실제 요소에 묶는다 — flex 줄은 요소가 없어 섹션이 쪽마다 따로 나뉜다
+        // widthOf: 섹션의 col-xl-N(없으면 12) → 인쇄 폭. 화면의 줄이 바뀌는 곳에서는 늘 새 줄이다 —
+        // 넓힌 섹션이 다음 화면 줄 섹션과 묶이면 그 뒤의 사진·표 짝이 한 칸씩 어긋난다
+        printLines(doc, row, className, widthOf) {
+            let box = doc.createElement('div');
+            box.className = className;
+            let line = null;
+            let used = 0;
+            let screenUsed = 0;
+            Array.from(row.children).forEach(function (col) {
+                let m = /(?:^|\s)col-xl-(\d+)(?:\s|$)/.exec(col.className);
+                let screen = m ? Number(m[1]) : 12;
+                let n = widthOf(screen);
+                let screenBreak = screenUsed + screen > 12;
+                if (screenBreak) screenUsed = 0;
+                if (!line || screenBreak || used + n > 12) {
+                    line = doc.createElement('div');
+                    line.className = 'row g-2 dig-form-print-line';
+                    box.appendChild(line);
+                    used = 0;
+                }
+                col.style.flex = '0 0 auto';
+                col.style.width = (n * 100 / 12) + '%';
+                line.appendChild(col);
+                used += n;
+                screenUsed += screen;
+            });
+            return box;
+        }
+
+        // 요소를 다 받으면 true, 못 받으면 false — 이미 받은 사진은 바로 끝난다
+        whenLoaded(el) {
+            return new Promise(function (resolve) {
+                if (el.tagName === 'IMG' && el.complete) { resolve(el.naturalWidth > 0); return; }
+                el.addEventListener('load', function () { resolve(true); });
+                el.addEventListener('error', function () { resolve(false); });
+            });
+        }
+
+        // 인쇄창 — e2e 는 이 함수를 바꿔 인쇄창 없이 인쇄 문서를 본다
+        printFrame(frame) {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+        }
+    }
+
+    let page = null;
+    $(document).ready(function (e) {
+        page = new DigFormResultPage();
+
+        $('#daterange').daterangepicker({
+            startDate: moment().subtract(30, 'days'),
+            endDate: moment(),
+            locale: { format: 'YYYY-MM-DD' }
+        });
+
+        page.loadForms();
+
+        $('#btnSearch').click(function (e) {
+            page.search();
+        });
+
+        $('#txtWorkOrder').keypress(function (e) {
+            if (e.which === 13) {
+                e.preventDefault();   // 입력칸 1개 form의 Enter 자동 제출 방지
+                page.search();
+            }
+        });
+
+        page.search();
+    });
+</script>
+{% endblock %}

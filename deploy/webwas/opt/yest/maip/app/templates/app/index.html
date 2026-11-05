@@ -1,0 +1,370 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="kr">
+
+<head>
+    <meta charset="utf-8" />
+    <title>제조AI플랫폼</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- App favicon -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.ico' %}">
+    <!-- Daterangepicker css -->
+    <link href="{% static 'assets/vendor/daterangepicker/daterangepicker.css' %}" rel="stylesheet" type="text/css">
+    <!-- Theme Config Js -->
+    <script src="{% static 'assets/js/hyper-config.js' %}"></script>
+    <!-- Vendor css -->
+    <link href="{% static 'assets/css/vendor.min.css' %}" rel="stylesheet" type="text/css" />
+    <!-- App css -->
+    <link href="{% static 'assets/css/app.min.css' %}" rel="stylesheet" type="text/css" id="app-style" />
+    <!-- Icons css -->
+    <link href="{% static 'assets/css/unicons/css/unicons.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'assets/css/remixicon/remixicon.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'assets/css/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet" type="text/css" />
+
+    <!-- Font css -->
+    <link href="{% static 'assets/css/pretendard.css' %}" rel="stylesheet" />
+    <!-- Custom css -->
+    <link href="{% static 'assets/css/SF-Custom.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'assets/css/tokens.css' %}" rel="stylesheet" type="text/css" />
+
+</head>
+
+
+<body>
+    <!-- Begin page -->
+    <div class="wrapper">
+        <input type="hidden" id="default_menu_code" value="{{ default_menu_code }}" />
+        <!-- ========== Topbar Start ========== -->
+        <div class="navbar-custom">
+            <div class="topbar container-fluid">
+                <div class="d-flex align-items-center gap-lg-2 gap-1">
+
+                    <!-- Sidebar Menu Toggle Button -->
+                    <button class="button-toggle-menu">
+                        <i class="ri-align-left"></i>
+                    </button>
+
+                    <!-- Horizontal Menu Toggle Button -->
+                    <button class="navbar-toggle" data-bs-toggle="collapse" data-bs-target="#topnav-menu-content">
+                        <div class="lines">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </button>
+
+                    <!-- Topbar Search Form -->
+                    <div class="app-search dropdown d-none d-lg-block">
+                        <form>
+                            <div class="input-group">
+                                <input type="text" class="form-control dropdown-toggle" placeholder="메뉴를 검색해 주세요."
+                                    id="top-search">
+                                <button class="input-group-text btn btn-band " type="submit"><span
+                                        class="ri-search-line search-icon"></span></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <!-- 환경설정 -->
+                <ul class="topbar-menu d-flex align-items-center gap-3 me-3">
+                    <!-- <li>
+                        <div class="brand-banner flex-wrap gap-2">
+                            <span class="me-2"> <img src="{% static 'assets/images/logo-dark-sm.png' %}"/ width="22px"><span>브랜드</span></span>
+                            <a href="http://10.10.10.233:8888" class="btn-newpadge" target="_blank" >JupyterHub</a>
+                            <a href="http://10.10.10.230:8091" class="btn-newpadge" target="_blank" >QMS</a>
+                            <a href="http://10.10.10.230:8092" class="btn-newpadge"  target="_blank">CMMS</a>
+                            <a href="http://10.10.10.230:8093/" class="btn-newpadge" target="_blank">APS</a>
+                            <a href="http://10.10.10.230:8094/" class="btn-newpadge" target="_blank">FEMS </a>
+                            
+                        </div>
+                    </li> -->
+                    {% if werag_url %}
+                    <li>
+                        <a class="nav-link topbar-werag" href="{{ werag_url }}" target="_blank" rel="noopener noreferrer" title="We.RAG 새 탭으로 열기">
+                            <img src="{% static 'assets/images/werag-logo.png' %}" alt="We.RAG">
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="d-none d-md-inline-block">
+                        <a class="nav-link" href="" data-toggle="fullscreen">
+                            <i class="ri-fullscreen-line font-22"></i>
+                        </a>
+                    </li>
+                    <li class="dropdown">
+                        <a class="nav-link dropdown-toggle arrow-none" data-bs-toggle="dropdown" href="#" role="button"
+                            aria-haspopup="false" aria-expanded="false">
+                            <span class="account-user-avatar">
+                                <i class="ri-settings-3-line font-22"></i>
+
+                            </span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-animated profile-dropdown">
+                            <!-- item-->
+                            <a href="javascript:void(0);" class="dropdown-item" id="myinfo">
+                                <i class="ri-user-settings-line font-16 me-1"></i>
+                                <span>내 정보</span>
+                            </a>
+                            <!-- item-->
+                            <a href="javascript:void(0);" class="dropdown-item" id="logout">
+                                <i class="ri-login-circle-line font-16 me-1"></i>
+                                <span>Logout</span>
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <!-- ========== Topbar End ========== -->
+
+        <!-- ========== Left Sidebar Start ========== -->
+        <div class="leftside-menu">
+
+            <!-- Brand Logo Light -->
+            <a href="/" class="logo logo-light">
+                <span class="logo-lg">
+                    <img src="{% static 'assets/images/logo-dark.png' %}" alt="제조AI플랫폼">
+                    <!--<img src="{% static 'assets/images/logo.png' %}" alt="logo">-->
+                    <!--<span class="system-name">MES</span>-->
+                </span>
+                <span class="logo-sm">
+                    <img src="{% static 'assets/images/logo-dark-sm.png' %}" alt="제조AI플랫폼">
+                    <!-- <img src="{% static 'assets/images/logo-sm.png' %}" alt="small logo">-->
+                </span>
+            </a>
+
+            <!-- Sidebar Hover Menu Toggle Button -->
+            <div class="button-sm-hover" data-bs-toggle="tooltip" data-bs-placement="right" title="Show Full Sidebar">
+                <i class="ri-checkbox-blank-circle-line align-middle"></i>
+            </div>
+
+            <!-- Full Sidebar Menu Close Button -->
+            <div class="button-close-fullsidebar">
+                <i class="ri-close-fill align-middle"></i>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="h-100" id="leftside-menu-container" data-simplebar>
+                <!-- Menu Tab -->
+                <div
+                    style="display:flex; border-bottom:1px solid rgba(255,255,255,0.15); margin:8px 12px 0 12px; position:sticky; top:0; z-index:10; background:transparent; border-radius:8px 8px 0 0;">
+                    <a href="javascript:void(0);" id="tabAllMenu"
+                        style="flex:1; text-align:center; padding:10px 0; font-size:12px; font-weight:700; color:#ffc107; cursor:pointer; border-bottom:2px solid #ffc107;">전체메뉴</a>
+                    <a href="javascript:void(0);" id="tabMyMenu"
+                        style="flex:1; text-align:center; padding:10px 0; font-size:12px; font-weight:700; color:rgba(255,255,255,0.4); cursor:pointer; border-bottom:2px solid transparent;">즐겨찾기</a>
+                </div>
+                <!--- Sidemenu -->
+                <ul class="side-nav" id="sideNavAll">
+
+                </ul>
+                <ul class="side-nav" id="sideNavBookmark" style="display:none;">
+
+                </ul>
+                <!--- End Sidemenu -->
+            </div>
+        </div>
+        <!-- ========== Left Sidebar End ========== -->
+
+        <!-- ==========다중 멀티 페이지 Start ========== -->
+        <div class="mnb-page">
+            <div class="mnb-tab">
+                <button type="button" class="btn btn-white mnb-scroll-left" aria-label="Scroll left"><i
+                        class="uil uil-angle-left"></i></button>
+                <div class="center-tab">
+                    <ul class="mnb-list" id="mnb-tab-list">
+                    </ul>
+                </div>
+                <button type="button" class="btn btn-white mnb-scroll-right" aria-label="Scroll right"><i
+                        class="uil uil-angle-right"></i></button>
+            </div>
+        </div>
+        <!-- ========== 다중 멀티 페이지 End ========== -->
+
+        <!-- ============================================================== -->
+        <!-- Start Page Content Here ifram-box 클래스 안에 내용 넣기 여백 건드리지 않기 -->
+        <!-- ============================================================== -->
+        <div class="content-page">
+            <div class="content">
+                <!-- Start Content-->
+                <div class="container-fluid">
+
+                    <!-- Star ifarm -->
+
+                    <!-- End ifarm -->
+                </div>
+                <!-- container -->
+            </div>
+            <!-- content -->
+
+            <!-- Footer Start <footer class="footer">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <script>document.write(new Date().getFullYear())</script> © Hyper - Coderthemes.com
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-md-end footer-links d-none d-md-block">
+                                <a href="javascript: void(0);">About</a>
+                                <a href="javascript: void(0);">Support</a>
+                                <a href="javascript: void(0);">Contact Us</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </footer> end Footer -->
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- End Page content -->
+        <!-- ============================================================== -->
+
+    </div>
+    <!-- END wrapper -->
+
+
+
+    <div id="mnbContextMenu" class="mnb-context-menu" style="display:none;">
+        <ul>
+            <li data-action="close-current">현재 탭 닫기</li>
+            <li data-action="close-others">다른 탭 닫기</li>
+            <li data-action="close-all">전체 탭 닫기</li>
+            <li data-action="open-new-window">새창에서 실행</li>
+        </ul>
+    </div>
+
+    <!-- Vendor js,  이거 jQuery임-->
+    <script src="{% static 'assets/js/vendor.min.js' %}"></script>
+
+
+    <!-- Daterangepicker js -->
+    <script src="{% static 'assets/vendor/moment/moment.min.js' %}"></script>
+    <script src="{% static 'assets/vendor/daterangepicker/daterangepicker.js' %}"></script>
+
+    <!----------------------------------------------------------------------------------------->
+    <script type="text/javascript">
+        {% include './system.js' %}
+    </script>
+    <script type="text/javascript" src="{% static 'assets/vendor/jquery-validation/1.22.1/jquery.validate.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'assets/vendor/JavaScript-Templates/tmpl.min.js' %}"></script>
+    <script src="{% static 'assets/vendor/decimal.js/decimal.js' %}"></script>
+    <script src="{% static 'assets/js/decimal-util.js' %}"></script>
+    <script type="text/javascript" src="{% static 'assets/js/common.js' %}"></script>
+    <script type="text/javascript" src="{% static 'assets/js/bscommUtil.js' %}"></script>
+
+    <!-- App js -->
+    <script src="{% static 'assets/js/app.js' %}"></script>
+
+    {% include "./left_menu_class.html" %}
+
+
+    <script type="text/javascript">
+
+
+        $(document).ready(function () {
+
+            // 메뉴 설정
+            i18n.initializeMenuData(i18n.getLanguageCode());
+            window.myMenu = new LeftMenuClass();
+            window.myMenu.init();
+
+            // 메뉴 탭: 전체메뉴 / 즐겨찾기
+            (function () {
+                var $tabAll = $('#tabAllMenu');
+                var $tabMy = $('#tabMyMenu');
+                var $navAll = $('#sideNavAll');
+                var $navBm = $('#sideNavBookmark');
+
+                $tabAll.text(i18n.getMenuText('전체메뉴'));
+                $tabMy.text(i18n.getMenuText('즐겨찾기'));
+
+                function setActiveTab($active, $inactive, $showNav, $hideNav) {
+                    window.myMenu.resetCondensedFlyoutState();
+                    $active.css({ color: '#fff', borderBottom: '2px solid #ffc107' });
+                    $inactive.css({ color: 'rgba(255,255,255,0.5)', borderBottom: '2px solid transparent' });
+                    $showNav.show();
+                    $hideNav.hide();
+                    window.myMenu.recalculateLeftMenuSimpleBar();
+                }
+
+                function loadBookmarkMenu() {
+                    $navBm.empty();
+                    AjaxUtil.getAsyncData('/api/system/bookmark', {}, function (bookmarks) {
+                        if (!Array.isArray(bookmarks) || bookmarks.length === 0) {
+                            $navBm.html('<li style="padding:20px; text-align:center; color:rgba(255,255,255,0.4); font-size:12px;">등록된 즐겨찾기가 없습니다.</li>');
+                            window.myMenu.recalculateLeftMenuSimpleBar();
+                            return;
+                        }
+                        for (var i = 0; i < bookmarks.length; i++) {
+                            var bm = bookmarks[i];
+                            var bmName = i18n.getMenuText(bm.name || bm.code);
+                            $navBm.append(
+                                '<li class="side-nav-item">' +
+                                '<a href="javascript:void(0);" class="side-nav-link menu-leaf-link" data-url="/gui/' + bm.code + '/default" data-mid="' + bm.code + '">' +
+                                '<i class="uil uil-star" style="color:#ffc107;"></i> <span>' + bmName + '</span>' +
+                                '</a></li>'
+                            );
+                        }
+                        // 즐겨찾기 메뉴 클릭 이벤트 바인딩
+                        $navBm.off('click', '.menu-leaf-link').on('click', '.menu-leaf-link', function (e) {
+                            e.preventDefault();
+                            var menuId = ($(this).data('mid') || '').toString().trim();
+                            var menuUrl = ($(this).data('url') || '').toString().trim();
+                            var menuTitle = $(this).text().trim();
+                            window.myMenu.openMenu(menuId, menuTitle, menuUrl);
+                        });
+                        window.myMenu.recalculateLeftMenuSimpleBar();
+                    }, function () { });
+                }
+
+                $tabAll.on('click', function () {
+                    setActiveTab($tabAll, $tabMy, $navAll, $navBm);
+                });
+
+                $tabMy.on('click', function () {
+                    loadBookmarkMenu();
+                    setActiveTab($tabMy, $tabAll, $navBm, $navAll);
+                });
+
+                // 즐겨찾기 갱신 함수를 전역에 노출
+                window.refreshBookmarkTab = function () {
+                    // 즐겨찾기 탭이 현재 활성이면 목록만 갱신, 아니면 탭 전환
+                    if ($navBm.is(':visible')) {
+                        loadBookmarkMenu();
+                    } else {
+                        loadBookmarkMenu();
+                        setActiveTab($tabMy, $tabAll, $navBm, $navAll);
+                    }
+                };
+            })();
+
+            // 내정보 클릭
+            $('#myinfo').on('click', function (e) {
+                e.preventDefault();
+                modal.open({
+                    width: 400,
+                    height: 500,
+                    title: '내 정보',
+                    iframe: {
+                        method: 'get',
+                        url: '/page/account/myinfo',
+                        param: 'callBack=setPopUpResult&'
+                    }
+                });
+                $(".profile_contbox").hide();
+            });
+
+
+            $('#logout').on('click', function (e) {
+                e.preventDefault();
+                Alert.confirm('', '로그아웃하시겠습니까?', function () {
+                    i18n.resetData();
+                    location.href = '/logout';
+                });
+            });
+
+        });
+
+    </script>
+
+</body>
+
+</html>

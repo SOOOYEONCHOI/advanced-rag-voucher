@@ -1,0 +1,194 @@
+{% extends "app/layout_page.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="품목·BOM 조회">품목·BOM 조회</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="card-body">
+        <form id="searchForm" autocomplete="off" onsubmit="return false">
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label for="keyword" class="form-label">품목코드/품목명</label>
+                    <input type="text" class="form-control" id="keyword" maxlength="100">
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="cboPartType" class="form-label">품목유형</label>
+                    <select class="form-select" id="cboPartType"><option value="">전체</option></select>
+                </div>
+                <div class="col-auto align-self-end pb-2">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="rootOnly">
+                        <label class="form-check-label" for="rootOnly">최상위 품목만</label>
+                    </div>
+                </div>
+                <div class="col-auto align-self-end">
+                    <button type="button" class="btn btn-search" id="btnSearch">조회</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">품목 목록</span></div>
+</div>
+<div id="main-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit"><span class="right_align rpt" id="detailTitle">상세 정보</span></div>
+    </div>
+    <ul class="tab_links nav nav-tabs nav-bordered mb-2">
+        <li class="nav-item"><a href="#tabInfo" data-bs-toggle="tab" class="nav-link active">상세 정보</a></li>
+        <li class="nav-item"><a href="#tabTree" data-bs-toggle="tab" class="nav-link">하위 BOM</a></li>
+        <li class="nav-item"><a href="#tabUsed" data-bs-toggle="tab" class="nav-link">사용처</a></li>
+    </ul>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tabInfo" role="tabpanel">
+            <p class="text-muted mb-0" id="infoEmpty">목록에서 품목을 선택합니다.</p>
+            <div class="row g-2 d-none" id="infoTables">
+                <div class="col-12 col-lg-6"><table class="table table-sm table-bordered mb-0" id="infoPart"><tbody></tbody></table></div>
+                <div class="col-12 col-lg-6"><table class="table table-sm table-bordered mb-0" id="infoCad"><tbody></tbody></table></div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="tabTree" role="tabpanel">
+            <div class="d-flex justify-content-end gap-2 mb-2">
+                <button type="button" class="btn btn-input" id="btnTreeExpand">모두 펼치기</button>
+                <button type="button" class="btn btn-input" id="btnTreeCollapse">모두 접기</button>
+            </div>
+            <div id="tree-grid"></div>
+        </div>
+        <div class="tab-pane fade" id="tabUsed" role="tabpanel">
+            <p class="text-muted mb-2">이 품목을 쓰는 상위 품목을 최상위까지 보입니다. 수량은 그 상위 품목 하나에 드는 수량입니다.</p>
+            <div id="used-grid"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+    // 품목·BOM 은 PLM 인터페이스 반영(apply_interface)으로만 들어온다 — 조회 전용이라 등록·수정·삭제가 없다.
+    class ProductBomPage {
+        init() {
+            const _this = this;
+            this.url = '/api/definition/product_bom';
+            this.params = null;     // 마지막 [조회] 조건. 페이지 이동이 같은 조건을 쓴다
+            // 품목은 장비 BOM 을 받을수록 쌓인다. 서버 페이징이고 코드순 고정이라 헤더 정렬을 끈다.
+            const source = AjaxUtil.gridRemoteSource(this.url, function () { return _this.params; });
+            this.grid = WeZonGrid.create('#main-grid', {
+                columnLayout: [
+                    { dataField: 'code', headerText: '품목코드', width: 140, align: 'left' }
+                    , { dataField: 'name', headerText: '품목명', width: 260, align: 'left' }
+                    , { dataField: 'part_type', headerText: '품목유형', width: 100 }
+                    , { dataField: 'spec', headerText: '규격', width: 200, align: 'left' }
+                    , { dataField: 'part_state', headerText: 'PLM 상태', width: 100 }
+                    , { dataField: 'version', headerText: '버전', width: 80 }
+                ]
+                , props: {
+                    height: 320, enableSorting: false, selectionMode: 'singleRow',
+                    dataMode: 'server', rowIdField: 'id', remoteDataSource: source,
+                    enablePaging: true, pageSize: 50, pageSizeOptions: [50, 100]
+                }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.grid.on('cellClick', function (e) { _this.select(e.item); });
+
+            const treeColumns = [
+                { dataField: 'code', headerText: '품목코드', width: 220, align: 'left' }
+                , { dataField: 'name', headerText: '품목명', width: 240, align: 'left' }
+                , { dataField: 'part_type', headerText: '품목유형', width: 90 }
+                , { dataField: 'qty', headerText: '수량', width: 70, align: 'right' }
+            ];
+            this.treeGrid = WeZonGrid.create('#tree-grid', {
+                columnLayout: treeColumns.concat([
+                    { dataField: 'total_qty', headerText: '소요량', width: 70, align: 'right' }
+                    , { dataField: 'spec', headerText: '규격', width: 180, align: 'left' }
+                    , { dataField: 'post_process', headerText: '후처리', width: 180, align: 'left' }
+                ])
+                , props: { height: 400, enableSorting: false, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(this.treeGrid);
+            this.usedGrid = WeZonGrid.create('#used-grid', {
+                columnLayout: treeColumns.concat([{ dataField: 'spec', headerText: '규격', width: 180, align: 'left' }])
+                , props: { height: 400, enableSorting: false, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(this.usedGrid);
+            // 숨은 탭에서 만든 그리드는 폭이 0 이다 — 탭을 열 때 다시 잰다
+            $('a[href="#tabTree"]').on('shown.bs.tab', function () { _this.treeGrid.resize(); });
+            $('a[href="#tabUsed"]').on('shown.bs.tab', function () { _this.usedGrid.resize(); });
+            $('#btnTreeExpand').on('click', function () { _this.treeGrid.expandTreeAll(); });
+            $('#btnTreeCollapse').on('click', function () { _this.treeGrid.collapseTreeAll(); });
+
+            $('#btnSearch').on('click', function () { _this.search(); });
+            $('#keyword').on('keydown', function (e) { if (e.key === 'Enter') { _this.search(); } });
+            this.loadPartTypes();
+            this.search();
+        }
+
+        loadPartTypes() {
+            AjaxUtil.getAsyncData(this.url, { action: 'part_types' }, function (rows) {
+                if (!Array.isArray(rows)) { return; }
+                // 품목유형은 PLM 이 준 값이다 — 글자로 넣는다
+                $('#cboPartType').append(rows.map(function (value) { return $('<option>', { value: value }).text(value); }));
+            });
+        }
+
+        search() {
+            this.params = {
+                action: 'list',
+                keyword: $('#keyword').val() || '',
+                part_type: $('#cboPartType').val() || '',
+                root_only: $('#rootOnly').is(':checked') ? 'Y' : ''
+            };
+            AjaxUtil.gridResearch(this.grid);
+        }
+
+        select(item) {
+            const _this = this;
+            // 품목코드·이름은 PLM 이 준 값이다 — 글자로 넣는다
+            $('#detailTitle').text('상세 정보 — ' + item.code + ' ' + item.name);
+            AjaxUtil.getAsyncData(this.url, { action: 'detail', id: item.id }, function (r) {
+                if (!r || r.success === false) { return; }
+                _this.fillTable('#infoPart', [
+                    ['품목코드', r.code], ['품번', r.part_no], ['리비전', r.revision], ['버전', r.version],
+                    ['품목명', r.name], ['품목유형', r.part_type], ['규격', r.spec], ['자재그룹', r.material_group],
+                    ['재질', r.material], ['후처리', r.post_process], ['PLM 상태', r.part_state],
+                    ['최초생성일', r.plm_created_date], ['현버전생성일', r.plm_version_date]
+                ]);
+                _this.fillTable('#infoCad', [
+                    ['3D 유형', r.model3d_type], ['3D 번호', r.model3d_no], ['3D 버전', r.model3d_version],
+                    ['3D 상태', r.model3d_state], ['3D 마지막수정일', r.model3d_modified],
+                    ['2D 번호', r.drawing2d_no], ['2D 버전', r.drawing2d_version],
+                    ['2D 상태', r.drawing2d_state], ['2D 마지막수정일', r.drawing2d_modified]
+                ]);
+                $('#infoEmpty').addClass('d-none');
+                $('#infoTables').removeClass('d-none');
+            });
+            this.loadTree(this.treeGrid, 'tree', item.id);
+            this.loadTree(this.usedGrid, 'where_used', item.id);
+        }
+
+        loadTree(grid, action, id) {
+            AjaxUtil.getAsyncData(this.url, { action: action, id: id }, function (rows) {
+                if (!Array.isArray(rows)) { return; }
+                grid.setTreeData(rows, { treeColumn: 'code', idField: 'tree_id', parentField: 'tree_pid', expandAll: true });
+            });
+        }
+
+        fillTable(selector, rows) {
+            $(selector + ' tbody').empty().append(rows.map(function (row) {
+                return $('<tr>').append($('<th>', { 'class': 'table-light', style: 'width:140px' }).text(row[0]),
+                    $('<td>').text(row[1] || '-'));
+            }));
+        }
+    }
+
+    let page = new ProductBomPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

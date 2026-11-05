@@ -1,0 +1,2 @@
+# Ubuntu 단일 환경 기준 — 체크아웃·커밋 모두 LF 로 고정한다.
+* text=auto eol=lf

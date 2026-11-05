@@ -1,0 +1,199 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="inspSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label for="cboItem" class="form-label">비전검사항목</label>
+                        <select class="form-select" id="cboItem"></select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label for="cboClient" class="form-label">클라이언트</label>
+                        <select class="form-select" id="cboClient"></select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <label for="cboStatus" class="form-label">상태</label>
+                        <select class="form-select" id="cboStatus">
+                            <option value="">전체</option>
+                            <option value="RECEIVED">접수됨</option>
+                            <option value="SUCCESS">판정 완료</option>
+                            <option value="FAILED">실패</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label">검사일</label>
+                        <div class="d-flex align-items-center gap-1">
+                            <input type="date" class="form-control" id="dateFrom">
+                            <span>~</span>
+                            <input type="date" class="form-control" id="dateTo">
+                        </div>
+                    </div>
+                    <div class="col-auto align-self-end">
+                        <button type="button" class="btn btn-search" id="btnSearch">조회</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">검사 목록</span></div>
+</div>
+<div id="insp-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="sub-tit mb-2"><span class="right_align rpt" id="inspDetailTitle">상세 정보</span></div>
+    <div class="row g-2">
+        <div class="col-12 col-lg-5">
+            <div class="detail-image-box" id="inspImageBox">
+                <img id="inspImage" class="d-none" alt="검사 이미지">
+                <p class="text-muted mb-0" id="inspImageEmpty">목록에서 검사를 선택합니다.</p>
+            </div>
+        </div>
+        <div class="col-12 col-lg-7">
+            <table class="table table-sm table-bordered mb-0" id="inspDetail">
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'assets/js/image_zoom.js' %}"></script>
+<script type="text/javascript">
+    class InspectionPage {
+        init() {
+            const _this = this;
+            ImageZoom.attach(document.getElementById('inspImageBox'), document.getElementById('inspImage'));
+            // 검사는 Client 전송마다 쌓인다. 서버 페이징이고 최신순 고정이라 헤더 정렬을 끈다.
+            const source = AjaxUtil.gridRemoteSource('/api/vision/inspection', function () { return _this.searchParams(); });
+            this.grid = WeZonGrid.create('#insp-grid', {
+                columnLayout: [
+                    { dataField: 'created_at', headerText: '검사일시', width: 150 }
+                    , { dataField: 'item_name', headerText: '비전검사항목', width: 200, align: 'left' }
+                    , { dataField: 'client_id', headerText: '클라이언트', width: 110 }
+                    , {
+                        // 판정은 이상·정상, 판정 전(접수·실패)은 '-'. 이상은 데이터 목록의 라벨 결과처럼 붉게 보인다.
+                        dataField: 'abnormal', headerText: '판정', width: 80, align: 'center',
+                        labelFunction: function (rowIndex, columnIndex, value) { return _this.judgement(value); },
+                        styleFunction: function (rowIndex, columnIndex, value) { return value === true ? 'text-danger fw-bold' : ''; }
+                    }
+                    , { dataField: 'status_label', headerText: '상태', width: 200, align: 'left' }
+                    , { dataField: 'model', headerText: '모델', width: 160, align: 'left' }
+                    , { dataField: 'camera', headerText: '카메라', width: 140, align: 'left' }
+                ]
+                , props: {
+                    height: 320, enableSorting: false, selectionMode: 'singleRow',
+                    dataMode: 'server', rowIdField: 'id', remoteDataSource: source,
+                    enablePaging: true, pageSize: 20
+                }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.grid.on('cellClick', function (e) { _this.showDetail(e.item.id); });
+            // 파일이 지워졌거나 권한이 없으면 깨진 아이콘 대신 안내 문구를 보인다.
+            $('#inspImage').on('error', function () { _this.showImageMessage('검사 이미지를 불러오지 못했습니다.'); });
+
+            // 기본 기간은 오늘을 포함한 최근 7일(서버 기본값과 같다)
+            $('#dateFrom').val(moment().add(-6, 'days').format('YYYY-MM-DD'));
+            $('#dateTo').val(moment().format('YYYY-MM-DD'));
+            $('#btnSearch').on('click', function () { _this.searchMainData(); });
+            // 목록은 그리드가 만들어지며 첫 페이지를 받는다(서버 모드)
+            this.loadCombos();
+            // 대시보드 "최근 비전 검사 이력" 행으로 열리면 그 검사 상세를 바로 보인다(?inspection=<id>)
+            const opened = new URLSearchParams(location.search).get('inspection');
+            if (opened) { this.showDetail(opened); }
+        }
+
+        loadCombos() {
+            AjaxUtil.getAsyncData('/api/vision/inspection?action=filters', {}, function (data) {
+                // 검사항목명·Client ID 는 사용자 값이다 — 글자로 넣는다.
+                $('#cboItem').empty().append($('<option>', { value: '' }).text('전체'), (data.items || []).map(function (r) {
+                    return $('<option>', { value: r.id }).text(r.code + ' · ' + r.name);
+                }));
+                $('#cboClient').empty().append($('<option>', { value: '' }).text('전체'), (data.clients || []).map(function (r) {
+                    return $('<option>', { value: r.id }).text(r.client_id);
+                }));
+            });
+        }
+
+        searchParams() {
+            return {
+                action: 'list',
+                item_id: $('#cboItem').val() || '',
+                client_id: $('#cboClient').val() || '',
+                status: $('#cboStatus').val() || '',
+                date_from: $('#dateFrom').val() || '',
+                date_to: $('#dateTo').val() || ''
+            };
+        }
+
+        searchMainData() {
+            AjaxUtil.gridResearch(this.grid);
+        }
+
+        showDetail(id) {
+            const _this = this;
+            AjaxUtil.getAsyncData('/api/vision/inspection?action=detail&id=' + encodeURIComponent(id), {}, function (r) {
+                if (!r || r.success === false) { return; }
+                const fixed3 = function (value) { return value === null || value === undefined ? null : Number(value).toFixed(3); };
+                const measured = r.measured || [];   // 치수 측정의 측정점별 줄. 다른 유형은 빈 목록
+                // 판정이 먼저, 내부 식별자(검사 ID)는 맨 아래다. 검사 유형과 무관해 값이 없는 줄(null)은 숨긴다.
+                const rows = [
+                    ['이상 판정', _this.judgement(r.abnormal), r.abnormal ? 'fw-bold text-danger' : 'fw-bold'],
+                    ['상태', r.status_label],
+                    ['비고', r.error_message || null],
+                    ['분류 결과', r.classification || null],
+                    ['검출 결함', r.detected || null]
+                ].concat(measured.map(function (m) { return ['측정 ' + m.label, m.text, m.ok ? '' : 'fw-bold text-danger']; }), [
+                    ['이상 점수', fixed3(r.anomaly_score)],
+                    ['임계값', fixed3(r.threshold)],
+                    ['비전검사항목', r.item_code + ' · ' + r.item_name],
+                    ['클라이언트', r.client_id + (r.client_version ? ' (' + r.client_version + ')' : '')],
+                    // 치수 측정은 모델 없이 측정값으로 판정한다 — 모델 줄을 감춘다
+                    ['모델', r.model || (measured.length ? null : '매핑 없음')],
+                    ['추론 시간', r.inference_ms === null || r.inference_ms === undefined ? '-' : r.inference_ms + ' ms'],
+                    ['촬영 시각', r.capture_timestamp || '-'],
+                    ['카메라', r.camera || '-'],
+                    ['검사 ID', r.id]
+                ]).filter(function (row) { return row[1] !== null; });
+                // camera·client_version 등은 Client 가 보낸 값이다 — 글자로 넣는다.
+                $('#inspDetail tbody').empty().append(rows.map(function (row) {
+                    return $('<tr>').append($('<th>', { 'class': 'table-light', style: 'width:140px' }).text(row[0]),
+                        $('<td>', { 'class': row[2] || '' }).text(row[1] === undefined ? '-' : row[1]));
+                }));
+                if (r.image_id) {
+                    $('#inspImageEmpty').addClass('d-none');
+                    $('#inspImage').attr('src', '/media/image/' + r.image_id + '/').removeClass('d-none');
+                } else {
+                    _this.showImageMessage('검사 이미지가 없습니다.');
+                }
+            });
+        }
+
+        // 이상 판정 표기. 판정 전(접수·실패)은 '-'.
+        judgement(abnormal) {
+            return abnormal === null || abnormal === undefined ? '-' : (abnormal ? '이상' : '정상');
+        }
+
+        showImageMessage(message) {
+            $('#inspImage').addClass('d-none').removeAttr('src');
+            $('#inspImageEmpty').text(message).removeClass('d-none');
+        }
+    }
+
+    let page = new InspectionPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

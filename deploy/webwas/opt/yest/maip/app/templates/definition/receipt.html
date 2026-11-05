@@ -1,0 +1,103 @@
+{% extends "app/layout_page.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="입고 내역">입고 내역</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="card-body">
+        <form id="searchForm" autocomplete="off" onsubmit="return false">
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label">입고일</label>
+                    <div class="d-flex align-items-center gap-1">
+                        <input type="date" class="form-control" id="dateFrom">
+                        <span>~</span>
+                        <input type="date" class="form-control" id="dateTo">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="keyword" class="form-label">입고번호/품목</label>
+                    <input type="text" class="form-control" id="keyword" maxlength="100">
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="project" class="form-label">프로젝트</label>
+                    <input type="text" class="form-control" id="project" maxlength="100">
+                </div>
+                <div class="col-auto align-self-end">
+                    <button type="button" class="btn btn-search" id="btnSearch">조회</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">입고 목록</span></div>
+</div>
+<div id="main-grid"></div>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+    // 입고는 ERP 구매요청(= 입고의뢰) 반영(apply_interface)으로만 들어온다 — 조회 전용(기준정보 > 입고 내역).
+    // 검사는 수입검사 작성의 검사 작업 목록이 다룬다(설계 2026-10-21 §6).
+
+    class ReceiptPage {
+        init() {
+            const _this = this;
+            this.url = '/api/definition/receipt';
+            this.params = null;     // 마지막 [조회] 조건. 페이지 이동이 같은 조건을 쓴다
+            this.createGrid();
+            this.search();
+            $('#btnSearch').on('click', function () { _this.search(); });
+            $('#keyword, #project').on('keydown', function (e) { if (e.key === 'Enter') { _this.search(); } });
+        }
+
+        createGrid() {
+            const _this = this;
+            // 입고는 구매요청을 받을수록 쌓인다. 서버 페이징이고 입고일 최신순 고정이라 헤더 정렬을 끈다.
+            const source = AjaxUtil.gridRemoteSource(this.url, function () { return _this.params; });
+            const columns = [
+                { dataField: 'receipt_no', headerText: '입고번호', width: 140, align: 'left' }
+                , { dataField: 'receipt_date', headerText: '입고일', width: 90 }
+                , { dataField: 'item_code', headerText: '품목코드', width: 110, align: 'left' }
+                , { dataField: 'item_name', headerText: '품목명', width: 200, align: 'left' }
+                , { dataField: 'spec', headerText: '규격', width: 140, align: 'left' }
+                , { dataField: 'category', headerText: '대분류', width: 80 }
+                , { dataField: 'qty', headerText: '수량', width: 60, align: 'right' }
+                , { dataField: 'vendor_name', headerText: '거래처', width: 160, align: 'left' }
+                , { dataField: 'project_no', headerText: '프로젝트', width: 90 }
+                , { dataField: 'project_name', headerText: '프로젝트명', width: 160, align: 'left' }
+            ];
+            this.grid = WeZonGrid.create('#main-grid', {
+                columnLayout: columns
+                , props: {
+                    height: Math.max(400, $(window).height() - $('#main-grid').offset().top - 90), enableSorting: false,
+                    selectionMode: 'singleRow', dataMode: 'server', rowIdField: 'id', remoteDataSource: source,
+                    enablePaging: true, pageSize: 50, pageSizeOptions: [50, 100]
+                }
+            });
+            GridUtil.fitWidth(this.grid);
+        }
+
+        search() {
+            if (!this.grid) { return; }
+            this.params = {
+                action: 'list',
+                date_from: $('#dateFrom').val() || '',
+                date_to: $('#dateTo').val() || '',
+                keyword: $('#keyword').val() || '',
+                project: $('#project').val() || ''
+            };
+            AjaxUtil.gridResearch(this.grid);
+        }
+    }
+
+    let page = new ReceiptPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

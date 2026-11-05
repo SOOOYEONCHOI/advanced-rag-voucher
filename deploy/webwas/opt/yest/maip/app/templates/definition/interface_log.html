@@ -1,0 +1,213 @@
+{% extends "app/layout_page.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="인터페이스 이력">인터페이스 이력</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="card-body">
+        <form id="searchForm" autocomplete="off" onsubmit="return false">
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="cboKind" class="form-label">종류</label>
+                    <select class="form-select" id="cboKind"><option value="">전체</option></select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-1">
+                    <label for="cboChannel" class="form-label">경로</label>
+                    <select class="form-select" id="cboChannel"><option value="">전체</option></select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="cboStatus" class="form-label">상태</label>
+                    <select class="form-select" id="cboStatus"><option value="">전체</option></select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label">수신일</label>
+                    <div class="d-flex align-items-center gap-1">
+                        <input type="date" class="form-control" id="dateFrom">
+                        <span>~</span>
+                        <input type="date" class="form-control" id="dateTo">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <label for="source" class="form-label">출처</label>
+                    <input type="text" class="form-control" id="source" maxlength="100">
+                </div>
+                <div class="col-auto align-self-end">
+                    <button type="button" class="btn btn-search" id="btnSearch">조회</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">수신 목록</span></div>
+</div>
+<div id="main-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit"><span class="right_align rpt" id="detailTitle">상세 정보</span></div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-input d-none" data-open-menu="wm_receipt" data-kind="ERP_PURCHASE_REQ">입고 내역</button>
+            <button type="button" class="btn btn-input d-none" data-open-menu="wm_product_bom" data-kind="PLM_PART_BOM">품목·BOM 조회</button>
+        </div>
+    </div>
+    <ul class="tab_links nav nav-tabs nav-bordered mb-2">
+        <li class="nav-item"><a href="#tabSummary" data-bs-toggle="tab" class="nav-link active">요약</a></li>
+        <li class="nav-item"><a href="#tabRows" data-bs-toggle="tab" class="nav-link">원본 데이터</a></li>
+    </ul>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tabSummary" role="tabpanel">
+            <p class="text-muted mb-0" id="summaryEmpty">목록에서 수신건을 선택합니다.</p>
+            <table class="table table-sm table-bordered mb-0 d-none" id="summaryTable"><tbody></tbody></table>
+        </div>
+        <div class="tab-pane fade" id="tabRows" role="tabpanel">
+            <p class="text-muted mb-2">받은 값을 그대로 보입니다. 열 이름은 원본 머리글입니다.</p>
+            <div id="rows-grid"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+    // 수신·반영은 명령(import_interface·apply_interface)이 한다 — 이 화면은 조회 전용이다.
+    const FAILED_STATUS = ['RECEIVE_FAILED', 'APPLY_FAILED'];
+
+    class InterfaceLogPage {
+        init() {
+            const _this = this;
+            this.url = '/api/definition/interface_log';
+            this.params = null;     // 마지막 [조회] 조건. 페이지 이동이 같은 조건을 쓴다
+            this.batch = null;      // 고른 수신건. 원본 데이터 페이지 이동이 쓴다
+            this.kind = null;       // 원본 데이터 그리드의 지금 열 구성(종류)
+            // 수신건은 쌓이기만 한다. 서버 페이징이고 최신순 고정이라 헤더 정렬을 끈다.
+            const source = AjaxUtil.gridRemoteSource(this.url, function () { return _this.params; });
+            this.grid = WeZonGrid.create('#main-grid', {
+                columnLayout: [
+                    { dataField: 'id', headerText: 'No', width: 60, align: 'center' }
+                    , { dataField: 'kind_label', headerText: '종류', width: 150 }
+                    , { dataField: 'channel_label', headerText: '경로', width: 80 }
+                    , { dataField: 'source_ref', headerText: '출처', width: 300, align: 'left' }
+                    , { dataField: 'row_count', headerText: '행수', width: 70, align: 'right' }
+                    , {
+                        dataField: 'status_label', headerText: '상태', width: 110,
+                        styleFunction: function (rowIndex, columnIndex, value, item) {
+                            return FAILED_STATUS.indexOf(item.status) >= 0 ? 'text-danger fw-bold' : '';
+                        }
+                    }
+                    , { dataField: 'received_at', headerText: '수신일시', width: 150 }
+                    , { dataField: 'receiver', headerText: '수신자', width: 100 }
+                    , { dataField: 'applied_at', headerText: '반영일시', width: 150 }
+                ]
+                , props: {
+                    height: 320, enableSorting: false, selectionMode: 'singleRow',
+                    dataMode: 'server', rowIdField: 'id', remoteDataSource: source,
+                    enablePaging: true, pageSize: 50, pageSizeOptions: [50, 100]
+                }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.grid.on('cellClick', function (e) { _this.select(e.item.id); });
+
+            // 원본 행은 수신건마다 수천 행일 수 있다 — 서버 페이징. 열은 고른 수신건의 종류로 바꾼다.
+            const rowsSource = AjaxUtil.gridRemoteSource(this.url, function () {
+                return _this.batch ? { action: 'rows', batch_id: _this.batch } : null;
+            });
+            this.rowsGrid = WeZonGrid.create('#rows-grid', {
+                columnLayout: [{ dataField: 'RowNo', headerText: '행', width: 60, align: 'center' }]
+                , props: {
+                    height: 400, enableSorting: false, selectionMode: 'singleRow',
+                    dataMode: 'server', rowIdField: 'RowNo', remoteDataSource: rowsSource,
+                    enablePaging: true, pageSize: 100, pageSizeOptions: [100]
+                }
+            });
+            GridUtil.fitWidth(this.rowsGrid);
+            // 숨은 탭에서 만든 그리드는 폭이 0 이다 — 탭을 열 때 다시 잰다
+            $('a[href="#tabRows"]').on('shown.bs.tab', function () { _this.rowsGrid.resize(); });
+
+            $('#btnSearch').on('click', function () { _this.search(); });
+            this.bindMenuButtons();
+            $('#source').on('keydown', function (e) { if (e.key === 'Enter') { _this.search(); } });
+            this.loadFilters();
+            this.search();
+        }
+
+        // 반영 결과를 보는 화면(입고 내역·품목·BOM 조회) 탭을 열고 그리로 옮긴다. 버튼은 고른 수신건 종류의 것 하나만 보인다(select).
+        // 좌측 메뉴에 없는 화면(메뉴 권한 없음)과 셸 밖에서 연 경우는 보이지 않는다
+        bindMenuButtons() {
+            const shell = window.parent !== window && window.parent.myMenu;
+            if (!shell) { return; }
+            $('[data-open-menu]').each(function () {
+                const $btn = $(this);
+                const $link = shell.$leftSideNavi.find('.menu-leaf-link[data-mid="' + $btn.data('open-menu') + '"]');
+                if (!$link.length) { return; }
+                $btn.data('allowed', true).on('click', function () {
+                    shell.openMenu($link.data('mid'), shell.leafTitle($link), $link.data('url'));
+                });
+            });
+        }
+
+        loadFilters() {
+            AjaxUtil.getAsyncData(this.url, { action: 'filters' }, function (r) {
+                if (!r || r.success === false) { return; }
+                [['#cboKind', r.kinds], ['#cboChannel', r.channels], ['#cboStatus', r.statuses]].forEach(function (pair) {
+                    $(pair[0]).append((pair[1] || []).map(function (c) { return $('<option>', { value: c.value }).text(c.label); }));
+                });
+            });
+        }
+
+        search() {
+            this.params = {
+                action: 'list',
+                kind: $('#cboKind').val() || '',
+                channel: $('#cboChannel').val() || '',
+                status: $('#cboStatus').val() || '',
+                date_from: $('#dateFrom').val() || '',
+                date_to: $('#dateTo').val() || '',
+                source: $('#source').val() || ''
+            };
+            AjaxUtil.gridResearch(this.grid);
+        }
+
+        select(id) {
+            const _this = this;
+            AjaxUtil.getAsyncData(this.url, { action: 'detail', id: id }, function (r) {
+                if (!r || r.success === false) { return; }
+                // 출처·사유는 외부에서 온 값이다 — 글자로 넣는다
+                $('#detailTitle').text('상세 정보 — 수신건 ' + r.id + ' ' + r.kind_label);
+                const result = (r.result || []).map(function (pair) { return pair[0] + ' ' + pair[1]; }).join(' · ');
+                const rows = [
+                    ['종류', r.kind_label], ['경로', r.channel_label], ['출처', r.source_ref], ['행수', r.row_count],
+                    ['상태', r.status_label, FAILED_STATUS.indexOf(r.status) >= 0 ? 'text-danger fw-bold' : 'fw-bold'],
+                    ['수신일시', r.received_at], ['수신자', r.receiver], ['반영일시', r.applied_at],
+                    ['반영 결과', result], ['사유', r.message]
+                ];
+                $('#summaryTable tbody').empty().append(rows.map(function (row) {
+                    return $('<tr>').append($('<th>', { 'class': 'table-light', style: 'width:140px' }).text(row[0]),
+                        $('<td>', { 'class': row[2] || '' }).text(row[1] === '' || row[1] === null || row[1] === undefined ? '-' : row[1]));
+                }));
+                $('[data-open-menu]').each(function () {
+                    $(this).toggleClass('d-none', !($(this).data('allowed') && $(this).data('kind') === r.kind));
+                });
+                $('#summaryEmpty').addClass('d-none');
+                $('#summaryTable').removeClass('d-none');
+
+                if (_this.kind !== r.kind) {
+                    _this.kind = r.kind;
+                    _this.rowsGrid.setColumnLayout([{ dataField: 'RowNo', headerText: '행', width: 60, align: 'center' }]
+                        .concat(r.columns.map(function (c) { return { dataField: c.field, headerText: c.header, width: 120, align: 'left' }; })));
+                }
+                _this.batch = r.id;
+                AjaxUtil.gridResearch(_this.rowsGrid);
+            });
+        }
+    }
+
+    let page = new InterfaceLogPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "standard": {
+      "format": "[%(asctime)s][%(levelname)s][%(name)s][%(filename)s:%(lineno)d] %(message)s"
+    }
+  },
+  "filters": {
+    "debug_only": {"()": "app.utils.log.log.DebugOnlyFilter"},
+    "info_warning": {"()": "app.utils.log.log.InfoWarningFilter"}
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "formatter": "standard",
+      "level": "INFO"
+    },
+    "file_debug": {
+      "class": "app.utils.log.log.DailyFileHandler",
+      "formatter": "standard",
+      "filters": ["debug_only"],
+      "directory": "./instance/log",
+      "label": "DEBUG",
+      "retention_days": 30,
+      "encoding": "utf-8"
+    },
+    "file_info": {
+      "class": "app.utils.log.log.DailyFileHandler",
+      "formatter": "standard",
+      "filters": ["info_warning"],
+      "directory": "./instance/log",
+      "label": "INFO",
+      "retention_days": 30,
+      "encoding": "utf-8"
+    },
+    "file_error": {
+      "class": "app.utils.log.log.DailyFileHandler",
+      "formatter": "standard",
+      "level": "ERROR",
+      "directory": "./instance/log",
+      "label": "ERROR",
+      "retention_days": 90,
+      "encoding": "utf-8"
+    }
+  },
+  "root": {
+    "handlers": ["console", "file_debug", "file_info", "file_error"],
+    "level": "INFO"
+  }
+}

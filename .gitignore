@@ -1,0 +1,129 @@
+# =============================================================================
+# .gitignore — NEOCON RAG (backend / docling-parser / frontend 공통)
+# 2026.09.29 생성
+# =============================================================================
+
+# ── 환경변수·비밀정보 ─────────────────────────────────────────────────────────
+# 실제 키·비밀번호가 들어있는 파일은 절대 커밋하지 않는다. 템플릿(.env.example)만 커밋.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── 런타임 데이터 (instance) ──────────────────────────────────────────────────
+# SQLite DB, 파싱 결과 md(MD_SAVE_DIR), 스프레드시트 resource(xl_res), 로그 등
+instance/
+**/instance/
+
+# ── 원본·샘플 문서 (사내 문서, 대용량) ─────────────────────────────────────────
+*.xlsx
+*.xlsm
+*.xls
+# 테스트용 합성 파일을 커밋해야 하면 아래처럼 예외로 추가
+# !tests/fixtures/*.xlsx
+
+# ── 작업 인계용 임시 폴더 (Claude Code / Codex) ────────────────────────────────
+_excel_ingest_모듈/
+_claude_code_프롬프트/
+
+# ── DB 파일 ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.dump
+*.sql.gz
+
+# ── Docker 볼륨·로컬 데이터 ───────────────────────────────────────────────────
+pgdata/
+postgres_data/
+qdrant_storage/
+qdrant_data/
+data/
+uploads/
+logs/
+qdrant_storage/
+
+# ── 모델·캐시 ────────────────────────────────────────────────────────────────
+huggingface-cache/
+.cache/
+*.safetensors
+*.bin
+*.onnx
+
+# ── 로그 ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.ipynb_checkpoints/
+
+# ── Node (frontend) ──────────────────────────────────────────────────────────
+node_modules/
+.next/
+.nuxt/
+out/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── IDE·OS ───────────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── AI 코딩 도구 로컬 설정 ────────────────────────────────────────────────────
+# 팀 공용 설정(CLAUDE.md, AGENTS.md, .claude/settings.json)은 커밋하고, 개인 설정만 제외
+.claude/settings.local.json
+
+# Local generated artifacts and deployment packages
+.ua/
+.playwright-mcp/
+.svn/
+*.rpm
+*.deb
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+~$*
+docling-parser/app/results/
+# Reference mockups contain internal source images (CLAUDE.md)
+docs/design/mockups/
+
+*.env
+*.whl
+
+
+env.sh
+

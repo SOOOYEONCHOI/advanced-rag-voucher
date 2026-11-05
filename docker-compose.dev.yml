@@ -1,0 +1,129 @@
+# WSL 로컬 개발용 Docker Compose
+#
+# vLLM 서비스(LLM / Embedding / Reranker)는 10.10.10.110 외부 서버를 그대로 사용.
+# 로컬에서는 Backend + Qdrant + PostgreSQL 만 컨테이너로 실행한다.
+#
+# 사용법:
+#   (2026.10.20 수정 - WSL에는 compose 플러그인이 없어 docker-compose v1 표기로 통일)
+#   docker-compose -f docker-compose.dev.yml up -d --build   # 최초 실행(이미지 빌드 포함)
+#   docker-compose -f docker-compose.dev.yml up -d           # 백그라운드 실행
+#   docker-compose -f docker-compose.dev.yml up              # 포그라운드 (로그 출력)
+#   docker-compose -f docker-compose.dev.yml down            # 종료
+#   docker-compose -f docker-compose.dev.yml logs -f backend # 백엔드 로그
+#   docker-compose -f docker-compose.dev.yml up -d postgres-dev  # DB만 실행 (로컬 직접 실행·테스트용, 호스트 5432)
+#
+# Frontend는 별도로 실행:
+#   cd frontend && npm run dev   (vite.config.js proxy → http://localhost:8081)
+
+version: '3.8'
+
+services:
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./adrag_backend
+      dockerfile: Dockerfile.dev          # CPU 개발용 이미지
+    image: rag-backend-dev:latest
+    container_name: rag-backend-dev
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env                              # .env 기본값 로드
+    environment:
+      - TZ=Asia/Seoul
+      # ── vLLM: 외부 서버 고정 (environment가 env_file보다 우선 적용) ──────
+      - VLLM_API_URL=${VLLM_API_URL}
+      - EMBEDDING_API_URL=${EMBEDDING_API_URL}
+      - RERANKER_API_URL=${RERANKER_API_URL}
+      # ── Qdrant: 로컬 컨테이너 서비스명 ──────────────────────────────────
+      - QDRANT_HOST=qdrant-dev
+      - QDRANT_PORT=6333
+      # ── PostgreSQL: 로컬 컨테이너 서비스명 (2026.09.29 파일 DB → PostgreSQL 전환) ──
+      - POSTGRES_HOST=postgres-dev
+      - POSTGRES_PORT=5432
+      # ── 모델 캐시: 컨테이너 내부 경로로 고정 (named volume 사용) ─────────
+      - HF_CACHE_DIR=/root/.cache/huggingface
+      # ── spreadsheet resource 저장 (2026.08.27 sooyeon.choi 추가) ─────────
+      # 값은 .env에서 관리한다.
+      - RESOURCE_STORAGE_ROOT=${RESOURCE_STORAGE_ROOT}
+      - RESOURCE_INTERNAL_API_KEY=${RESOURCE_INTERNAL_API_KEY}
+      # 2026.08.28(sooyeon.choi) 추가 - 파서가 resource를 회신할 이 백엔드 주소
+      - BACKEND_CALLBACK_URL=${BACKEND_CALLBACK_URL}
+      - RESOURCE_DELIVERY=${RESOURCE_DELIVERY:-pull}
+      - RESOURCE_MAX_UPLOAD_BYTES=${RESOURCE_MAX_UPLOAD_BYTES}
+      - RESOURCE_STAGING_TTL_HOURS=${RESOURCE_STAGING_TTL_HOURS}
+      # 2026.10.12 추가 - Phasdev는 엑셀을 excel_ingest(backend)로 처리 — 역할·Step 기반 이미지 답변 확인용
+      #   (.env에 EXCEL_PARSE_MODE가 있으면 그 값. 컨테이너에 LibreOffice가 없어 .xls 업로드는 "LibreOffice 필요" 오류)
+      - EXCEL_PARSE_MODE=${EXCEL_PARSE_MODE}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS}
+      - LOG_ERROR_RETENTION_DAYS=${LOG_ERROR_RETENTION_DAYS}
+      # 2026.10.20 추가 - D-19: 기동 시 활성 관리자가 없으면 .env의 ADMIN_PASSWORD로 관리자 자동 생성
+      #   (아이디는 DEV_BOOTSTRAP_ADMIN_ID, 기본 admin. ADMIN_PASSWORD는 env_file로 전달. dev compose에서만 켠다)
+      - DEV_BOOTSTRAP_ADMIN=${DEV_BOOTSTRAP_ADMIN}
+      - DEV_BOOTSTRAP_ADMIN_ID=${DEV_BOOTSTRAP_ADMIN_ID}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    user: root                            # 볼륨 마운트 권한 문제 방지
+    volumes:
+      - ./adrag_backend:/app               # 소스 코드 실시간 반영 (--reload 연동)
+      # - /opt/venv                         # 가상환경을 소스 마운트로 덮어쓰지 않도록 격리
+      - model-cache:/root/.cache          # fastembed + HuggingFace 모델 영구 캐시
+    networks:
+      - rag-dev-network
+    depends_on:
+      qdrant-dev:
+        condition: service_started
+      postgres-dev:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Qdrant ─────────────────────────────────────────────────────────────────
+  qdrant-dev:
+    image: qdrant/qdrant:v1.18.2
+    container_name: rag-qdrant-dev
+    ports:
+      - "6333:6333"
+      - "6334:6334"                       # gRPC (선택 사항)
+    volumes:
+      # 2026.10.20 수정 - Windows 드라이브(/mnt/d) 바인드 마운트는 디스크 기록이 느려 대화 주제(컬렉션) 생성이
+      #   약 34초 걸림(payload 인덱스 16개 × 약 2초) → Linux 파일시스템 named volume으로 변경(측정: 인덱스 5개 9.9초 → 1.1초)
+      - qdrant-dev-storage:/qdrant/storage
+      # - ./adrag_backend/instance/qdrant_storage:/qdrant/storage
+    networks:
+      - rag-dev-network
+    restart: unless-stopped
+
+  # ── PostgreSQL (2026.09.29 추가) ────────────────────────────────────────────
+  postgres-dev:
+    image: postgres:16.14
+    container_name: rag-postgres-dev
+    environment:
+      - TZ=Asia/Seoul
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - rag-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+networks:
+  rag-dev-network:
+    driver: bridge
+
+volumes:
+  model-cache:                            # fastembed BM42 + HuggingFace 모델 캐시
+    driver: local
+  qdrant-dev-storage:                     # Qdrant 데이터 (named volume, 2026.10.20 바인드 마운트에서 전환)
+    driver: local
+  postgres-dev-data:                      # PostgreSQL 데이터 (named volume)
+    driver: local

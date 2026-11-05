@@ -1,0 +1,539 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="digFormSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="양식">양식</label>
+                            <select class="form-select" id="cboForm" name="cboForm"></select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <!-- 메뉴 params form_type: INCOMING(수입검사)=입고번호·품목(검사 작업 목록), 그 외=WO. 일부만 맞아도 찾는다 -->
+                            {% if gparam.form_type == 'INCOMING' %}
+                            <label class="form-label" data-labelCd="입고번호/품목">입고번호/품목</label>
+                            {% else %}
+                            <label class="form-label" data-labelCd="WO">WO</label>
+                            {% endif %}
+                            <input type="text" class="form-control" id="txtWorkOrder" name="txtWorkOrder" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" for="cboKind" data-labelCd="상태">상태</label>
+                            <select class="form-select" id="cboKind" name="cboKind">
+                                <option value="">전체</option><option value="WAITING">대기</option><option value="WORKING">작성 중</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-end">
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#digFormSearchCollapse" role="button" aria-expanded="true" aria-controls="digFormSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<!-- 검사 작업 목록 — 대기([작성])와 작성 중([열기]). 1024 폭(탭 930px)에서도 가로 스크롤이 없다.
+     수입검사의 대기는 매핑된 입고 × 양식 중 작성건이 없는 것(설계 2026-10-21 §6). 품질검사의 대기는 작업지시 중 아직 쓰지 않은 것인데
+     작업지시 데이터 출처가 정해지지 않아 지금은 비어 있고, 작업지시 관리 화면을 이 화면에 합쳤다(사용자 결정 2026-10-21) -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span data-labelCd="검사 작업 목록">검사 작업 목록</span>
+        {% if gparam.form_type != 'INCOMING' %}<span class="text-muted ms-2" style="font-size:12px" id="waitingNotice">대기는 작업지시 데이터를 연결하면 나옵니다. 지금은 [신규 작성]으로 시작합니다.</span>{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        {% if gparam.form_type != 'INCOMING' %}
+        <button type="button" class="btn btn-input y_write_auth" id="btnNewWorkOrder" data-labelCd="작업지시 등록">작업지시 등록</button>
+        {% endif %}
+        <button type="button" class="btn btn-input y_write_auth" id="btnNew" data-labelCd="신규 작성">신규 작성</button>
+    </div>
+</div>
+<div id="workingGrid"></div>
+{% endblock %}
+
+{% block scripts %}
+{% include 'dig_form/dig_form_renderer.html' %}
+{% include 'data/camera_capture.html' %}
+{% include 'dig_form/dig_form_capture.html' %}
+{% include 'dig_form/dig_form_wo_popup.html' %}
+{% include 'dig_form/dig_form_mat_in_popup.html' %}
+<!-- 신규 작성 팝업 — 이 구분의 사용 중인 최신 양식 중 하나를 고른다 -->
+<script type="text/x-tmpl" id="digFormNewTemplate">
+<div class="content_wrap popup p-2">
+    <div class="grid-table-radius mb-2"><div id="digFormNewGrid"></div></div>
+    <div class="d-flex justify-content-end gap-1">
+        <button type="button" class="btn btn-input" id="btnPopClose" data-commonCd="닫기">닫기</button>
+        <button type="button" class="btn btn-band" id="btnPopSelect" data-commonCd="선택">선택</button>
+    </div>
+</div>
+</script>
+<!-- 작성 모달 — 보기 상태 [수정][완료][삭제], 입력 상태 [WO 검색][수정 취소][저장][완료][삭제]. 버튼 표시는 setButtons 가 정한다 -->
+<script type="text/x-tmpl" id="digFormWriteTemplate">
+<div class="content_wrap popup p-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div><span id="formInfo" class="fw-bold"></span><span id="resultInfo" class="ms-2"></span></div>
+        <div class="d-flex flex-wrap gap-2">
+            {% if gparam.form_type == 'INCOMING' %}
+            <button type="button" class="btn btn-outline-light" id="btnFindWO" data-labelCd="자재입고 검색">자재입고 검색</button>
+            {% else %}
+            <button type="button" class="btn btn-outline-light" id="btnFindWO" data-labelCd="WO 검색">WO 검색</button>
+            {% endif %}
+            <button type="button" class="btn btn-input" id="btnEdit" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-input" id="btnCancelEdit" data-labelCd="수정 취소">수정 취소</button>
+            <button type="button" class="btn btn-band" id="btnSave" data-commonCd="저장">저장</button>
+            <button type="button" class="btn btn-band" id="btnComplete" data-labelCd="완료">완료</button>
+            <button type="button" class="btn btn-dell" id="btnDelete" data-commonCd="삭제">삭제</button>
+        </div>
+    </div>
+    <!-- 머리글에 입고번호/WO 칸이 없는 양식의 입력줄 — setMode 가 없는 것만 채운다 -->
+    <div class="d-none flex-wrap align-items-center gap-3 mb-2" id="digFormBaseBar"></div>
+    <div class="table-responsive mb-3">
+        <div class="dig-form-grid"><table class="dig-form-table" id="digFormTopTable"></table></div>
+    </div>
+    <!-- 본문: 섹션마다 표(점검항목) 또는 참고사진 — DigFormRenderer.render 가 채움 -->
+    <div id="digFormTable"></div>
+</div>
+</script>
+<script type="text/javascript">
+    // 검사작성: 작성 중 목록을 양식·입고번호/WO 로 찾고, 행의 [열기]로 작성 모달(보기)을 연다 → [수정]으로 입력 → [저장]·[완료]·[삭제]
+    // [신규 작성]·검사양식 [검사 작성]은 같은 모달을 입력 상태로 연다(사용자 결정 2026-10-19)
+    // 같은 양식·WO 의 작성 중인 검사는 하나(이어쓰기). 완료된 검사는 고치지 않고 검사결과에서 본다(사용자 결정 2026-10-16)
+    // 저장은 바뀐 칸만 — 칸의 작업자는 그 칸을 마지막으로 저장한 사람이다
+    const FORM_TYPE = '{{ gparam.form_type|escapejs }}';
+    const WO_LABEL = FORM_TYPE === 'INCOMING' ? '입고번호' : 'WO';
+
+    class DigFormWritePage {
+        constructor() {
+            let _this = this;
+            this.renderer = new DigFormRenderer();
+            this.url = this.renderer.url;
+            this.popup = null;      // 열린 작성 모달
+            this.$content = null;
+            this.formId = null;
+            this.resultId = null;   // 불러온 작성건 — null 이면 새 작성
+            this.header = null;     // 불러온 작성건 머리 — 작성일·WO·차수·is_mine
+            this.values = [];
+            this.dirty = false;     // 저장하지 않은 입력 — 모달을 닫을 때 묻는다
+            // 1024 폭(탭 930px, 카드 안)에서 넘치지 않게 칸 정의 폭 합을 줄인다 — 넓은 화면은 fitWidth 가 늘린다
+            this.grid = WeZonGrid.create('#workingGrid', {
+                columnLayout: FORM_TYPE === 'INCOMING' ? this.jobColumns() : this.stateColumns().concat([
+                    { dataField: 'write_date', headerText: '작성일', width: 90, align: 'center' },
+                    { dataField: 'form_code', headerText: '양식코드', width: 75, align: 'center' },
+                    { dataField: 'form_title', headerText: '양식명', width: 150, align: 'left' },
+                    { dataField: 'form_version', headerText: '개정', width: 45, align: 'center' },
+                    { dataField: 'work_order_number', headerText: WO_LABEL, width: 110, align: 'left' },
+                    { dataField: 'round', headerText: '차수', width: 45, align: 'center' },
+                    {
+                        dataField: 'value_count', headerText: '입력', width: 65, align: 'right',
+                        labelFunction: function (rowIndex, columnIndex, value, item) { return value + ' / ' + item.input_count; }
+                    },
+                    { dataField: 'creater_name', headerText: '작성자', width: 70, align: 'center' },
+                    { dataField: 'created', headerText: '작성일시', width: 105, align: 'center' },
+                ]),
+                // 아래 작성 영역이 없으므로 목록이 창 아래까지 쓴다
+                props: { height: Math.max(300, $(window).height() - $('#workingGrid').offset().top - 40), enableSorting: true, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(this.grid);
+        }
+
+        // 검사 작업 목록의 앞 두 칸 — 버튼은 대기면 [작성], 작성 중이면 [열기](action_label)
+        stateColumns() {
+            let _this = this;
+            return [
+                {
+                    dataField: 'action_label', headerText: '작업', width: 60,
+                    renderer: { type: 'button', className: 'btn btn-input py-0 px-2', onClick: function (item) { _this.openJob(item); } }
+                },
+                {
+                    dataField: 'kind_label', headerText: '상태', width: 60, align: 'center',
+                    styleFunction: function (rowIndex, columnIndex, value, item) { return item.kind === 'WAITING' ? 'text-danger fw-bold' : ''; }
+                },
+            ];
+        }
+
+        // 수입검사 검사 작업 목록 칸
+        jobColumns() {
+            return this.stateColumns().concat([
+                { dataField: 'receipt_no', headerText: '입고번호', width: 110, align: 'left' },
+                { dataField: 'receipt_date', headerText: '입고일', width: 85, align: 'center' },
+                { dataField: 'item_name', headerText: '품목명', width: 140, align: 'left' },
+                { dataField: 'qty', headerText: '수량', width: 50, align: 'right' },
+                { dataField: 'form_code', headerText: '양식코드', width: 75, align: 'center' },
+                { dataField: 'form_title', headerText: '양식명', width: 130, align: 'left' },
+                {
+                    dataField: 'value_count', headerText: '입력', width: 65, align: 'right',
+                    labelFunction: function (rowIndex, columnIndex, value, item) { return value + ' / ' + item.input_count; }
+                },
+                { dataField: 'writer_name', headerText: '작성자', width: 70, align: 'center' },
+            ]);
+        }
+
+        // 양식 고르기 — 품질은 이 구분의 모든 버전(작성 중인 검사가 옛 버전에 달려 있을 수 있다),
+        // 수입은 검사 작업이 양식 코드 단위라 코드마다 최신 버전 하나(값 = 코드)
+        loadForms() {
+            let $cbo = $('#cboForm').empty().append($('<option>').val('').text('전체'));
+            let incoming = FORM_TYPE === 'INCOMING';
+            AjaxUtil.getAsyncData(this.url, { action: 'form_list', form_type: FORM_TYPE, latest_only: incoming ? 'Y' : '' }, function (rows) {
+                (rows || []).forEach(function (f) {
+                    $cbo.append($('<option>').val(incoming ? f.code : f.id).text(f.code + (incoming ? '' : ' Rev.' + f.version) + ' ' + f.title));
+                });
+            });
+        }
+
+        loadWorking() {
+            let _this = this;
+            if (FORM_TYPE === 'INCOMING') {
+                let jobParam = { action: 'job_list', form_type: FORM_TYPE, form_code: $('#cboForm').val(),
+                                 keyword: $.trim($('#txtWorkOrder').val()), kind: $('#cboKind').val() };
+                AjaxUtil.getAsyncData(_this.url, jobParam, function (rows) {
+                    _this.grid.setData((Array.isArray(rows) ? rows : []).map(function (r) {
+                        return Object.assign({}, r, { action_label: r.kind === 'WAITING' ? '작성' : '열기' });
+                    }));
+                });
+                return;
+            }
+            // 품질검사 — 대기(작업지시)는 아직 출처가 없어 작성 중만 있다
+            if ($('#cboKind').val() === 'WAITING') { _this.grid.setData([]); return; }
+            let param = { action: 'result_search', form_type: FORM_TYPE, state: 'working',
+                          form_id: $('#cboForm').val(), work_order_number: $.trim($('#txtWorkOrder').val()) };
+            AjaxUtil.getAsyncData(_this.url, param, function (rows) {
+                _this.grid.setData((rows || []).map(function (r) {
+                    return Object.assign({}, r, { kind: 'WORKING', kind_label: '작성 중', action_label: '열기' });
+                }));
+            });
+        }
+
+        // 검사 작업 행 — 대기는 그 양식(사용 중인 최신 버전)·입고번호로 새로 쓰고, 작성 중은 보기로 연다
+        openJob(row) {
+            if (FORM_TYPE !== 'INCOMING') { this.openResult(row); return; }    // 품질검사는 작성 중만 있다
+            if (row.kind === 'WAITING') { this.start(row.form_id, row.receipt_no); return; }
+            this.openResult({ id: row.result_id, form_id: row.form_id, write_date: row.write_date, work_order_number: row.receipt_no,
+                              round: row.round, header_values: row.header_values, writer_name: row.writer_name, is_mine: row.is_mine });
+        }
+
+        // 모달 닫기 — 저장하지 않은 수정이 있으면 묻는다. 닫힌 뒤 fnNext(다른 모달 열기 등)
+        closeModal(fnNext) {
+            let _this = this;
+            let done = function () {
+                if (_this.popup) _this.popup.forceClose();
+                if (fnNext) fnNext();
+            };
+            if (!_this.popup || !_this.dirty) { done(); return; }
+            Alert.confirm('', '저장하지 않은 내용이 있습니다. 저장하지 않고 닫으시겠습니까?', done);
+        }
+
+        // 작성 모달 — 화면 폭 최대(검사양식 상세 조회와 같은 크기 규칙). 열려 있던 모달은 닫기 규칙을 거친다
+        openModal(fnReady) {
+            let _this = this;
+            _this.closeModal(function () {
+                let $content = _this.$content = $(tmpl('digFormWriteTemplate', {}));
+                $content.find('button').hide();   // 값을 읽어 상태가 정해지면 setButtons 가 보인다
+                let popup = _this.popup = new PopupDraggable('검사 작성');
+                let scrollbar = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+                popup.open({
+                    width: document.documentElement.clientWidth - scrollbar - 32,
+                    height: $(window).height() - 64,
+                    $content,
+                }, function () {
+                    if (_this.popup !== popup) return;
+                    _this.popup = null;
+                    _this.$content = null;
+                    _this.dirty = false;
+                });
+                // 닫기(오른쪽 위 X)도 저장 여부를 묻는다. 묻지 않고 닫을 때는 forceClose
+                popup.forceClose = popup.close.bind(popup);
+                popup.close = function () { _this.closeModal(); };
+                _this.renderer.bindInputEvents();   // 새 #digFormTable 에 입력 이벤트를 묶는다
+                $content.on('input change', '#digFormTable input, #digFormTable select, #digFormTable textarea, #digFormTopTable input, #digFormTopTable select, #digFormTopTable textarea, #digFormBaseBar input', function () { _this.dirty = true; });
+                $content.on('change', '#work_order_number', function () { _this.checkWorkOrder(); });
+                $content.find('#btnFindWO').on('click', function () { _this.findWorkOrder(); });
+                $content.find('#btnEdit').on('click', function () { _this.setMode('input'); });
+                $content.find('#btnCancelEdit').on('click', function () { _this.cancelEdit(); });
+                $content.find('#btnSave').on('click', function () { _this.save(); });
+                $content.find('#btnComplete').on('click', function () { _this.complete(); });
+                $content.find('#btnDelete').on('click', function () { _this.remove(); });
+                fnReady();
+            });
+        }
+
+        // 새 작성 — [신규 작성]·검사양식 [검사 작성]·입고 조회 [검사 작성]. 입력 상태로 연다.
+        // workOrder(입고번호)를 주면 넣는다 — 같은 번호로 작성 중인 검사가 있으면 checkWorkOrder 가 이어 쓸지 묻는다
+        start(formId, workOrder) {
+            let _this = this;
+            _this.openModal(function () {
+                _this.renderer.loadDetail(formId, function () {
+                    _this.formId = formId;
+                    _this.resultId = null;
+                    _this.header = null;
+                    _this.values = [];
+                    _this.setMode('input', '새로 작성합니다. ' + WO_LABEL + '를 넣으면 작성 중인 검사를 불러와 이어 쓸 수 있습니다.');
+                    if (workOrder) $('#work_order_number').val(workOrder).trigger('change');
+                });
+            });
+        }
+
+        // 작성 중 목록의 [열기] — 보기 상태로 연다
+        openResult(row) {
+            let _this = this;
+            _this.openModal(function () {
+                _this.renderer.loadDetail(row.form_id, function () {
+                    _this.formId = row.form_id;
+                    _this.loadResult(row, 'view');
+                });
+            });
+        }
+
+        // 작성건 값을 읽어 mode(view/input)로 그린다
+        loadResult(header, mode, infoText) {
+            let _this = this;
+            AjaxUtil.getAsyncData(_this.url, { action: 'result_values', result_id: header.id }, function (values) {
+                _this.resultId = header.id;
+                _this.header = header;
+                _this.values = values || [];
+                _this.setMode(mode, infoText);
+            });
+        }
+
+        // 보기(view) ↔ 입력(input) — 같은 값으로 다시 그린다. 불러온 작성건의 입고번호/WO 는 바꾸지 않는다
+        setMode(mode, infoText) {
+            let f = this.renderer.form;
+            this.renderer.mode = mode;
+            this.renderer.render(this.values, this.header);
+            this.renderBaseBar(mode);
+            this.dirty = false;
+            if (this.resultId) $('#work_order_number').prop('readonly', true);
+            $('#formInfo').text(f.code + ' Rev.' + f.version + ' · ' + f.title);
+            $('#resultInfo').text(infoText || (this.header ? (this.header.work_order_number || '-') + ' · ' + (this.header.round || 1) + '차' : ''));
+            this.setButtons();
+        }
+
+        // 머리글에 입고번호/WO 입력칸이 없는 양식(섹션 양식 등)은 모달 위쪽 입력줄에 둔다 — 저장·WO 검색·이어쓰기가 같은 id 를 쓴다
+        // 작성일은 입력받지 않는다(서버가 새 작성건을 만든 날로 넣는다)
+        // 보기 상태는 입력칸을 읽기 전용으로 둔다. 앞으로 WO 목록 검색 모달에서 고르는 방식으로 바뀔 수 있다
+        renderBaseBar(mode) {
+            let $bar = this.$content.find('#digFormBaseBar').empty();
+            let h = this.header;
+            let fields = [];
+            if (!$('#work_order_number').length) fields.push({ id: 'work_order_number', label: WO_LABEL, type: 'text', value: h ? h.work_order_number : '' });
+            fields.forEach(function (fd) {
+                $bar.append($('<div class="d-flex align-items-center">').append(
+                    $('<label class="form-label">').attr('for', fd.id).text(fd.label),
+                    $('<input class="form-control">').attr({ id: fd.id, type: fd.type, maxlength: 50 }).prop('readonly', mode !== 'input').val(fd.value || '')));
+            });
+            $bar.toggleClass('d-none', !fields.length).toggleClass('d-flex', !!fields.length);
+        }
+
+        // 쓰기 권한이 있을 때만 — 모달은 페이지 로드 뒤 생겨 y_write_auth 자동 숨김이 닿지 않는다. [삭제]는 저장된 작성건의 작성자만
+        setButtons() {
+            let $c = this.$content;
+            let editing = this.renderer.mode === 'input';
+            let w = userinfo.can_write();
+            $c.find('#btnFindWO').toggle(w && editing && !this.resultId);
+            $c.find('#btnEdit').toggle(w && !editing);
+            $c.find('#btnCancelEdit').toggle(w && editing && !!this.resultId);   // 새 작성은 돌아갈 보기 상태가 없다 — X 로 닫는다
+            $c.find('#btnSave').toggle(w && editing);
+            $c.find('#btnComplete').toggle(w);
+            $c.find('#btnDelete').toggle(w && !!this.resultId && !!(this.header && this.header.is_mine));
+        }
+
+        // [수정 취소] — 저장된 작성건을 다시 읽어 보기 상태로 돌아간다
+        cancelEdit() {
+            let _this = this;
+            let back = function () { _this.loadResult(_this.header, 'view'); };
+            if (!_this.dirty) { back(); return; }
+            Alert.confirm('', '저장하지 않은 수정 내용이 지워집니다. 수정을 취소하시겠습니까?', back, function () { });
+        }
+
+        // 새 작성 중 입고번호/WO 입력 → 같은 양식·번호의 작성 중인 검사가 있으면 불러올지 묻는다
+        checkWorkOrder() {
+            let _this = this;
+            let wo = $.trim($('#work_order_number').val());
+            if (_this.resultId || !wo || !_this.formId) return;
+            AjaxUtil.getAsyncData(_this.url, { action: 'find_result', form_id: _this.formId, work_order_number: wo }, function (found) {
+                if (!found || !found.id) return;
+                let msg = wo + '로 작성 중인 검사가 있습니다.\n(작성일 ' + found.write_date + ', ' + found.round + '차)\n불러와서 이어 쓰시겠습니까?'
+                    + (_this.dirty ? '\n지금 입력한 내용은 지워집니다.' : '');
+                Alert.confirm('', msg, function () { _this.loadResult(found, 'input'); }, function () { });
+            });
+        }
+
+        // 저장 전 확인 — 입력값 수집·필수 검사, 통과하면 항목 목록 반환
+        collect() {
+            if (this.renderer.invalidNumbers()) {
+                Alert.alert('', '숫자 칸에는 숫자만 입력해 주세요.\n(빨간 칸 확인)');
+                return null;
+            }
+            let items = this.renderer.collectValues();
+            // 머리글 입력 항목만 고쳐도 저장한다
+            if (!items.length && $.isEmptyObject(this.renderer.collectHeaderValues())) {
+                Alert.alert('', '입력한 칸이 없습니다.');
+                return null;
+            }
+            return items;
+        }
+
+        // fnAfter 가 있으면 저장 뒤 그것을 부르고, 없으면 같은 작성건을 보기 상태로 다시 읽는다(작업자·차수 갱신)
+        doSave(fnAfter) {
+            let _this = this;
+            let items = _this.collect();
+            if (!items) return;
+            let param = {
+                form_id: _this.renderer.form.id,
+                result_id: _this.resultId || '',
+                work_order_number: $('#work_order_number').val(),
+                Q: JSON.stringify(items),
+                header_values: JSON.stringify(_this.renderer.collectHeaderValues()),
+            };
+            AjaxUtil.postAsyncData(_this.url + '?action=save', param, function (res) {
+                if (!res.success) {
+                    Alert.alert('', res.message);
+                    return;
+                }
+                _this.dirty = false;
+                _this.loadWorking();
+                if (fnAfter) { fnAfter(res.result_id); return; }
+                Notify.success('저장되었습니다.');
+                // 새 작성건은 저장한 사람이 작성자다
+                _this.loadResult({ id: res.result_id, write_date: res.write_date, work_order_number: param.work_order_number, round: res.round,
+                                   header_values: res.header_values, writer_name: res.writer_name, is_mine: _this.header ? _this.header.is_mine : true },
+                    'view', '저장되었습니다(바뀐 칸 ' + res.changed + '개).');
+            });
+        }
+
+        save() {
+            let _this = this;
+            if (!_this.collect()) return;
+            Alert.confirm('', '저장하시겠습니까?', function () { _this.doSave(); }, function () { });
+        }
+
+        // 완료 — 되돌릴 수 없다. 저장하지 않은 입력이 있거나 아직 저장 전이면 저장부터 한다
+        complete() {
+            let _this = this;
+            Alert.confirm('', '완료하면 고칠 수 없습니다.\n완료하시겠습니까?', function () {
+                let finish = function (resultId) {
+                    AjaxUtil.postAsyncData(_this.url + '?action=complete', { result_id: resultId }, function (res) {
+                        if (!res.success) {
+                            Alert.alert('', res.message);
+                            return;
+                        }
+                        Notify.success('완료되었습니다. {% if gparam.form_type == 'INCOMING' %}수입{% else %}품질{% endif %}검사 결과에서 봅니다.');
+                        // 입고 조회의 검사 대기 배지를 다시 센다
+                        if (window.parent !== window && window.parent.myMenu) window.parent.myMenu.refreshBadges();
+                        _this.dirty = false;
+                        _this.closeModal();
+                        _this.loadWorking();
+                    });
+                };
+                if (_this.dirty || !_this.resultId) _this.doSave(finish);
+                else finish(_this.resultId);
+            }, function () { });
+        }
+
+        // 삭제 — 작성 중인 검사를 작성한 사람만 지운다(서버가 확인한다)
+        remove() {
+            let _this = this;
+            if (!_this.resultId) return;
+            Alert.confirm('', '작성 중인 검사를 삭제하시겠습니까?', function () {
+                AjaxUtil.postAsyncData(_this.url + '?action=delete', { result_id: _this.resultId }, function (res) {
+                    if (!res.success) {
+                        Alert.alert('', res.message);
+                        return;
+                    }
+                    Notify.success('삭제되었습니다.');
+                    _this.dirty = false;
+                    _this.closeModal();
+                    _this.loadWorking();
+                });
+            }, function () { });
+        }
+
+        // 머리글 입고번호/WO 칸을 검색 팝업으로 채운다 — 바꾸면 작성 중인 검사를 찾는다(checkWorkOrder)
+        findWorkOrder() {
+            let keyword = $.trim($('#work_order_number').val());
+            let fill = function (value) { $('#work_order_number').val(value).trigger('change'); };
+            if (FORM_TYPE === 'INCOMING') {
+                new DigFormMatInSearchPopup().show(keyword, function (item) { fill(item.receipt_number); });
+            } else {
+                new DigFormWoSearchPopup().show(keyword, function (item) { fill(item.work_order_number); });
+            }
+        }
+    }
+
+    // 신규 작성 팝업 — 이 구분의 사용 중인 최신 양식을 고른다
+    class DigFormNewPopup {
+        show(callback) {
+            let _this = this;
+            _this.modalContainer = new PopupDraggable('신규 작성');
+            let $content = $(tmpl('digFormNewTemplate', {}));
+            _this.modalContainer.open({ width: Math.min(640, document.documentElement.clientWidth - 32), height: 480, $content });
+            _this.grid = WeZonGrid.create($content.find('#digFormNewGrid')[0], {
+                columnLayout: [
+                    { dataField: 'code', headerText: '양식코드', width: 90, align: 'center' },
+                    { dataField: 'title', headerText: '양식명', width: 300, align: 'left' },
+                    { dataField: 'version', headerText: '개정', width: 60, align: 'center' },
+                ],
+                props: { height: 340, enableSorting: true, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(_this.grid);
+            let select = function (item) {
+                _this.modalContainer.close();
+                callback(item.id);
+            };
+            _this.grid.on('cellDoubleClick', function (e) { if (e.item && e.item.id) select(e.item); });
+            $content.find('#btnPopSelect').on('click', function () {
+                let items = _this.grid.getSelectedItems();
+                if (items.length) select(items[0]);
+                else Alert.alert('', '목록에서 양식을 선택해 주세요.');
+            });
+            $content.find('#btnPopClose').on('click', function () { _this.modalContainer.close(); });
+            AjaxUtil.getAsyncData('/api/dig_form/dig_form', { action: 'form_list', form_type: FORM_TYPE, latest_only: 'Y' }, function (rows) {
+                _this.grid.setData(rows || []);
+            });
+        }
+    }
+
+    let page = null;
+    $(document).ready(function (e) {
+        page = new DigFormWritePage();
+        page.loadForms();
+        page.loadWorking();
+
+        // 검사양식·입고 조회의 [검사 작성]으로 열면 그 양식(과 입고번호)으로 새로 쓴다
+        let formId = '{{ gparam.form_id|default:""|escapejs }}';
+        if (formId) page.start(formId, '{{ gparam.work_order_number|default:""|escapejs }}');
+
+        $('#btnSearch').click(function (e) { page.loadWorking(); });
+        $('#cboKind').on('change', function () { page.loadWorking(); });
+        $('#txtWorkOrder').keypress(function (e) {
+            if (e.which === 13) {
+                e.preventDefault();   // 입력칸 form 의 Enter 자동 제출 방지
+                page.loadWorking();
+            }
+        });
+        // 작업지시 데이터 출처(ERP/MES 수신 또는 현장 등록)를 정하면 잇는다(사용자 결정 2026-10-21)
+        $('#btnNewWorkOrder').click(function () { Alert.alert('', '준비 중입니다. 작업지시 데이터를 받는 방법을 정한 뒤 연결합니다.'); });
+        $('#btnNew').click(function (e) {
+            new DigFormNewPopup().show(function (id) { page.start(id); });
+        });
+    });
+</script>
+{% endblock %}

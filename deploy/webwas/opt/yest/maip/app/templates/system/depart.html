@@ -1,0 +1,158 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <!-- 즐겨찾기 on/OFF favorite-On/Off 클래스 사용 -->
+            <a href="#"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+</div>
+
+<!-- 공통 CRUD 화면 — 목록 머리 [등록] → 등록 모달, 상세는 [수정]·[삭제](DESIGN §5.5) -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt" data-labelCd="부서 목록">부서 목록</span></div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-input y_write_auth" id="btnNew" data-commonCd="등록">등록</button>
+    </div>
+</div>
+<div id="depart-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit" data-commonCd="상세 정보">상세 정보</div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-dell y_write_auth" id="btnDelete" data-commonCd="삭제">삭제</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel" data-commonCd="취소">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave" data-commonCd="저장">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off">
+        <input type="hidden" id="id" name="id">
+        <div class="card mb-0 p-15"><div class="row g-2 align-items-end">
+            <div class="col-12 col-lg-3"><label for="code" class="form-label" data-commonCd="코드">코드</label><input type="text" class="form-control" id="code" name="code" disabled></div>
+            <div class="col-12 col-lg-3"><label for="name" class="form-label" data-labelCd="부서명">부서명</label><input type="text" class="form-control" id="name" name="name" maxlength="200" required></div>
+            <div class="col-12 col-lg-3"><label for="type" class="form-label" data-labelCd="부서유형">부서유형</label><input type="text" class="form-control" id="type" name="type" maxlength="20"></div>
+            <div class="col-12"><label for="description" class="form-label" data-commonCd="비고">비고</label><textarea class="form-control" id="description" name="description" rows="3" maxlength="1000"></textarea></div>
+        </div></div>
+    </form>
+</div>
+
+<div class="modal fade" id="departCreateModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="departCreateTitle">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="departCreateTitle">부서 등록</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      <form id="departCreateForm" autocomplete="off" onsubmit="return false">
+        <div class="mb-2"><label for="createCode" class="form-label">코드 (필수)</label>
+          <input type="text" class="form-control" id="createCode" name="code" maxlength="50" required></div>
+        <div class="mb-2"><label for="createName" class="form-label">부서명 (필수)</label>
+          <input type="text" class="form-control" id="createName" name="name" maxlength="200" required></div>
+        <div class="mb-2"><label for="createType" class="form-label">부서유형</label>
+          <input type="text" class="form-control" id="createType" name="type" maxlength="20"></div>
+        <div class="mb-2"><label for="createDescription" class="form-label">비고</label>
+          <textarea class="form-control" id="createDescription" name="description" rows="2" maxlength="1000"></textarea></div>
+        <p class="text-muted small mt-2 mb-0">코드는 등록한 뒤 바꿀 수 없습니다.</p>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-input" data-bs-dismiss="modal">취소</button>
+      <button type="button" class="btn btn-band" id="btnCreateDepart">등록</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include '../common/columns_setting.html' %}
+<script type="text/javascript">
+    // 부서 정보 — 사용자 그룹과 같은 공통 CRUD 구조. 코드는 등록 때만 넣는다. 사용자가 있는 부서는 서버가 삭제를 막는다
+    class DepartPage {
+        init() {
+            const _this = this;
+            this.grid = WeZonGrid.create('#depart-grid', {
+                columnLayout: [
+                    { dataField: 'code', headerText: '코드', width: 120, align: 'center' }
+                    , { dataField: 'name', headerText: '부서명', width: 200, align: 'left' }
+                    , { dataField: 'type', headerText: '부서유형', width: 120, align: 'left' }
+                    , { dataField: 'description', headerText: '비고', width: 350, align: 'left' }
+                ]
+                , props: { height: 400, enableSorting: true, selectionMode: 'singleRow', rowIdField: 'id' }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.detail = DetailForm.create({
+                form: '#detailForm', grid: this.grid, rowIdField: 'id', fields: '#name, #type, #description',
+                buttons: { create: '#btnNew', edit: '#btnEdit', del: '#btnDelete', save: '#btnSave', cancel: '#btnCancel' },
+                onCreate: function () { _this.openCreate(); },
+                onDelete: function (row) { _this.remove(row); },
+                onSave: function (row) { _this.save(row); }
+            });
+            this.grid.on('cellClick', function (e) { _this.detail.select(e.item); });
+            $('#btnCreateDepart').on('click', function () { _this.create(); });
+            this.searchMainData();
+        }
+
+        // select: 다시 읽은 뒤 고를 행 id. 그 행을 상세에 다시 넣는다(읽기 전용). 없으면 상세를 비운다.
+        searchMainData(select) {
+            const _this = this;
+            AjaxUtil.getAsyncData('/api/system/depart', { action: 'read' }, function (rows) {
+                rows = rows || [];
+                GridUtil.setRows(_this.grid, rows, { select: select, firstPage: select === undefined });
+                const row = rows.find(function (r) { return r.id === select; });
+                if (row) { _this.detail.bind(row); } else { _this.detail.clear(); }
+            });
+        }
+
+        openCreate() {
+            $('#departCreateForm')[0].reset();
+            $('#departCreateForm .is-invalid').removeClass('is-invalid');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('departCreateModal')).show();
+        }
+
+        create() {
+            const _this = this;
+            if (!DetailForm.requireFields($('#departCreateForm'))) { return; }
+            const data = FormUtil.extractForm($('#departCreateForm'));
+            AjaxUtil.postAsyncData('/api/system/depart?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('departCreateModal')).hide();
+                Notify.success('등록되었습니다.');
+                _this.searchMainData(res.id);
+            });
+        }
+
+        save(row) {
+            const _this = this;
+            const data = { id: row.id, name: $('#name').val(), type: $('#type').val(), description: $('#description').val() };
+            AjaxUtil.postAsyncData('/api/system/depart?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                Notify.success('저장되었습니다.');
+                _this.searchMainData(row.id);
+            });
+        }
+
+        remove(row) {
+            const _this = this;
+            Alert.confirm('', "'" + row.name + "' 부서를 삭제하시겠습니까?", function () {
+                AjaxUtil.postAsyncData('/api/system/depart?action=delete', { id: row.id }, function (res) {
+                    if (res && res.success === false) { Alert.alert('', res.message); return; }
+                    Notify.success('삭제되었습니다.');
+                    _this.searchMainData(null);
+                });
+            });
+        }
+    }
+
+    let page = new DepartPage();
+    $(document).ready(function () {
+        page.init();
+        // 저장된 컬럼 설정(머리 이름·순서)을 적용한다. 설정 버튼은 두지 않는다(사용자 결정 2026-10-19)
+        page.popColSetting = new popColSetting();
+        page.popColSetting.loadColumnData(gui.gui_code, gui.template_key, 'grid', page.grid);
+    });
+</script>
+{% endblock %}

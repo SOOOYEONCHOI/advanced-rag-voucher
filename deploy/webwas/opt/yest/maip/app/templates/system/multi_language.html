@@ -1,0 +1,546 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="다국어 설정">다국어 설정</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="multiLanguageSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label for="cboMenuFolder" class="form-label" data-labelCd="메뉴폴더">메뉴폴더</label>
+                            <select class="form-select" id="cboMenuFolder" name="MenuFolder_id"></select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label for="cboMenuCode" class="form-label" data-labelCd="메뉴">메뉴</label>
+                            <select class="form-select" id="cboMenuCode" name="MenuCode"></select>
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnMainSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#multiLanguageSearchCollapse" role="button"
+            aria-expanded="true" aria-controls="multiLanguageSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="mt-2">
+    <div class="d-flex justify-content-between align-items-center upper-wezongrid">
+        <div class="sub-tit"><span data-labelCd="Label 목록">Label 목록</span></div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input" id="btnNewLabel" data-auth="W" data-commonCd="등록">등록</button>
+            <button type="button" class="btn btn-input" id="btnEditLabel" data-auth="W" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-dell" id="btnDeleteLabel" data-auth="W" data-commonCd="삭제">삭제</button>
+            <span class="font-12">|</span>
+            <button type="button" class="btn rounded-pill btn-icon" id="btnLabelExcel" title="엑셀 다운로드" data-labelCd="엑셀 다운로드" data-labelTarget="title"><i class="uil uil-file-times"></i></button>
+        </div>
+    </div>
+    <div id="label-grid"></div>
+</div>
+
+<div class="mt-2">
+    <div class="d-flex justify-content-between align-items-center upper-wezongrid">
+        <div class="sub-tit"><span data-labelCd="Label 언어정의">Label 언어정의</span></div>
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <div class="form-sm d-flex align-items-center">
+                <label for="cboLanguage" class="form-label me-2 mb-0" data-labelCd="언어">언어</label>
+                <select class="form-select w-140" id="cboLanguage" name="lang_code"></select>
+            </div>
+            <button type="button" class="btn btn-input" id="btnNewLabelLanguage" data-auth="W" data-commonCd="등록">등록</button>
+            <button type="button" class="btn btn-input" id="btnEditLabelLanguage" data-auth="W" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-dell" id="btnDeleteLabelLanguage" data-auth="W" data-commonCd="삭제">삭제</button>
+            <span class="font-12">|</span>
+            <button type="button" class="btn rounded-pill btn-icon" id="btnLabelLanguageExcel" title="엑셀 다운로드" data-labelCd="엑셀 다운로드" data-labelTarget="title"><i class="uil uil-file-times"></i></button>
+        </div>
+    </div>
+    <div id="label-lang-grid"></div>
+</div>
+
+{% verbatim %}
+<script type="text/x-tmpl" id="labelCreateTemplate">
+<div class="p-2">
+    <form id="labelForm">
+        <input type="hidden" id="labelcode_id" name="id" value="{%=o.id%}">
+        <div class="card mb-0 p-15">
+            <div class="row">
+                <div class="col-12"><div class="d-flex align-items-center"><label for="cboFolder" class="form-label" data-labelCd="메뉴폴더">메뉴폴더</label><select id="cboFolder" name="MenuFolder_id" class="form-select"></select></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="ModuleName" class="form-label" data-labelCd="메뉴">메뉴</label><select id="ModuleName" name="ModuleName" class="form-select"></select></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="TemplateKey" class="form-label" data-labelCd="템플릿">템플릿</label><select id="TemplateKey" name="TemplateKey" class="form-select"></select></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="LabelCode" class="form-label" data-labelCd="Label코드">Label코드</label><input type="text" class="form-control" id="LabelCode" name="LabelCode" value="{%=o.LabelCode%}"></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="Description" class="form-label" data-commonCd="비고">비고</label><textarea class="form-control" id="Description" name="Description">{%=o.Description%}</textarea></div></div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button type="button" class="btn btn-light" id="modal-close-button" data-commonCd="닫기">닫기</button>
+            <button type="button" class="btn btn-band" id="btn_label_save" data-auth="W" data-commonCd="저장">저장</button>
+        </div>
+    </form>
+</div>
+</script>
+<script type="text/x-tmpl" id="labelLangCreateTemplate">
+<div class="p-2">
+    <form id="labelLangForm">
+        <div class="card mb-0 p-15">
+            <div class="row">
+                <div class="col-12"><div class="d-flex align-items-center"><label for="LabelCode" class="form-label" data-labelCd="라벨코드">라벨코드</label><input type="hidden" id="id" name="id" value="{%=o.id%}"><input type="hidden" id="LabelCode_id" name="LabelCode_id" value="{%=o.LabelCode_id%}"><input type="text" class="form-control" id="LabelCode" name="LabelCode" value="{%=o.LabelCode%}" readonly></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="LangCode" class="form-label" data-labelCd="언어">언어</label><select class="form-select" id="LangCode" name="LangCode"></select></div></div>
+                <div class="col-12"><div class="d-flex align-items-center"><label for="DispText" class="form-label" data-labelCd="표시값">표시값</label><input class="form-control" type="text" id="DispText" name="DispText" value="{%=o.DispText%}"></div></div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button type="button" class="btn btn-light" id="modal-close-button" data-commonCd="닫기">닫기</button>
+            <button type="button" class="btn btn-band" id="btn_labelLang_save" data-auth="W" data-commonCd="저장">저장</button>
+        </div>
+    </form>
+</div>
+</script>
+{% endverbatim %}
+
+{% endblock %}
+
+{% block scripts %}
+
+<script type="text/javascript">
+
+    class MultiLanguagePage {
+        constructor() {
+            this.url = '/api/system/labelcode';
+            this.labelGrid = null;
+            this.labelLangGrid = null;
+
+            this.$cboMenuFolder = $('#cboMenuFolder');
+            this.$cboMenuCode = $('#cboMenuCode');
+            this.$cboLanguage = $('#cboLanguage');
+            this.$folderOptions = [];
+            this.init();
+        }
+
+        init() {
+            let _this = this;
+            this.initLabel();
+            this.initLabelLanguage();
+        }
+
+        initLabel() {
+            let _this = this;
+            this.labelGrid = WeZonGrid.create('#label-grid', {
+                columnLayout: [
+                    { dataField: 'menu_name', headerText: '메뉴', width: 150, align: 'center' },
+                    { dataField: 'TemplateKey', headerText: '템플릿', width: 150, align: 'center' },
+                    { dataField: 'LabelCode', headerText: 'Label 코드', width: 150, align: 'center' },
+                    { dataField: 'Description', headerText: '설명', width: 300, align: 'left' },
+                    { dataField: 'created', headerText: '생성일', width: 150, align: 'center' }
+                ],
+                props: {
+                    height: 280,
+                    fixedColumnCount: 0,
+                    showRowNumColumn: false,
+                    showRowCheckColumn: false,
+                    enableSorting: false,
+                    multiSortable: false,
+                    enablePaging: true,
+                    selectionMode: 'singleRow',
+                    headerHeight: 35,
+                    rowHeight: 25
+                }
+            });
+            GridUtil.fitWidth(this.labelGrid);
+            this.labelGrid.on('cellClick', function () {
+                _this.labelLangList();
+            });
+            AjaxUtil.getSelectData('menu_folder', '', '', '', function (rows) {
+                _this.$folderOptions = rows;
+                _this.$folderOptions.unshift({ value: '', text: 'Common' });
+                $.each(_this.$folderOptions, function (idx, item) {
+                    _this.$cboMenuFolder.append('<option value="' + item.value + '">' + item.text + '</option>');
+                });
+            });
+
+            this.$cboMenuCode.append('<option value="common">Common</option>');
+            this.$cboMenuFolder.off('change.multiLanguage').on('change.multiLanguage', function () {
+                let selectedValue = _this.$cboMenuFolder.val();
+                if (selectedValue == '') {
+                    _this.$cboMenuCode.empty();
+                    _this.$cboMenuCode.append('<option value="common">Common</option>');
+                } else {
+                    AjaxUtil.fillSelectOptions(_this.$cboMenuCode, 'menu_code', null, false, _this.$cboMenuFolder.val());
+                }
+            });
+
+            this.$cboMenuCode.off('change.multiLanguage').on('change.multiLanguage', function () {
+                _this.labelList();
+            });
+
+            // 조회버튼 클릭
+            $('#btnMainSearch').off('click.multiLanguage').on('click.multiLanguage', function () {
+                _this.labelList();
+            });
+
+            ///////////////////////////////////////////////////////////////////////////////
+            // 다국어 설정 시작
+            // 신규라벨 
+            $('#btnNewLabel').off('click.multiLanguage').on('click.multiLanguage', function () {
+                let labelcodeData = {
+                    id: '',
+                    MenuFolder_id:'',
+                    ModuleName: 'common',
+                    TemplateKey: 'common',
+                    LabelCode: '',
+                    Description: '',
+                    mode : 'new'
+                };
+                _this.showLabelEdit(labelcodeData);
+            });
+
+            // 라벨 수정
+            $('#btnEditLabel').off('click.multiLanguage').on('click.multiLanguage', function () {
+                let items = _this.labelGrid.getSelectedItems();
+                if (items.length > 0) {
+                    let id = items[0].id;
+                    let data = {
+                        action: 'labelcode_detail',
+                        id : id
+                    };
+
+                    let fnsuccess = function (result) {
+                        result.mode = 'edit';
+                        _this.showLabelEdit(result);
+                    };
+
+                    AjaxUtil.getAsyncData(_this.url, data, fnsuccess);
+                }
+            });
+
+            // 라벨 삭제
+            $('#btnDeleteLabel').off('click.multiLanguage').on('click.multiLanguage', function () {
+
+                let items = _this.labelGrid.getSelectedItems();
+                if (items.length == 0) {
+                    return;
+                }
+
+                Alert.confirm('', '삭제하시겠습니까?', function (e) {
+                    let id = items[0].id;
+                    let data = {
+                        action: 'labelcode_delete',
+                        id : id
+                    };
+                    let fnsuccess = function (result) {
+                        if (!result.success) {
+                            Notify.error(result.message || '삭제에 실패했습니다.');
+                            return;
+                        }
+                        Notify.success('삭제했습니다.');
+                        _this.labelList();
+                    };
+                    let url = _this.url + '?action=labelcode_delete';
+                    AjaxUtil.postAsyncData(url, data, fnsuccess);
+                });
+            });
+
+            $('#btnLabelExcel').off('click.multiLanguage').on('click.multiLanguage', function () {
+                GridUtil.exportExcel(_this.labelGrid, { fileName: '다국어_Label_목록.xlsx' });
+            });
+
+        }
+
+        initLabelLanguage() {
+
+            let _this = this;
+            //////////////////////////////////////////////////////////////////////////////
+            this.labelLangGrid = WeZonGrid.create('#label-lang-grid', {
+                columnLayout: [
+                    { dataField: 'LabelCode', headerText: '라벨코드', width: 150, align: 'left' },
+                    { dataField: 'LangCode', headerText: '언어코드', width: 150, align: 'center' },
+                    { dataField: 'lang_code_name', headerText: '언어', width: 150, align: 'center' },
+                    { dataField: 'DispText', headerText: '표시값', width: 300, align: 'left' },
+                    { dataField: 'created', headerText: '생성일', width: 150, align: 'center' }
+                ],
+                props: {
+                    height: 280,
+                    fixedColumnCount: 0,
+                    showRowNumColumn: false,
+                    showRowCheckColumn: false,
+                    enableSorting: false,
+                    multiSortable: false,
+                    enablePaging: true,
+                    selectionMode: 'singleRow',
+                    headerHeight: 35,
+                    rowHeight: 25
+                }
+            });
+            GridUtil.fitWidth(this.labelLangGrid);
+
+            AjaxUtil.fillSelectOptions(this.$cboLanguage, 'system_code', 'all', false, 'lang_code');
+
+            this.$cboLanguage.off('change.multiLanguage').on('change.multiLanguage', function () {
+                _this.labelLangList();
+            });
+
+            $('#btnNewLabelLanguage').off('click.multiLanguage').on('click.multiLanguage', function () {
+                let items = _this.labelGrid.getSelectedItems();
+
+                let lang_code = i18n.getLanguageCode(); //현재언어 설정
+                if (items.length > 0) {
+                    let id = items[0].id;
+                    let newData = { LabelCode_id: id, LabelCode: items[0].LabelCode, LangCode: lang_code, DispText: '' };
+                    _this.showLabelLangEdit(newData);
+                } else {
+                    Alert.alert('', '선택된 Label 이 없습니다.', function () { });
+                }
+            });
+
+            $('#btnEditLabelLanguage').off('click.multiLanguage').on('click.multiLanguage', function () {
+                let items = _this.labelLangGrid.getSelectedItems();
+                if (items.length > 0) {
+                    let id = items[0].id;
+                    let pData = { id: id, action: 'labellang_detail' };
+                    let fnsuccess = function (result) {
+                        _this.showLabelLangEdit(result);
+                    };
+                    AjaxUtil.getAsyncData(_this.url, pData, fnsuccess);
+                } else {
+                    Alert.alert('', '선택된 Label언어가 없습니다.', function () { });
+                }
+            });
+
+            $('#btnDeleteLabelLanguage').off('click.multiLanguage').on('click.multiLanguage', function () {
+                let items = _this.labelLangGrid.getSelectedItems();
+                if (items.length > 0) {
+                    Alert.confirm('', '삭제하시겠습니까?', function () {
+                        let data = { id: items[0].id };
+                        let url = _this.url + '?action=labellang_delete';
+                        let fnsuccess = function (result) {
+                            if (!result.success) {
+                                Notify.error(result.message || '삭제에 실패했습니다.');
+                                return;
+                            }
+                            Notify.success('삭제했습니다.');
+                            _this.labelLangList();
+                        };
+                        AjaxUtil.postAsyncData(url, data, fnsuccess);
+                    });
+                }
+                else {
+                    Alert.alert('', '선택된 Label언어가 없습니다.', function () { });
+                }
+            });
+
+            $('#btnLabelLanguageExcel').off('click.multiLanguage').on('click.multiLanguage', function () {
+                GridUtil.exportExcel(_this.labelLangGrid, { fileName: '다국어_Label_언어정의.xlsx' });
+            });
+        }
+
+        // 라벨코드 목록
+        labelList() {
+            let _this = this;
+            let menu_code = this.$cboMenuCode.val();
+            let data = {
+                action : 'labelcode_read',
+                menu_code: menu_code,
+            };
+            AjaxUtil.getAsyncData(this.url, data, function (result) {
+                _this.labelGrid.setData(result);
+
+                _this.labelLangGrid.setData([]);
+            });
+        }
+
+        // 언어설정 목록
+        labelLangList() {
+            let _this = this;
+            let items = _this.labelGrid.getSelectedItems();
+            if (items.length == 0) {
+                return;
+            }
+            let lang_code = this.$cboLanguage.val();
+            let data = {
+                labelcode_id: items[0].id,
+                lang_code: lang_code,
+                action:'label_language_list'
+            };
+
+            let fnsuccess = function (result) {
+                _this.labelLangGrid.setData(result);
+            };
+
+            AjaxUtil.getAsyncData(this.url, data, fnsuccess);
+        }
+        
+        showLabelEdit(labelcodeData) {
+            let _this = this;
+            let content = tmpl('labelCreateTemplate', labelcodeData);
+            let $content = $(content);
+
+            let modalContainer = null;
+            if (labelcodeData.mode == 'new') {
+                modalContainer = new PopupDraggable('Label 등록');
+            } else {
+                modalContainer = new PopupDraggable('Label 수정');
+            }
+            modalContainer.open({ width: 440, height: 300, $content });
+
+            let $menuFoler = $content.find('#cboFolder');
+            let $ModuleName = $content.find('#ModuleName');
+            let $TemplateKey = $content.find('#TemplateKey');
+            let $LabelCode = $content.find('#LabelCode');
+            let $Description = $content.find('#Description');
+            let $form = $content.find('#labelForm');
+
+
+            $.each(this.$folderOptions, function (idx, item) {
+                $menuFoler.append('<option value="'+item.value+'">'+item.text+'</option>');
+            });
+
+            $menuFoler.val(labelcodeData.MenuFolder_id);
+
+            let selectedFolder = $menuFoler.val();
+            if (selectedFolder=='') {
+                $ModuleName.append('<option value="common">Common</option>');
+            } else {
+                AjaxUtil.fillSelectOptions($ModuleName, 'menu_code', false, false, selectedFolder);
+            }
+
+            $ModuleName.val(labelcodeData.ModuleName);
+            $menuFoler.on('change.multiLanguage', function () {
+                let selectedValue = $menuFoler.val();
+                if (selectedValue == '') {
+                    $ModuleName.empty();
+                    $ModuleName.append('<option value="common">Common</option>');
+                    $TemplateKey.empty();
+                    $TemplateKey.append('<option value="common">Common</option>');
+                    $TemplateKey.append('<option value="menu">Menu</option>');
+
+                } else {
+                    AjaxUtil.fillSelectOptions($ModuleName, 'menu_code', 'choose', false, $menuFoler.val());
+                }
+            });
+
+            if (labelcodeData.ModuleName == 'common') {
+                $TemplateKey.append('<option value="common">common</option>');
+                $TemplateKey.append('<option value="menu">Menu</option>');
+            }
+
+            $ModuleName.on('change.multiLanguage', function () {
+                let selectedValue = $ModuleName.val();
+                if (selectedValue == 'common') {
+                    $TemplateKey.empty();
+                    $TemplateKey.append('<option value="common">Common</option>');
+                    $TemplateKey.append('<option value="menu">Menu</option>');
+                } else {
+                    AjaxUtil.fillSelectOptions($TemplateKey, 'menu_template', null, false, $ModuleName.val());
+                }
+            });
+
+            let $btn_label_save = $content.find('#btn_label_save');
+
+
+            //라벨코드저장
+            $btn_label_save.on('click', function (e) {
+                //ModuleName, TemplateKey, LabelCode
+                if ($ModuleName.val() == '') {
+                    Alert.alert('', 'GUI(메뉴)를 선택해 주십시요', function () { });
+                    return;
+                }
+                if ($TemplateKey.val() == '') {
+                    Alert.alert('', 'TemplateKey를 선택해 주십시요', function () { });
+                    return;
+                }
+                if ($LabelCode.val() == '') {
+                    Alert.alert('', 'LabelCode를 입력해 주십시요', function () { });
+                    return;
+                }
+
+                let data = {
+                    id: labelcodeData.id,
+                    ModuleName: $ModuleName.val(),
+                    TemplateKey: $TemplateKey.val(),
+                    LabelCode: $LabelCode.val(),
+                    Description: $Description.val()
+                };
+                let url = _this.url + '?action=labelcode_save';
+                let fnsuccess = function (result) {
+                    if (!result.success) {
+                        Notify.error(result.message || '저장에 실패했습니다.');
+                        return;
+                    }
+                    Notify.success('저장했습니다.');
+                    _this.labelList();
+                    //modalContainer.close();
+                };
+                AjaxUtil.postAsyncData(url, data, fnsuccess);
+            });
+        }
+
+        // 언어설정 추가/등록
+        showLabelLangEdit(labelLangData) {
+            let _this = this;
+            let content = tmpl('labelLangCreateTemplate', labelLangData);
+            let $content = $(content);
+
+            let modalContainer = null;
+            if (labelLangData.mode == 'new') {
+                modalContainer = new PopupDraggable('언어설정 추가');
+            } else {
+                modalContainer = new PopupDraggable('언어설정 수정');
+            }
+
+            modalContainer.open({ width: 440, height: 200, $content });
+            let $form = $content.find('#labelLangForm');
+            let $LangCode = $content.find('#LangCode');
+            AjaxUtil.fillSelectOptions($LangCode, 'system_code', 'choose', labelLangData.LangCode, 'lang_code');
+
+            let $btn_labelLang_save = $content.find('#btn_labelLang_save');
+            $btn_labelLang_save.on('click.multiLanguage', function () {
+                let url = _this.url + '?action=labellang_save';
+                let data = FormUtil.extractForm($form);
+                if (data.LangCode == '') {
+                    Alert.alert('', '언어를 선택하세요!!');
+                    return;
+                }
+                if (data.DispText == '') {
+                    Alert.alert('', '표시값을 선택하세요!!');
+                    return;
+                }
+
+                let fnsuccess = function (result) {
+                    if (!result.success) {
+                        Notify.error(result.message || '저장에 실패했습니다.');
+                        return;
+                    }
+                    Notify.success('저장되었습니다.');
+                    _this.labelLangList();
+                    //modalContainer.close();
+                };
+                AjaxUtil.postAsyncData(url, data, fnsuccess);
+            });
+        }
+
+
+    }
+
+    let page = null;
+    $(document).ready(function (e) {
+        page = new MultiLanguagePage();
+        page.labelList();
+    });
+
+</script>
+
+
+{% endblock %}

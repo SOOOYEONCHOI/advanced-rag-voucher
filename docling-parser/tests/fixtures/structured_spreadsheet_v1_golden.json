@@ -1,0 +1,24 @@
+{
+  "schema_name": "StructuredSpreadsheet",
+  "schema_version": "1.0",
+  "sheet": {
+    "sheet_id": "sheet-1",
+    "sheet_index": 1,
+    "sheet_name": "Parts",
+    "source_range": "A1:C2"
+  },
+  "block": {
+    "block_id": "sheet-1:block-1",
+    "block_type": "record_table",
+    "source_range": "A1:C2",
+    "header_range": "A1:C1",
+    "headers": ["ID", "Name", "Quantity"]
+  },
+  "record": {
+    "record_id": "sheet-1:row-2",
+    "source_range": "A2:C2",
+    "row_start": 2,
+    "row_end": 2,
+    "values": ["1", "Motor", "2"]
+  }
+}

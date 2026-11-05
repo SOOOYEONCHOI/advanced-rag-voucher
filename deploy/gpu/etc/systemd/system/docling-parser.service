@@ -1,0 +1,18 @@
+# 서버 위치: /etc/systemd/system/docling-parser.service (root 644)
+# 2026.10.28(sooyeon.choi) 추가 - docling-parser compose를 서버 부팅 시 자동 실행
+[Unit]
+Description=Chatbot docling-parser (GPU 0)
+Requires=docker.service
+After=docker.service network-online.target vllm@llm.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/yest/chatbot/docling
+ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

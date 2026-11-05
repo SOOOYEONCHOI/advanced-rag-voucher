@@ -1,0 +1,164 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <!-- 즐겨찾기 on/OFF favorite-On/Off 클래스 사용 -->
+            <a href="#"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+</div>
+
+<!-- 공통 CRUD 화면 — 목록 머리 [등록] → 등록 모달, 상세는 [수정]·[삭제](DESIGN §5.5) -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt" data-labelCd="그룹 목록">그룹 목록</span></div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-input y_write_auth" id="btnNew" data-commonCd="등록">등록</button>
+    </div>
+</div>
+<div id="my-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit" data-commonCd="상세 정보">상세 정보</div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit" data-commonCd="수정">수정</button>
+            <button type="button" class="btn btn-dell y_write_auth" id="btnDelete" data-commonCd="삭제">삭제</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel" data-commonCd="취소">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave" data-commonCd="저장">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off">
+        <input type="hidden" id="id" name="id">
+        <div class="card mb-0 p-15"><div class="row g-2 align-items-end">
+            <div class="col-12 col-lg-3"><label for="code" class="form-label" data-commonCd="코드">코드</label><input type="text" class="form-control" id="code" name="code" disabled></div>
+            <div class="col-12 col-lg-3"><label for="name" class="form-label" data-labelCd="그룹명">그룹명</label><input type="text" class="form-control" id="name" name="name" maxlength="100" required></div>
+            <div class="col-12 col-lg-3"><label for="active" class="form-label" data-labelCd="사용">사용</label>
+                <div class="form-check form-switch detail-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="active" name="active">
+                    <label class="form-check-label" for="active" data-on="사용" data-off="미사용">미사용</label></div></div>
+            <div class="col-12"><label for="description" class="form-label" data-commonCd="설명">설명</label><textarea class="form-control" id="description" name="description" rows="3"></textarea></div>
+        </div></div>
+    </form>
+</div>
+
+<div class="modal fade" id="groupCreateModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="groupCreateTitle">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="groupCreateTitle">사용자 그룹 등록</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      <form id="groupCreateForm" autocomplete="off" onsubmit="return false">
+        <div class="mb-2"><label for="createCode" class="form-label">코드 (필수)</label>
+          <input type="text" class="form-control" id="createCode" name="code" maxlength="50" required></div>
+        <div class="mb-2"><label for="createName" class="form-label">그룹명 (필수)</label>
+          <input type="text" class="form-control" id="createName" name="name" maxlength="100" required></div>
+        <div class="mb-2"><label for="createDescription" class="form-label">설명</label>
+          <textarea class="form-control" id="createDescription" name="description" rows="2"></textarea></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="createActive" checked>
+          <label class="form-check-label" for="createActive">사용</label></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-input" data-bs-dismiss="modal">취소</button>
+      <button type="button" class="btn btn-band" id="btnCreateGroup">등록</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include '../common/columns_setting.html' %}
+<script type="text/javascript">
+    // 사용자그룹 — 비전검사 클라이언트 관리와 같은 공통 CRUD 구조. 코드는 등록 때만 넣는다(소스가 그룹을 코드로 찾는다)
+    class UserGroupPage {
+        init() {
+            const _this = this;
+            this.grid = WeZonGrid.create('#my-grid', {
+                columnLayout: [
+                    { dataField: 'code', headerText: '코드', width: 100, align: 'center' }
+                    , { dataField: 'name', headerText: '그룹명', width: 250, align: 'left' }
+                    , { dataField: 'active', headerText: '사용', width: 80, align: 'center',
+                        labelFunction: function (rowIndex, columnIndex, value) { return value ? '사용' : '미사용'; } }
+                    , { dataField: 'description', headerText: '설명', width: 350, align: 'left' }
+                ]
+                , props: { height: 400, enableSorting: true, selectionMode: 'singleRow', rowIdField: 'id' }
+            });
+            GridUtil.fitWidth(this.grid);
+            this.detail = DetailForm.create({
+                form: '#detailForm', grid: this.grid, rowIdField: 'id', fields: '#name, #active, #description',
+                buttons: { create: '#btnNew', edit: '#btnEdit', del: '#btnDelete', save: '#btnSave', cancel: '#btnCancel' },
+                onCreate: function () { _this.openCreate(); },
+                onDelete: function (row) { _this.remove(row); },
+                onSave: function (row) { _this.save(row); }
+            });
+            this.grid.on('cellClick', function (e) { _this.detail.select(e.item); });
+            $('#btnCreateGroup').on('click', function () { _this.create(); });
+            this.searchMainData();
+        }
+
+        // select: 다시 읽은 뒤 고를 행 id. 그 행을 상세에 다시 넣는다(읽기 전용). 없으면 상세를 비운다.
+        // 서버의 disabled(참이면 미사용)를 화면의 사용(active) 토글로 바꾼다
+        searchMainData(select) {
+            const _this = this;
+            AjaxUtil.getAsyncData('/api/system/usergroup', { action: 'read' }, function (rows) {
+                rows = (rows || []).map(function (r) { return Object.assign({}, r, { active: !r.disabled }); });
+                GridUtil.setRows(_this.grid, rows, { select: select, firstPage: select === undefined });
+                const row = rows.find(function (r) { return r.id === select; });
+                if (row) { _this.detail.bind(row); } else { _this.detail.clear(); }
+            });
+        }
+
+        openCreate() {
+            $('#groupCreateForm')[0].reset();
+            $('#groupCreateForm .is-invalid').removeClass('is-invalid');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('groupCreateModal')).show();
+        }
+
+        create() {
+            const _this = this;
+            if (!DetailForm.requireFields($('#groupCreateForm'))) { return; }
+            const data = FormUtil.extractForm($('#groupCreateForm'));
+            data.disabled = $('#createActive').is(':checked') ? '1' : '';   // 저장 API 는 disabled 값이 있으면 사용이다
+            AjaxUtil.postAsyncData('/api/system/usergroup?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('groupCreateModal')).hide();
+                Notify.success('등록되었습니다.');
+                _this.searchMainData(res.id);
+            });
+        }
+
+        save(row) {
+            const _this = this;
+            const data = { id: row.id, name: $('#name').val(), description: $('#description').val(),
+                           disabled: $('#active').is(':checked') ? '1' : '' };
+            AjaxUtil.postAsyncData('/api/system/usergroup?action=save', data, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                Notify.success('저장되었습니다.');
+                _this.searchMainData(row.id);
+            });
+        }
+
+        remove(row) {
+            const _this = this;
+            Alert.confirm('', "'" + row.name + "' 그룹을 삭제하시겠습니까?", function () {
+                AjaxUtil.postAsyncData('/api/system/usergroup?action=delete', { id: row.id }, function (res) {
+                    if (res && res.success === false) { Alert.alert('', res.message); return; }
+                    Notify.success('삭제되었습니다.');
+                    _this.searchMainData(null);
+                });
+            });
+        }
+    }
+
+    let page = new UserGroupPage();
+    $(document).ready(function () {
+        page.init();
+        // 저장된 컬럼 설정(머리 이름·순서)을 적용한다. 설정 버튼은 두지 않는다(사용자 결정 2026-10-19)
+        page.popColSetting = new popColSetting();
+        page.popColSetting.loadColumnData(gui.gui_code, gui.template_key, 'grid', page.grid);
+    });
+</script>
+{% endblock %}

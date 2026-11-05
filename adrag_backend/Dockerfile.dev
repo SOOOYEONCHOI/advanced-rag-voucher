@@ -1,0 +1,54 @@
+# 로컬 개발용 Dockerfile (CPU 전용)
+#
+# 프로덕션(Dockerfile)과의 차이:
+#   - 단일 스테이지 빌드 (빌드 속도 우선, 이미지 크기 최적화 불필요)
+#   - --reload 기본 실행 (소스 변경 시 자동 재시작)
+#   - root 실행 (볼륨 마운트 권한 문제 방지)
+#   - 소스 코드는 docker-compose.dev.yml의 볼륨 마운트로 주입
+
+# 2026.10.27(sooyeon.choi) 수정 - Python 3.11 → 3.12 (python:3.12-slim)
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# 시스템 의존성
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    git \
+    curl \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# 가상환경 생성
+RUN python -m venv $VIRTUAL_ENV
+
+# pip 업그레이드
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# PyTorch CPU 버전 (프로덕션과 동일 버전 고정)
+RUN pip install --no-cache-dir \
+    torch==2.4.0 \
+    torchvision==0.19.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# 나머지 의존성 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 필수 디렉토리 생성 (소스 마운트 전 생성하여 마운트 후에도 유지)
+RUN mkdir -p /app/instance/db /app/instance/log /app/logs /app/uploads /app/data
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+# DB 초기화 후 --reload 모드로 실행
+CMD ["sh", "-c", "python init_database.py && uvicorn main:app --host 0.0.0.0 --port 8081 --reload"]

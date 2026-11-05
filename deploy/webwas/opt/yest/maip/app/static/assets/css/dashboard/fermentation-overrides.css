@@ -1,0 +1,523 @@
+/* ===============================
+   Fermentation page overrides ONLY
+   Base: dashboard-del.css (do NOT modify)
+   This file defines grid/cards/status and minor utilities not present in del.
+   =============================== */
+
+/* Layout: main split */
+.fer-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+/* Left: grid of unit cards */
+.fer-main {
+    flex: 1 1 auto;
+}
+
+/* Grid for unit cards */
+.fer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 21px;
+}
+
+/* Unit card */
+.fer-card {
+    background-color: #2c3e50;
+    /* match .del-section tone */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+.fer-info,
+.fer-metrics {
+    /* 네가 fer-info를 쓰는 경우도 커버 */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* 1fr의 최소폭을 0으로 */
+    gap: 10px;
+}
+
+.fer-card__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #f4f7f9;
+}
+/* 발효시간 인라인 */
+.fer-time-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* '발효시간' 라벨과 값 간격 */
+    font-weight: 800;
+    white-space: nowrap;
+    /* 시간 줄바꿈 방지 */
+}
+.fer-time-label {
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.9;
+    /* DEL 팔레트 유지, 살짝만 약하게 */
+}
+.fer-time-value {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+}
+/* DEL 타이틀 기본 여백 제거(줄맞춤) */
+.fer-card__header .del-section-title {
+    margin: 0;
+}
+.fer-section {
+    padding: 21px;
+}
+.fer-section-title {
+    color: #d0d5e3;
+}
+
+/* Status pill */
+.fer-status {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 12px;
+    color: #fff;
+    line-height: 1;
+}
+.fer-status--progress {
+    background: rgba(245, 158, 11, 0.12);
+    color: #ffb801;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+.fer-status--idle {
+    background-color: #888;
+}
+.fer-status--done {
+    background-color: #48bb78;
+}
+
+/* Info row */
+.fer-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    align-items: stretch;
+    /* 높이 맞춤(선택) */
+}
+
+/* Info box */
+.fer-box {
+    background-color: #222736;
+    border-radius: 2px;
+    padding: 10px;
+    text-align: center;
+    min-width: 0;
+}
+.fer-box__label {
+    font-size: 12px;
+    color: #dfe6ee;
+    opacity: 0.8;
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+.fer-box__value {
+    font-size: 18px;
+    font-weight: 400;
+    color: #f4f7f9;
+}
+
+/* Temperature box accent */
+.fer-temp {
+    background-color: #222736;
+}
+.fer-icon {
+    font-family: 'Material Symbols Outlined';
+    font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+    font-size: 26px;
+    display: inline-block;
+    color: #80252d;
+}
+.fer-icon-water {
+    font-family: 'Material Symbols Outlined';
+    font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+    font-size: 22px;
+    display: inline-block;
+    color: #325787;
+    margin: 3px 0;
+}
+.fer-icon-temp {
+    margin-bottom: -1px;
+}
+/* Scroll utility for tables on the right */
+.scroll-y {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* === Fermentation: '발효시간' 박스를 리스트(라벨:값) 3줄로 === */
+/* 컨테이너: 기존 fer-box에 같이 쓰는 보조 클래스 */
+.fer-box.fer-list {
+    display: grid;
+    grid-template-rows: repeat(3, auto);
+    row-gap: 6px;
+    padding: 12px;
+    border-radius: 2px;
+}
+
+/* 각 행: 좌 라벨 / 우 값 */
+.fer-list__row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    /* 좌: 라벨, 우: 값(우측 정렬) */
+    align-items: baseline;
+    column-gap: 12px;
+}
+
+/* 라벨: '--' 느낌의 머리표시 + 볼드 */
+.fer-list__label {
+    position: relative;
+    font-weight: 700;
+    font-size: 12px;
+    text-align: left;
+    /* 불릿 여백 */
+    letter-spacing: 0.2px;
+    color: #797e92;
+}
+
+/*
+.fer-list__label::before {
+  content: "·";                
+  position: absolute; left: 0; top: 0;
+  line-height: 1;
+}
+*/
+
+/* 값: 우측 정렬, 굵게 */
+.fer-list__value {
+    justify-self: end;
+    /* 값은 오른쪽 정렬 */
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 상태 + 발효시간 묶음 (header 오른쪽 정렬) */
+.fer-status-time {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+    /* 오른쪽 끝으로 밀기 */
+    border: 1px solid rgba(255,255,255,0.2);
+    /* 라벨처럼 라인 */
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.fer-time-box .fer-time-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #dfe6ee;
+    opacity: 0.9;
+}
+
+.fer-time-box .fer-time-value {
+    font-size: 12px;
+    font-weight: 500;
+    color: #bfc5d4;
+}
+
+/* ✅ 헤더: 발효시간 + 상태를 한묶음으로, 우측 정렬 */
+.fer-head-group {
+    --fer-head-gap: 12px;
+    /* 기본 간격 값 (원하면 페이지/카드/인라인에서 override) */
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fer-head-gap);
+    margin-left: auto;
+    /* 묶음 전체를 헤더의 우측 끝으로 */
+    flex-wrap: nowrap;
+}
+
+/* 발효시간: 박스 스타일 (이미 사용 중) → auto 마진 제거 */
+.fer-time-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 30px;
+    padding: 4px 14px;
+    /* margin-left:auto;  ← ❌ 그룹이 정렬하므로 제거 */
+}
+
+/* 헤더 기본 정렬은 그대로 두되, status가 혼자 auto로 밀리지 않게 안전장치 */
+.fer-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.fer-card__header .fer-status {
+    margin-left: 0;
+    /* ❗ 기존 auto 밀기 비활성화: 그룹이 담당 */
+}
+
+.status-container {
+    display: flex;
+    gap: 8px;
+    border-radius: 10px;
+}
+
+.status-label {
+    font-size: 14px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 0;
+    color: #f4f7f9;
+}
+
+.status-value {
+    font-size: 24px;
+    font-weight: 600;
+    padding: 10px 0;
+}
+
+/* 상태별 커스텀 컬러 */
+.status-ferment {
+    background-color: #7f1d1d;
+}
+/* 발효중 라벨 */
+.status-running {
+    background-color: #1e3a8a;
+}
+/* 유하중 라벨 */
+.status-repair {
+    background-color: #78350f;
+}
+/* 수리중 라벨 */
+
+/* === 전체 가동현황 그룹 === */
+
+.status-group__title {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #e5e7eb;
+    letter-spacing: 0.2px;
+}
+
+.status-group__body {
+    /* 내부에 기존 status-container가 들어감 */
+}
+
+/* ===== 전체 가동현황 라벨 색상 ===== 
+.status-label--intake {
+    background-color: var(--col-intake);
+}
+.status-label--ferment {
+    background-color: var(--col-ferment);
+}
+.status-label--ua-wait {
+    background-color: var(--col-ua-wait);
+}
+.status-label--ua-run {
+    background-color: var(--col-ua-run);
+}
+.status-label--repair {
+    background-color: var(--col-repair);
+}
+*/
+
+/* ===== per-unit 상태 pill 5종 ===== */
+.fer-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--fer-status-min, 84px);
+    /* 최소 너비 통일(하드코딩 X) */
+    box-sizing: border-box;
+    text-align: center;
+}
+.fer-status--intake-wait {
+    background: rgba(156, 163, 175, 0.12);
+    color: #c0cbe0;
+    border: 1px solid rgba(156, 163, 175, 0.35);
+}
+.fer-status--intake-run {
+    background: rgba(241, 241, 241, 0.12);
+    color: #c4ccd8;
+    border: 1px solid rgba(241, 241, 241, 0.35);
+}
+.fer-status--ferment,
+.fer-status--progress {
+    background: rgba(245, 158, 11, 0.12);
+    color: #ffb800;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+/* alias */
+.fer-status--ua-wait {
+    background: rgba(59, 130, 246, 0.12);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+.fer-status--ua-run {
+    background: rgba(16, 185, 129, 0.12);
+    color: #27eda4;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.fer-status--repair {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ff1515;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.fer-status--ster {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+
+/* === 전체 가동현황 · 시각 강화 패치 ========================= */
+
+/* 그룹 컨테이너: 깊이감 + 여백 정렬 */
+.status-group {
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 14px 16px 18px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    background-color: #112b4f !important;
+    /* 다크 섹션 배경 */
+    border-radius: 5px;
+    grid-column: span 2;
+}
+
+/* 카드 레이아웃: 균등 간격/반응형 유지 */
+.status-container {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(100px, 1fr));
+    gap: 5px;
+}
+
+/* 각 상태 카드: 레이어드 패널 + 미세한 호버 */
+.status-card {
+    background: #112541;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 0 0 12px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    flex: 1;
+    color: #f8fafc;
+    text-align: center;
+    min-width: 100px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 라벨: 배지화 + 상태색 매핑(아래 팔레트 적용) */
+.status-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 3px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    background-color: #204a83;
+}
+
+/* 값: 숫자 가독성/정렬 강화 */
+.status-value {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: #eef3f9;
+}
+
+/* — 상태별 배지 컬러 (이미 정의된 상태 네이밍에 맞춰 연결) — */
+/* 사입대기
+.status-label--intake {
+  background: rgba(156,163,175,0.12);
+  color: #9ca3af;
+  border-color: rgba(156,163,175,0.35);
+}
+   */
+/* 발효중 
+.status-label--ferment {
+  background: rgba(245,158,11,0.12);
+  color: #ffb801;
+  border-color: rgba(245,158,11,0.35);
+}
+  */
+/* 유하대기 
+.status-label--ua-wait {
+  background: rgba(59,130,246,0.12);
+  color: #3b82f6;
+  border-color: rgba(59,130,246,0.35);
+}
+  */
+/* 유하중 
+.status-label--ua-run {
+  background: rgba(16,185,129,0.12);
+  color: #34d399;
+  border-color: rgba(16,185,129,0.35);
+}
+  */
+/* 수리중 
+.status-label--repair {
+  background: rgba(239,68,68,0.12);
+  color: #ef4444;
+  border-color: rgba(239,68,68,0.35);
+}
+  */
+
+/* 좁은 화면 대응: 2~3열로 자동 전환 */
+@media (max-width: 1400px) {
+    .status-container {
+        grid-template-columns: repeat(3, minmax(160px,1fr));
+    }
+}
+@media (max-width: 900px) {
+    .status-container {
+        grid-template-columns: repeat(2, minmax(160px,1fr));
+    }
+}
+
+/* 필요 시 페이지 전체에서 폭 조정
+.del-body{ --fer-status-min: 90px; } */
+
+/* 필요 시 좁은 화면에서 2열로 자동 줄바꿈 */
+@media (max-width: 900px) {
+    .status-container {
+        flex-wrap: wrap;
+    }
+    .status-card {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 160px;
+    }
+}
+/* 수리중 - 옐로 */
+
+@media (max-width: 1400px) {
+    .fer-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 900px) {
+    .fer-info {
+        grid-template-columns: 1fr;
+    }
+}

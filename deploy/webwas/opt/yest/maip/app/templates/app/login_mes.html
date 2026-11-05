@@ -1,0 +1,443 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>제조AI플랫폼</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta content="A fully featured admin theme which can be used to build CRM, CMS, etc." name="description" />
+    <meta content="Coderthemes" name="author" />
+
+    <!-- App favicon -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.ico' %}">
+
+    <!-- Theme Config Js -->
+    <script src="{% static 'assets/js/hyper-config.js' %}"></script>
+
+    <!-- Vendor css -->
+    <link href="{% static 'assets/css/vendor.min.css' %}" rel="stylesheet" type="text/css" />
+
+    <!-- App css -->
+    <link href="{% static 'assets/css/app.min.css' %}" rel="stylesheet" type="text/css" id="app-style" />
+
+    <!-- Icons css -->
+    <link href="{% static 'assets/css/unicons/css/unicons.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'assets/css/remixicon/remixicon.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'assets/css/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet" type="text/css" />
+
+    <!-- Font css -->
+    <link href="{% static 'assets/css/pretendard.css' %}" rel="stylesheet" />
+    <!-- Custom css -->
+    <link href="{% static 'assets/css/SF-login.css' %}" rel="stylesheet" type="text/css"  />
+    <link href="{% static 'assets/css/tokens.css' %}" rel="stylesheet" type="text/css" />
+
+</head>
+
+<body class="authentication-bg position-relative login">
+    <div class="account-pages pt-2 pt-sm-5 pb-4 pb-sm-5 position-relative">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-xxl-4 col-lg-5">
+                    <div class="card">
+                        <!-- Logo -->
+                        <div class="card-header py-3 text-center">
+                            <img src="{% static 'assets/images/logo-dark.png' %}" alt="제조AI플랫폼" class="brand-logo">
+                        </div>
+
+                        <div class="card-body">
+                            <div class="border-radius mb-3">
+                                <h4 class="log-tit">제조AI플랫폼</h4>
+                            </div>
+
+                            <form method="post" id="loginFrm">
+                                {% csrf_token %}
+                                <input type="hidden" id="token" name="token">
+                                <div class="mb-2">
+                                    <label for="loginId" class="form-label">아이디</label>
+                                    <input class="form-control" type="text" name="username" id="loginId" required="" placeholder="아이디를 입력해 주세요.">
+                                </div>
+                                <div class="mb-4">
+                                    <label for="loginPwd" class="form-label">비밀번호</label>
+                                    <div class="input-group input-group-merge">
+                                        <input type="password" name="password" id="loginPwd" class="form-control" placeholder="비밀번호를 입력해 주세요.">
+                                        <div class="input-group-text" data-password="false">
+                                            <span class="password-eye"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3 text-center">
+                                    <button class="btn btn-login" type="submit" id="login" data-labelCd="로그인"> 로그인 </button>
+                                </div>
+
+                            </form>
+                        </div> <!-- end card-body -->
+                    </div>
+                    <!-- end card -->
+                    <!-- end row -->
+
+                </div> <!-- end col -->
+            </div>
+            <!-- end row -->
+        </div>
+        <!-- end container -->
+    </div>
+    <!-- end page -->
+
+    <footer class="footer footer-alt">
+        <script>document.write(new Date().getFullYear())</script> © (주)위존. All Rights Reserved.
+    </footer>
+
+<script type="text/javascript">
+    {% include './system.js' %}
+</script>
+
+<!-- Vendor js -->
+<script src="{% static 'assets/js/vendor.min.js' %}"></script>
+
+<!-- App js -->
+<script type="text/javascript" src="{% static 'assets/js/app.js' %}"></script>
+<script type="text/javascript" src="{% static 'assets/vendor/js-cookie/js.cookie.js' %}"></script>
+<script type="text/javascript" src="{% static 'assets/vendor/jquery-validation/1.22.1/jquery.validate.min.js' %}"></script>    
+<script src="{% static 'assets/vendor/decimal.js/decimal.js' %}"></script>
+<script src="{% static 'assets/js/decimal-util.js' %}"></script>
+<script type="text/javascript" src="{% static 'assets/js/common.js' %}"></script>
+
+<script type="text/javascript">
+
+/*
+  Password Validator 0.1
+  (c) 2007 Steven Levithan 
+  MIT License
+ */
+function validatePassword(pw, options) {
+    // default options (allows any password)
+    var o = {
+        lower: 0,
+        upper: 0,
+        alpha: 0, /* lower + upper */
+        numeric: 0,
+        special: 0,
+        length: [0, Infinity],
+        custom: [ /* regexes and/or functions */],
+        badWords: [],
+        badSequenceLength: 0,
+        noQwertySequences: false,
+        noSequential: false
+    };
+
+    for (var property in options)
+        o[property] = options[property];
+
+    var re = {
+        lower: /[a-z]/g,
+        upper: /[A-Z]/g,
+        alpha: /[A-Z]/gi,
+        numeric: /[0-9]/g,
+        special: /[\W_]/g
+    },
+        rule, i;
+
+    // enforce min/max length
+    if (pw.length < o.length[0] || pw.length > o.length[1])
+        return false;
+
+    // enforce lower/upper/alpha/numeric/special rules
+    for (rule in re) {
+        if ((pw.match(re[rule]) || []).length < o[rule])
+            return false;
+    }
+
+    // enforce word ban (case insensitive)
+    for (i = 0; i < o.badWords.length; i++) {
+        if (pw.toLowerCase().indexOf(o.badWords[i].toLowerCase()) > -1)
+            return false;
+    }
+
+    // enforce the no sequential, identical characters rule
+    if (o.noSequential && /([\S\s])\1/.test(pw))
+        return false;
+
+    // enforce alphanumeric/qwerty sequence ban rules
+    if (o.badSequenceLength) {
+        var lower = "abcdefghijklmnopqrstuvwxyz",
+            upper = lower.toUpperCase(),
+            numbers = "0123456789",
+            qwerty = "qwertyuiopasdfghjklzxcvbnm",
+            start = o.badSequenceLength - 1,
+            seq = "_" + pw.slice(0, start);
+        for (i = start; i < pw.length; i++) {
+            seq = seq.slice(1) + pw.charAt(i);
+            if (
+                lower.indexOf(seq) > -1 ||
+                upper.indexOf(seq) > -1 ||
+                numbers.indexOf(seq) > -1 ||
+                (o.noQwertySequences && qwerty.indexOf(seq) > -1)
+            ) {
+                return false;
+            }
+        }
+    }
+    // enforce custom regex/function rules
+    for (i = 0; i < o.custom.length; i++) {
+        rule = o.custom[i];
+        if (rule instanceof RegExp) {
+            if (!rule.test(pw))
+                return false;
+        } else if (rule instanceof Function) {
+            if (!rule(pw))
+                return false;
+        }
+    }
+
+    // great success!
+    return true;
+}
+</script>
+
+<script type="text/javascript">
+
+/*
+  Password Validator 0.1
+  (c) 2007 Steven Levithan 
+  MIT License
+ */
+function validatePassword(pw, options) {
+    // default options (allows any password)
+    var o = {
+        lower: 0,
+        upper: 0,
+        alpha: 0, /* lower + upper */
+        numeric: 0,
+        special: 0,
+        length: [0, Infinity],
+        custom: [ /* regexes and/or functions */],
+        badWords: [],
+        badSequenceLength: 0,
+        noQwertySequences: false,
+        noSequential: false
+    };
+
+    for (var property in options)
+        o[property] = options[property];
+
+    var re = {
+        lower: /[a-z]/g,
+        upper: /[A-Z]/g,
+        alpha: /[A-Z]/gi,
+        numeric: /[0-9]/g,
+        special: /[\W_]/g
+    },
+        rule, i;
+
+    // enforce min/max length
+    if (pw.length < o.length[0] || pw.length > o.length[1])
+        return false;
+
+    // enforce lower/upper/alpha/numeric/special rules
+    for (rule in re) {
+        if ((pw.match(re[rule]) || []).length < o[rule])
+            return false;
+    }
+
+    // enforce word ban (case insensitive)
+    for (i = 0; i < o.badWords.length; i++) {
+        if (pw.toLowerCase().indexOf(o.badWords[i].toLowerCase()) > -1)
+            return false;
+    }
+
+    // enforce the no sequential, identical characters rule
+    if (o.noSequential && /([\S\s])\1/.test(pw))
+        return false;
+
+    // enforce alphanumeric/qwerty sequence ban rules
+    if (o.badSequenceLength) {
+        var lower = "abcdefghijklmnopqrstuvwxyz",
+            upper = lower.toUpperCase(),
+            numbers = "0123456789",
+            qwerty = "qwertyuiopasdfghjklzxcvbnm",
+            start = o.badSequenceLength - 1,
+            seq = "_" + pw.slice(0, start);
+        for (i = start; i < pw.length; i++) {
+            seq = seq.slice(1) + pw.charAt(i);
+            if (
+                lower.indexOf(seq) > -1 ||
+                upper.indexOf(seq) > -1 ||
+                numbers.indexOf(seq) > -1 ||
+                (o.noQwertySequences && qwerty.indexOf(seq) > -1)
+            ) {
+                return false;
+            }
+        }
+    }
+    // enforce custom regex/function rules
+    for (i = 0; i < o.custom.length; i++) {
+        rule = o.custom[i];
+        if (rule instanceof RegExp) {
+            if (!rule.test(pw))
+                return false;
+        } else if (rule instanceof Function) {
+            if (!rule(pw))
+                return false;
+        }
+    }
+
+    // great success!
+    return true;
+}
+</script>
+<script type="text/javascript">
+
+    $(document).ready(function () {
+
+
+        // Password show/hide
+        $('.pass_box i').on('click', function () {
+            $('.pass_box input').toggleClass('active');
+            if ($('.pass_box input').hasClass('active')) {
+                $(this).attr('class', "icon ion-md-eye").css({ "color": "#5567ff" }).prev('input').attr('type', "text");
+            } else {
+                $(this).attr('class', "icon ion-md-eye-off").css({ "color": "#989db1" }).prev('.pass_box input').attr('type', 'password');
+            }
+        });
+
+        //// 로그인ID 저장 Cokiee 관련 처리
+        let $loginId = $('#loginId');
+        $loginId.val(Cookies.get('loginId'));
+
+        if ($loginId.val() != '') {
+            $('#remember_me').attr('checked', true);
+            $('#loginPwd').focus();
+        }
+
+        $('#remember_me').change(function () {
+            if ($('#remember_me').is(':checked')) {
+                Cookies.set('loginId', $loginId.val(), { expires: 7 });
+            } else {
+                Cookies.remove('loginId');
+            }
+        });
+
+        $loginId.keyup(function () {
+            if ($('#remember_me').is(':checked')) {
+                Cookies.set('loginId', $loginId.val(), { path: '/', expires: 7 });
+            }
+        });
+
+        let clearFields = function () {
+            $loginId.val('');
+            $loginId.focus();
+            $('#loginPwd').val('');
+        };
+
+        let submitHandler = function (form) {
+            let passOption = {
+                length: [8, 20],
+                lower: 1,
+                upper: 1,
+                numeric: 1,
+                special: 1,
+                badWords: [],
+                badSequenceLength: 4
+            };
+
+            let pwd = $('#loginPwd').val();
+            let validationResult = validatePassword(pwd, passOption);
+            if (!validationResult) {
+                //Alert.alert('', '에러', clearFields);
+                //return;
+                //console.log('패스워드 복잡성 테스트 확인');
+            }
+
+            var submitData = $(form).serialize() + '&isMobile=' + isMobile();
+            $.post('/login/', submitData, function (data) {
+                //console.log(data);
+                var resultmsg = data.loginResultMsg;
+                // 서버가 보내는 코드는 OK · ETC · LOCKED · INACTIVE 넷이다
+                // (app/views/account.py). 코드별로 문구를 여기서 또 쓰지 않고
+                // 서버가 보낸 loginResultMsg 를 그대로 보여준다 — 잠금은 남은
+                // 시간이 들어 있어 여기서 만들 수 없는 문구다.
+                if (data.loginResult != 'OK') {
+                    let msg = data.loginResultMsg || '로그인에 실패했습니다. 다시 시도해 주세요.';
+                    Alert.alert('', msg, clearFields);
+                }
+                else {
+                    if (data.loginResult == 'OK') {
+                        let lang_cd = i18n.getLanguageCode();
+                        let url = '/api/common/labels?action=read';
+                        let pData = { lang_code: lang_cd };
+                        let fnsuccess = function (result) {
+                            dic = {};
+                            
+                            $.each(result, function (idx, item) {
+                                let storageKey = lang_cd + '_' + item.gui_code + '_' + item.template_key;
+                                let data = [];
+                                if (dic.hasOwnProperty(storageKey)) {
+                                    data = dic[storageKey];
+                                } else {
+                                    dic[storageKey] = data;
+                                }
+                                data.push({ 'label_code': item.label_code, 'text': item.text, 'desc': item.descr });
+                            });
+
+                            $.each(dic, function (k, v) {
+                                let sessionData = JSON.stringify(v);
+                                sessionStorage.setItem(k, sessionData);
+                            });
+
+                            if (data.is_app) {
+                                
+                                if (window.YullinMesNative) {
+                                    let strJson = JSON.stringify(data.app_data);
+                                    //console.log(strJson);
+                                    window.YullinMesNative.login(strJson);
+                                } else {
+                                    Alert.alert('실패', '잘못된 동작입니다.');
+                                }
+
+                            }
+                            location.href = data.next;
+                        };
+                        let fnfailure = function () {
+                            location.href = data.next;
+                        };
+                        AjaxUtil.getAsyncData(url, pData, fnsuccess, fnfailure);
+                        //location.href = data.next;
+
+                    } else {
+                        //location.href = '/login';
+                    }
+                }
+            }).fail(function (e) {
+                var message = '로그인 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                if (e.responseJSON && typeof e.responseJSON.message === 'string' && e.responseJSON.message) {
+                    message = e.responseJSON.message;
+                }
+                Alert.alert('', message);
+            });
+        };
+
+        $('#loginFrm').validate({
+            submitHandler: submitHandler,
+            messages: { username: { required: '아이디를 입력해 주세요.' } }
+        });
+
+        //$('#memberReg').click(function () { location.href = '/memberreg'; });
+
+    });
+
+    function getMobileToken(token) {
+        $('#token').val(token);
+    }
+
+    function isMobile() {
+        return (navigator.userAgent.indexOf('Mobi') > -1) ? 'F' : 'B'; // F: 모바일웹 B:PC웹
+    }
+
+
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,55 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- 설정·비밀 --------------------------------------------------------------
+# .env 와 그 변형(.env.prod 등)은 커밋하지 않는다. 예시 파일만 남긴다.
+.env
+.env.*
+!.env.example
+# 검증 스크립트·e2e 가 읽는 비밀번호 파일(시드가 만들지 않는다 — 직접 적는다, DEVELOPMENT §1.4).
+.admin_pw
+.demo_pw
+.demo_apikey
+# 외부 연동 키 전달용 접속 정보(API Key 원문). 커밋하지 않는다.
+*.local.md
+
+# --- 실행 산출물 -------------------------------------------------------------
+# collectstatic(STATIC_ROOT)·저장소 기본 경로(STORAGE_ROOT: 이미지·Export·로그).
+/static/
+/media/
+/storage/
+*.log
+e2e-shell.png
+e2e-*.png
+
+# 배포물은 확장자로 제외한다. `distribution/` 한 줄로 막으면 저장소에 남겨야 하는
+# SHA256SUMS.txt 와 README.md 까지 사라진다.
+distribution/**/*.zip
+distribution/**/*.tar.xz
+
+# 운영 서버용 wheel(deploy/wheels, 약 20MB). requirements.txt 로 다시 받는다 — DEPLOYMENT §2
+/deploy/wheels/
+# 서버 점검 결과(deploy/check_rocky.sh 출력) — 서버 주소·구성이 들어 있다
+/deploy/*.txt
+# 배포 묶음(deploy/build_package.sh 출력, 약 100MB)
+/deploy/dist/
+
+# 원본 프로젝트 사본(읽기 전용 참고).
+tmp/
+docs/prd
+
+# --- 편집기·OS --------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+node_modules/

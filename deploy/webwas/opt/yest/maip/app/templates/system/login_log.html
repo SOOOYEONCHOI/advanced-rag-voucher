@@ -1,0 +1,134 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'assets/vendor/daterangepicker/daterangepicker.css' %}" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="userSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label for="daterange" class="form-label" data-labelCd="발생일">발생일</label>
+                            <input type="hidden" id="srchStartDt" name="srchStartDt" />
+                            <input type="hidden" id="srchEndDt" name="srchEndDt" />
+                            <input type="text" class="form-control date" id="daterange" data-toggle="date-picker" data-cancel-class="btn-warning" style="width: 260px;" />
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label for="keyword" class="form-label" data-commonCd="이름">이름</label>
+                            <input class="form-control" id="keyword" name="keyword" />
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#userSearchCollapse" role="button" aria-expanded="true" aria-controls="userSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit">
+        <span class="right_align rpt" data-labelCd="로그인 내역">로그인 내역</span>
+    </div>
+</div>
+<div id="login-log-grid"></div>
+
+{% endblock %}
+
+{% block scripts %}
+{% include '../common/columns_setting.html' %}
+<script type="text/javascript">
+
+
+    class LoginLogPage {
+        constructor() {
+            this.grid = null;
+            this.params = null;     // 마지막 [조회] 조건. 페이지 이동·엑셀이 같은 조건을 쓴다
+            this.init();
+        }
+
+        init() {
+            let _this = this;
+            // 로그는 쌓이기만 한다. 서버에서 50건씩, 최신순 고정이라 헤더 정렬을 끈다. [조회] 전에는 받지 않는다(params null).
+            const source = AjaxUtil.gridRemoteSource('/api/system/loginlog', function () { return _this.params; });
+
+            _this.grid = WeZonGrid.create('#login-log-grid', {
+                columnLayout: [
+                    { dataField: 'id', headerText: 'No', width: 70, align: 'center' }
+                    , { dataField: 'type', headerText: '구분', width: 100, align: 'center' }
+                    , { dataField: 'addr', headerText: '접속 IP', width: 250, align: 'left' }
+                    , { dataField: 'login_id', headerText: '아이디', width: 150, align: 'left' }
+                    , { dataField: 'name', headerText: '이름', width: 150, align: 'center' }
+                    , { dataField: 'fail_reason', headerText: '실패 사유', width: 200, align: 'left' }
+                    , { dataField: 'created', headerText: '일시', width: 150, align: 'center' }
+                ]
+                , props: { height: 600, enableSorting: false, selectionMode: 'singleRow', dataMode: 'server', rowIdField: 'id', remoteDataSource: source, enablePaging: true, pageSize: 50, pageSizeOptions: [50, 100, 200] }
+            });
+            GridUtil.fitWidth(_this.grid);
+
+        }
+
+
+        searchDataBind() {
+            let _this = this;
+            let datePicker = $('#daterange').data('daterangepicker');
+            if (datePicker) {
+                $('#srchStartDt').val(datePicker.startDate.format('YYYY-MM-DD'));
+                $('#srchEndDt').val(datePicker.endDate.format('YYYY-MM-DD'));
+            }
+
+            _this.params = FormUtil.extractForm($('#searchForm'));
+            AjaxUtil.gridResearch(_this.grid);
+        }//searchDataBind
+
+    }
+    var page = null;
+    $(document).ready(function (e) {
+        page = new LoginLogPage();
+
+        $('#daterange').daterangepicker({
+            opens: 'left',
+            startDate: moment(),
+            endDate: moment(),
+            locale: {
+                format: 'YYYY-MM-DD'
+            }
+        });
+        let datePicker = $('#daterange').data('daterangepicker');
+        if (datePicker) {
+            $('#srchStartDt').val(datePicker.startDate.format('YYYY-MM-DD'));
+            $('#srchEndDt').val(datePicker.endDate.format('YYYY-MM-DD'));
+        }
+
+        page.popColSetting = new popColSetting();
+        page.popColSetting.loadColumnData(gui.gui_code, gui.template_key, 'grid', page.grid);
+
+        page.searchDataBind();
+
+        $('#btnSearch').click(function (ex) {
+            page.searchDataBind();
+        });
+
+
+    });
+</script>
+
+
+{% endblock %}

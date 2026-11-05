@@ -1,0 +1,1584 @@
+@charset "UTF-8";
+/*
+Template Name: SF ALL System 
+Version:2026.01.16
+*/
+
+html[data-menu-color=dark] {
+    --ct-menu-bg: #edeff1;
+    --ct-menu-item-color: rgba(255,255,255,.8);
+    --ct-menu-item-hover-color: var(--brand-surface-1);
+    --ct-menu-item-active-color: #ffffff;
+    --ct-topbar-item-color: #2e2e31;
+    --ct-topbar-item-hover-color: #1e85e7;
+    --ct-help-box-bg: rgba(255, 255, 255, 0.07);
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .mnb-page {
+    margin-left: var(--ct-leftbar-width-sm);
+}
+:root[data-bs-theme=light] {
+    --ct-font-sans-serif: 'Pretendard','Open Sans','Helvetica Neue', sans-serif;
+    --ct-body-font-size: 14px;
+    --ct-topbar-height: 50px;
+    --ct-menu-item-padding-y: 7px;
+    --ct-footer-height: 36px;
+    --ct-body-bg: #edeff1;
+    --ct-border-radius: 10px;
+    --ct-border-color: #d8d8d8;
+    --ct-box-shadow: 0;
+    --ct-body-color: #242424;
+    --ct-dark: #242424;
+    --ct-light: #d8d8d8;
+    --ct-secondary-color: #747474;
+    --ct-link-color: #1e85e7;
+    --ct-link-hover-color:  var(--brand-primary);
+    --ct-font-monospace: 'Pretendard','Open Sans','Helvetica Neue', sans-serif;
+    --ct-border-color: #d8d8d8;
+    --ct-tertiary-bg: #e7e7e7;
+    --ct-primary: var(--brand-primary);
+    --ct-danger: #2e2e31;
+    --ct-tertiary-bg: #f5f4f4;
+    --ct-btn-disabled-color: #777777;
+    --ct-btn-disabled-bg: #d7d7d7 ;
+    --ct-btn-disabled-border-color: #a9a9a9;
+    --ct-btn-disabled-opacity: 1 ;
+    --ct-emphasis-color:  var(--brand-primary);
+
+}
+
+input:-webkit-autofill {
+    font-family: 'Pretendard','Open Sans','Helvetica Neue', sans-serif;
+}
+
+/* 전체 스크롤 크기 */
+::-webkit-scrollbar {
+  width: 10px;   /* 세로 스크롤 */
+  height: 10px;  /* 가로 스크롤 */
+   border-radius: 6px; 
+}
+
+/* 스크롤 막대 */
+::-webkit-scrollbar-thumb {
+    background: rgba(63, 63, 63, 0.2);
+    border-radius: 6px; 
+}
+/* 스크롤 배경 */
+::-webkit-scrollbar-track {
+    background: rgba(0,0,0, .1);
+}
+
+body {
+    overflow: hidden;
+}
+[class^="uil-"]:before, [class*=" uil-"]:before {
+    line-height: 1;
+}
+.nav-user {
+    background: linear-gradient(135deg, rgb(124, 58, 237), rgb(99, 102, 241));
+    border: 0;
+}
+
+.bg-primary {
+    background: linear-gradient(135deg, rgb(124, 58, 237), rgb(99, 102, 241));
+}
+/*system-name*/
+.logo span.logo-lg {
+    display: inline-block;
+    align-items: center;
+    height: 50px;
+}
+.system-name {
+    color: #242424;
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 700;
+    padding: 0 0 0 4px;
+    display: inline-block;
+}
+
+/* 로고 파일은 2배로 내보냈다(고해상도 화면 대비). 표시 높이를 여기서
+   고정하지 않으면 자연 크기인 68px 로 떠서 50px 로고 영역을 넘는다. */
+.logo img {
+    height: 34px;
+    width: auto;
+}
+
+/* 상단 바 We.RAG 로고 — 파일은 2배 해상도(높이 48px)라 표시 높이를 고정한다 */
+.topbar-werag img {
+    height: 24px;
+    width: auto;
+}
+
+/*상단 로고 영역*/
+.logo.logo-light {
+    background: #fff;
+}
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .logo {
+    background: #fff;
+}
+
+.navbar-custom .topbar .app-search form .form-control {
+    color: #242424;
+    background-color: #fff;
+}
+.navbar-custom .topbar .app-search form span.search-icon {
+    color: #fff;
+    left: 6px;
+    top:-4px
+}
+.navbar-custom .topbar .app-search form .input-group {
+    border-bottom: 2px solid #2e2e31;
+    display: flex;
+    width: 100%;
+    height: 40px;
+}
+.navbar-custom .topbar .app-search form .form-control {
+    padding: 0 12px;
+    height: 32px;
+}
+.navbar-custom .topbar .app-search form .input-group .btn-band {
+    width: 36px;
+    line-height: 36px;
+    margin: 2px 0 3px 0;
+    width: 36px;
+    line-height: 36px;
+    margin: 2px 0 3px 0;
+    position: absolute;
+    right: 12px;
+}
+.input-group>:not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+    margin-left:0;
+    border-radius: 10px;
+}
+.brand-banner {
+     font-size: 13px;
+     font-weight: 500;
+     display: inline-block;
+}
+
+.brand-banner a {
+    font-weight: 900;
+    color: #707075;
+    font-size: 14px;
+    border-left: 1px solid rgba(0, 0, 0, .1);
+    padding: 0 10px;
+}
+.brand-banner a:hover,.brand-banner a:active {
+    color: var(--brand-primary);
+}
+/* 멀티 다중 채널*/
+.mnb-page {
+    /*height: calc(100vh - var(--ct-topbar-height) - 2px);*/
+    overflow: auto;
+    padding: 0 .75rem;
+}
+
+.mnb-page {
+    position: relative;
+    margin-left: var(--ct-leftbar-width);
+    /*min-height: calc(100vh - var(--ct-topbar-height) - 2px);*/
+    padding: 0 1.5rem;
+    -webkit-transition: all .25s ease-in-out;
+    transition: all .25s ease-in-out;
+}
+
+.center-tab::-webkit-scrollbar {
+    height: 4px;
+}
+.center-tab::-webkit-scrollbar-thumb {
+    cursor: pointer;
+    background:rgba(0, 0, 0, .2);
+    border-radius: 2px;
+}
+.mnb-tab {
+    width: 100%;
+    margin:20px 0 0px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    overflow-y: hidden;
+}
+.mnb-tab .center-tab {
+    width: calc(100% - 64px);
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+}
+.mnb-list {
+    width: max-content;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap; 
+    margin: 0;
+    padding: 0;
+}
+.mnb-list li {
+    text-decoration: none;
+    margin: 0 2px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.mnb-list li a {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0 16px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    background: #fff;
+    color: #959595;
+    border: 1px solid #d8d8d8;
+    border-radius: 20px;
+}
+.mnb-list li a .mnb-tab-title {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mnb-list li a:hover {
+    color: #666;
+}
+.mnb-list li a button, .mnb-list li a.active button {
+    background: rgba(0, 0, 0, .15);
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    margin-left: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+}
+.mnb-list li a button i {
+    color: rgba(0, 0, 0, .5);
+    font-size: 0.725rem;
+    line-height: 1;
+}
+.mnb-list li a.active {
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+    color: #fff;
+}
+
+.mnb-list li button.close {
+  cursor: pointer;
+}
+.mnb-list li a.active button i {
+    color: rgba(255, 255, 255, .7);
+}
+.mnb-context-menu {
+    position: absolute;
+    z-index: 1200;
+    min-width: 150px;
+    background: #ffffff;
+    border: 1px solid #d8d8d8;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+}
+.mnb-context-menu ul {
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+}
+.mnb-context-menu li {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #7d7d82;
+    cursor: pointer;
+    user-select: none;
+}
+.mnb-context-menu li:hover {
+    background: #f5f5f5;
+}
+.mnb-context-menu li.disabled {
+    color: #293042;
+    cursor: default;
+    background: #fff;
+}
+.nav-tabs.nav-bordered {
+    border-bottom: 1px solid var(--ct-border-color);
+}
+.nav-tabs.nav-bordered li a {
+    border: 0;
+    padding: .25rem 1rem;
+}
+
+/*left menu 영역*/
+.leftside-menu {
+    padding-bottom: 0;
+    box-shadow: none;
+    border-right: 0;
+}
+.simplebar-offset {
+    margin-top: 20px;
+    background: #2e2e31;
+    border-top-right-radius: 25px;
+}
+#leftside-menu-container .simplebar-content > div:first-child {
+    background: #2e2e31 !important;
+}
+#leftside-menu-container .simplebar-track.simplebar-vertical {
+    top: 69px;
+}
+.side-nav {
+    margin-top: 15px;
+}
+
+.side-nav .menuitem-active> a {
+    color: #ffba00;
+    font-weight: 500;
+}
+.side-nav .menuitem-active .active {
+    color: #ffba00;  
+}
+
+/* 좌측 메뉴 글자·간격·hover(사용자 결정 2026-10-21) — 1단계(폴더·대시보드)는 하위보다 크게 하고, 긴 이름은 한 줄로 줄여 … 로 끝낸다
+ * (전체 이름은 링크 title). 1단계의 flex·크기는 펼친 메뉴에만 둔다 — 접힌 사이드바의 1단계는 아래 flyout 보완 규칙이 그린다 */
+html:not([data-sidenav-size=condensed]) .side-nav > .side-nav-item > .side-nav-link {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    padding: 9px calc(var(--ct-menu-item-padding-x) - 8px);
+    margin: 0 8px;     /* hover 막대가 메뉴 양끝에서 떨어지게. 줄인 padding 만큼이라 글자 자리는 그대로다 */
+}
+.side-nav-second-level li a,
+.side-nav-third-level li a,
+.side-nav-forth-level li a {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    margin-right: 8px;
+}
+html:not([data-sidenav-size=condensed]) .side-nav .side-nav-link > span:not(.menu-arrow):not(.badge),
+.side-nav-second-level li a > span:not(.menu-arrow),
+.side-nav-third-level li a > span:not(.menu-arrow),
+.side-nav-forth-level li a > span:not(.menu-arrow) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* 오른쪽 끝의 펼침 화살표(absolute)와 겹치지 않게 */
+.side-nav a:has(> .menu-arrow) > span:not(.menu-arrow) {
+    margin-right: 24px;
+}
+.side-nav-second-level li a:hover,
+.side-nav-third-level li a:hover,
+.side-nav-forth-level li a:hover,
+html:not([data-sidenav-size=condensed]) .side-nav > .side-nav-item > .side-nav-link:hover {
+    background: var(--sidebar-hover-bg);
+    border-radius: 6px;
+}
+/* 건수 배지는 이름이 줄어도 남는다 */
+.menu-leaf-link[data-badge]::after {
+    flex-shrink: 0;
+}
+
+/* ========================================================================
+ * 접힌 왼쪽 메뉴 flyout 보완 시작
+ * - CSS :hover 대신 JS 상태 클래스로 상위·자손 메뉴를 연다.
+ * - 화면 밖 목록은 위쪽 배치 또는 내부 스크롤로 처리한다.
+ * - 헤더와 목록의 폭·높이·스크롤바를 같은 좌표 계약으로 맞춘다.
+ * ======================================================================== */
+.mnb-subflyout-header {
+    display: none;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu {
+    height: 100vh;
+    overflow: visible;
+    padding-bottom: 0;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container {
+    height: calc(100vh - var(--ct-topbar-height));
+    max-height: calc(100vh - var(--ct-topbar-height));
+    overflow: hidden;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-mask,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-content-wrapper {
+    height: 100% !important;
+    max-height: 100% !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.simplebar-scrollable-y .simplebar-track.simplebar-vertical .simplebar-scrollbar::before,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.mnb-condensed-scrollable .simplebar-track.simplebar-vertical .simplebar-scrollbar::before {
+    opacity: .5 !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.simplebar-scrollable-y .simplebar-track.simplebar-vertical .simplebar-scrollbar,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.mnb-condensed-scrollable .simplebar-track.simplebar-vertical .simplebar-scrollbar {
+    display: block !important;
+    height: var(--mnb-condensed-scrollbar-height, 24px) !important;
+    transform: translate3d(0, var(--mnb-condensed-scrollbar-top, 0), 0) !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.simplebar-scrollable-y .simplebar-track.simplebar-vertical .simplebar-scrollbar::before,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container.mnb-condensed-scrollable .simplebar-track.simplebar-vertical .simplebar-scrollbar::before {
+    bottom: 2px !important;
+    height: auto !important;
+    top: 2px !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-offset {
+    bottom: 0 !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-content-wrapper {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-track.simplebar-vertical {
+    pointer-events: none;
+    visibility: visible !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu #leftside-menu-container .simplebar-scrollbar {
+    pointer-events: auto;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:hover > .collapse,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:hover > .collapsing,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-second-level > li:hover > .collapse,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-second-level > li:hover > .collapsing {
+    display: none !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapse,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapsing,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-second-level > li.mnb-subflyout-open > .collapse,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-second-level > li.mnb-subflyout-open > .collapsing {
+    display: block !important;
+    transition: none !important;
+}
+
+/* fixed로 옮기기 전에 최종 폭과 표시 상태를 먼저 적용한다.
+   JS가 이 상태의 높이를 측정해야 헤더와 목록 사이에 소수점 픽셀 틈이 생기지 않는다. */
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:is(:hover, .mnb-flyout-open) > .side-nav-link {
+    background:
+        linear-gradient(var(--ct-menu-condensed-link-bg), var(--ct-menu-condensed-link-bg))
+            0 0 / var(--ct-leftbar-width-sm) 100% no-repeat,
+        linear-gradient(var(--ct-menu-condensed-link-bg), var(--ct-menu-condensed-link-bg))
+            var(--ct-leftbar-width-sm) 0 /
+            calc(var(--ct-leftbar-width) - var(--ct-leftbar-width-sm) + 10px) 100% no-repeat !important;
+    display: block !important;
+    max-width: calc(var(--ct-leftbar-width) + 10px) !important;
+    min-width: calc(var(--ct-leftbar-width) + 10px) !important;
+    overflow: visible !important;
+    position: relative !important;
+    width: calc(var(--ct-leftbar-width) + 10px) !important;
+    z-index: 1047 !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-condensed-flyout-positioned:is(:hover, .mnb-flyout-open) {
+    min-height: var(--mnb-condensed-link-height);
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-condensed-flyout-positioned:is(:hover, .mnb-flyout-open) > .side-nav-link {
+    box-sizing: border-box;
+    height: var(--mnb-condensed-link-height);
+    left: 0;
+    position: fixed !important;
+    top: var(--mnb-condensed-link-top);
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:is(:hover, .mnb-flyout-open) > .side-nav-link span {
+    display: inline !important;
+    visibility: visible !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:is(:hover, .mnb-flyout-open) > .side-nav-link span.menu-arrow {
+    display: block !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:is(:hover, .mnb-flyout-open) > .side-nav-link span.badge {
+    display: inline-block !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"]:is(:hover, .mnb-flyout-open) > .side-nav-link > span:not(.badge):not(.menu-arrow) {
+    display: inline !important;
+    left: calc(var(--ct-leftbar-width-sm) + var(--ct-menu-item-padding-x) * 2);
+    margin-left: 0;
+    overflow: hidden;
+    position: absolute;
+    right: calc(var(--ct-menu-item-padding-x) * 3);
+    text-overflow: ellipsis;
+    top: 50%;
+    transform: translateY(-50%);
+    visibility: visible !important;
+    white-space: nowrap;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-condensed-flyout-positioned > .collapse > ul,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-condensed-flyout-positioned > .collapsing > ul {
+    background-color: #2e2e31;
+    box-shadow: var(--ct-box-shadow);
+    box-sizing: border-box;
+    display: block !important;
+    left: var(--ct-leftbar-width-sm);
+    max-height: var(--mnb-condensed-flyout-max-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px 0;
+    position: fixed;
+    scrollbar-color: rgba(255, 255, 255, .5) transparent;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scroll-padding-block: 10px;
+    scroll-snap-type: y mandatory;
+    top: var(--mnb-condensed-flyout-top);
+    width: calc(var(--ct-leftbar-width) - var(--ct-leftbar-width-sm) + 10px);
+    z-index: 1045;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapse > ul a,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapsing > ul a {
+    box-shadow: none;
+    padding: calc(var(--ct-menu-item-padding-y) * .6) calc(var(--ct-menu-item-padding-x) * 2);
+    position: relative;
+    width: calc(var(--ct-leftbar-width) - var(--ct-leftbar-width-sm));
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-flyout-above > .collapse > ul,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-flyout-above > .collapsing > ul {
+    padding-bottom: 1px !important;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapse > ul > li,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapsing > ul > li,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapse > ul > li,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapsing > ul > li {
+    scroll-snap-align: start;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapse > ul::-webkit-scrollbar,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapsing > ul::-webkit-scrollbar,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapse > ul::-webkit-scrollbar,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapsing > ul::-webkit-scrollbar {
+    width: 10px;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapse > ul::-webkit-scrollbar-thumb,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .side-nav .side-nav-item[level="0"].mnb-flyout-open > .collapsing > ul::-webkit-scrollbar-thumb,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapse > ul::-webkit-scrollbar-thumb,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapsing > ul::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, .5);
+    border: 2px solid #2e2e31;
+    border-radius: 10px;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapse > .mnb-subflyout-header,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapsing > .mnb-subflyout-header {
+    align-items: center;
+    background-color: var(--ct-menu-condensed-link-bg);
+    box-sizing: border-box;
+    color: #fff;
+    display: flex !important;
+    font-size: calc(var(--ct-menu-item-font-size) * .95);
+    height: var(--mnb-condensed-subflyout-header-height);
+    left: var(--mnb-condensed-subflyout-left);
+    overflow: hidden;
+    padding: 0 calc(var(--ct-menu-item-padding-x) * 2);
+    position: fixed;
+    top: var(--mnb-condensed-subflyout-header-top);
+    white-space: nowrap;
+    width: calc(var(--ct-leftbar-width) - var(--ct-leftbar-width-sm) + 10px);
+    z-index: 1047;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-subflyout-header .menu-arrow {
+    display: block;
+    right: var(--ct-menu-item-padding-x);
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-subflyout-header > i {
+    flex: 0 0 auto;
+    margin-right: 10px;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapse > ul,
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-condensed-subflyout-positioned > .collapsing > ul {
+    background-color: #2e2e31;
+    box-sizing: border-box;
+    display: block !important;
+    left: var(--mnb-condensed-subflyout-left);
+    max-height: var(--mnb-condensed-subflyout-max-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    position: fixed !important;
+    scrollbar-color: rgba(255, 255, 255, .5) transparent;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scroll-padding-block: 0;
+    scroll-snap-type: y mandatory;
+    top: var(--mnb-condensed-subflyout-top);
+    width: calc(var(--ct-leftbar-width) - var(--ct-leftbar-width-sm) + 10px);
+    z-index: 1046;
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .wrapper .leftside-menu .mnb-subflyout-header-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    padding-right: var(--ct-menu-item-padding-x);
+    text-overflow: ellipsis;
+}
+
+/* ========================================================================
+ * 접힌 왼쪽 메뉴 flyout 보완 끝
+ * ======================================================================== */
+
+.footer {
+    position: relative;
+    font-size: 13px;
+}
+.content-page {
+    height: calc(100vh - var(--ct-topbar-height) - 2px);
+    overflow: auto;
+    padding: 0 .75rem;
+}
+.mnb-tab-panels {
+    width: 100%;
+    min-height: calc(100vh - var(--ct-topbar-height) - 70px);
+}
+.mnb-tab-panel {
+    display: none;
+    width: 100%;
+    height: calc(100vh - var(--ct-topbar-height) - 70px);
+}
+.mnb-tab-panel.active {
+    display: block;
+}
+
+.favorite-on {
+    color: #ffba00;
+}
+.favorite-off {
+    color: #a9a9a9;
+}
+
+/*button*/
+.btn {
+    font-size: 14px;
+    font-weight: 500;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: var(--radius);
+    
+}
+.btn-outline-light, .btn-band, .btn-white, .btn-icon, .btn-search, .btn-dell, .btn-input, .btn-search {
+    --ct-btn-disabled-color: #a0a0a1;
+    --ct-btn-disabled-bg: #dfdfe0 ;
+    --ct-btn-disabled-border-color: #c1c1c2;
+    --ct-btn-disabled-opacity: 1;
+    white-space: nowrap;
+}
+.btn-search {
+    white-space: nowrap;
+    margin-left: 15px;
+    color: #fff;
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+    border-radius: var(--radius);
+    
+}
+.btn-search:hover, .btn-search:focus, .btn-search:active {
+    color: #fff;
+    background: #242424;
+    border: 1px solid #242424;
+}
+/* 검색조건 폼: .btn-search(조회)가 든 열(col)을 늘려 버튼을 폼 오른쪽 끝으로 정렬
+   단, 같은 칸에 입력박스(form-control)/셀렉트(form-select)가 있으면 입력박스가 같이 늘어나므로 제외 */
+.row > [class*="col-"]:has(.btn-search):not(:has(.form-control)):not(:has(.form-select)) {
+    flex-grow: 1;
+}
+.btn-band {
+    color: #fff;
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary); 
+}
+.btn-band:hover, .btn-band:active  {
+    color: #fff;
+    background: #d20303;
+    border: 1px solid #d20303;
+}
+.btn-white, .btn-white:hover, .btn-white:active {
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border: 1px solid #dbdbdb;
+    padding: 0;
+    margin: 0;
+    border-radius: 10px;
+}
+.btn-white i {
+    color: #a9a9a9;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.btn-white:hover i {
+    color: #666;
+}
+
+.btn-icon, .btn-icon:hover, .btn-icon:active {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #d8d8d8;
+}
+.btn-icon i {
+    color: #242424;
+    font-size: 18px;
+    margin-bottom: 3px;
+    display: flex;
+    justify-content: center;
+}
+.btn-icon:hover i {
+    color: var(--brand-primary);
+}
+/* 등록 = 보조 동작. 입력 폼을 새로 여는 동작이고, 실제 반영은 저장이다.
+   검정 채움(#2e2e31)이라 주요 동작(빨강)보다 무거워 보였다. */
+.btn-input {
+    color: var(--brand-ink-2);
+    background: transparent;
+    border: 1px solid var(--brand-line);
+    white-space: nowrap;
+}
+.btn-input:hover, .btn-input:active  {
+    color: var(--brand-ink-2);
+    background: var(--brand-surface-2);
+    border: 1px solid var(--brand-line-strong);
+}
+/* 삭제 = 되돌릴 수 없는 동작. 빨강 외곽선이다.
+   회색 채움(#9a9a9a)이던 것이 비활성(#dfdfe0)과 구분되지 않아, 화면에서
+   가장 위험한 동작이 가장 약해 보였다. 채움을 쓰지 않는 이유는 주요
+   동작(저장·조회)과 같은 빨강이기 때문이다 — 형태로 가른다. */
+.btn-dell {
+    color: var(--brand-primary);
+    background: transparent;
+    border: 1px solid var(--brand-primary);
+    white-space: nowrap;
+}
+.btn-dell:hover, .btn-dell:active  {
+    color: #fff;
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+}
+.btn-outline-light {
+    color: #2e2e31;
+    background: #fff;
+    border: 1px solid #d8d8d8;
+    white-space: nowrap;
+}
+.btn-outline-light:hover, .btn-outline-light:focus, .btn-outline-light:active {
+    color: #fff;
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+}
+.btn-newpadge {
+    height: 32px;
+    color: #fff;
+    padding: 6px 14px;
+    margin: 0 2px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-newpadge a:hover, .btn-newpadge a:active {
+   background: transparent;
+}
+/* Alert 의 확인 버튼이 이 클래스를 쓴다(common.js 가 마크업을 동적 생성).
+   원래 #6451f3 보라였다 — 빨강 브랜드 제품에서 알림 89곳이 보라 버튼이었다.
+   주요 동작이므로 브랜드 빨강 채움이다. */
+.btn-info {
+    background: var(--brand-primary);
+    border: 1px solid var(--brand-primary);
+    color: #fff;
+    box-shadow: none;
+    white-space: nowrap;
+}
+.btn-info:hover, .btn-info:active, .btn-info:focus {
+    background: var(--brand-primary-hover);
+    border: 1px solid var(--brand-primary-hover);
+}
+
+/* app.min.css 가 .btn-primary{--ct-btn-bg:#727cf5} 로 보라를 하드코딩한다.
+   --ct-primary 를 따르지 않으므로 여기서 덮는다. Confirm 의 확인 버튼이
+   이 클래스를 쓴다. */
+.btn-primary {
+    --ct-btn-bg: var(--brand-primary);
+    --ct-btn-border-color: var(--brand-primary);
+    --ct-btn-hover-bg: var(--brand-primary-hover);
+    --ct-btn-hover-border-color: var(--brand-primary-hover);
+    --ct-btn-active-bg: var(--brand-primary-hover);
+    --ct-btn-active-border-color: var(--brand-primary-hover);
+}
+.btn-light {
+    background: #f4f4f4;
+    border: 1px solid #f4f4f4;
+    color: #666;
+    box-shadow: none;
+    white-space: nowrap;
+}
+.btn-light:hover, .btn-light:active, .btn-light:focus {
+    background: #d8d8d8;
+    border: 1px solid #d8d8d8;
+}
+.font-12 {
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color:#cacaca;
+}
+.d-auto {
+    display: flex;
+    align-items: stretch;
+}
+
+/* Alert 의 정보 아이콘. 빨강으로 두면 단순 안내가 오류로 읽히므로 중립이다. */
+.text-info {
+    color: var(--brand-muted) !important;
+}
+/* app.min.css 의 .text-danger 는 벤더 분홍으로 렌더된다. SF-Custom 의
+   --ct-danger 오버라이드는 이 색에 닿지 않는다(죽은 선언은 아니다 — 벤더의
+   var(--ct-danger) 40곳, 입력 오류 말풍선·알림 점·btn-soft-danger 가 쓴다).
+   오류 글자는 토큰 --brand-danger 로 모은다. */
+.text-danger {
+    color: var(--brand-danger) !important;
+}
+
+/* ifarme-box */
+iframe body {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.mnb-tab-iframe {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: transparent;
+}
+
+.ifram-box {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 82px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.card {
+    margin-bottom: 15px;
+    border: 1px solid #d8d8d8;
+}
+.card-header {
+    padding:15px 15px 12px 15px;
+}
+.card-body {
+    padding:12px 15px 12px 15px;
+}
+.card .header-title {
+    font-size: 16px;
+    font-weight: 500;
+}
+.card .header-title i {
+    font-size: 120%;
+}
+.sub-tit {
+    font-size: 14px;
+    color: #666666;
+    font-weight: 500;
+}
+/*from*/
+.form-label {
+    display: inline-flex;
+    justify-content: center;
+    flex: 0 0 140px;
+    font-size: 14px;
+    font-weight: 500; 
+    margin-bottom: 0;
+    /*padding-right: 20px;*/
+}
+.form-control, .form-select {
+    font-size: 14px;
+    padding: 0 12px;
+    line-height: 32px;
+    height: 32px;
+    margin:3px 0;
+    box-shadow: none;
+}
+.select2-container .select2-selection--single .select2-selection__rendered {
+   font-size: 14px;
+    padding: 0 12px;
+    line-height: 32px;
+    height: 32px;
+    box-shadow: none; 
+}
+.select2-container .select2-selection--single {
+    height: 32px;
+    line-height: 32px;
+}
+.select2-container .select2-selection--single .select2-selection__arrow  {
+    height: 32px;
+    width: 32px;
+}
+
+.select2-container--default .select2-results>.select2-results__options {
+    color: #666;
+}
+.form-check label {
+    padding: 3px 20px 0 4px;
+    margin-bottom: 0;
+}
+.form-check-input {
+    width: 1.35em;
+    height: 1.35em;
+    margin-top: .125em;
+}
+
+.form-check-input:checked {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+.form-check-input:active, .form-check-input:focus,  .form-check-input:visited {
+    outline: none;
+}
+.form-check-input:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.form-check-label {
+    font-weight: 400;
+}
+.form-check {
+    width: 100%;
+    padding-left: none;
+}
+.col-auto {
+    -webkit-box-flex: 0;
+    -ms-flex: 0 0 auto;
+    flex: auto;
+    width: auto;
+    max-width: 100%;
+}
+.col-auto-flex {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.sub-project-tit {
+    width: 50%;
+    display: inline-flex;
+    align-items: center;
+}
+.sub-project-tit span {
+    font-size: 12px;
+    font-weight: 500;
+    color: #595b5e;
+}
+.form-sm {
+    display: inline-flex;
+}
+.form-sm label {
+    font-weight: 400;
+    padding-right: 10px;
+    white-space: nowrap;
+}
+.floder-close {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    margin-bottom: -20px;
+    z-index: 10;
+}
+
+.floder-close a {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    width: 32px;
+    height: 20px;
+    background: #fff;
+    border-left: 1px solid #d8d8d8;
+    border-right: 1px solid #d8d8d8;
+    border-bottom: 1px solid #d8d8d8;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    padding: 0;
+}
+.floder-close a i {
+    color: var(--brand-primary);
+     font-size: 24px;
+    font-weight: 600;
+   line-height: 0;
+}
+.nav-pills {
+    --ct-nav-pills-link-active-bg:  var(--brand-primary);
+}
+.nav-pills>li>a, .nav-tabs>li>a {
+    color: var(--ct-secondary-color);
+    font-weight: 500;
+    font-size: 14px;
+}
+.tab-content .nav-link:focus, .tab-content .nav-link:hover {
+    background: #fef9f9;
+}
+.p-8 {
+    padding: 8px;
+}
+.p-15 {
+    padding: 15px;
+}
+/*팝업*/
+.modal-content {
+    border-radius: var(--radius);
+    padding: 12px;
+}
+.modal-header {
+    border-radius: var(--radius);
+    background: var(--brand-primary);
+    color:#fff;
+    font-weight: 500;
+    font-size: 16px !important;
+    padding: 8px 20px;
+    margin-bottom: 10px;
+    border-bottom:0;
+}
+.common-alert-modal .modal-content {
+    padding: 15px;
+    border: 0 ;
+    outline: 0 ;
+    box-shadow: none ;
+    overflow: hidden;
+}
+.common-alert-modal {
+    --ct-modal-zindex: 1080;
+}
+.common-alert-modal .modal-header {
+     border-radius: var(--radius);
+    background: var(--brand-primary);
+    color:#fff;
+    font-weight: 500;
+    font-size: 16px !important;
+    padding: 8px 20px;
+    margin-bottom: 10px;
+    border-bottom:0;
+}
+.common-alert-modal .modal-body {
+    padding: 15px;
+    border: 0 ;
+    outline: 0 ;
+    box-shadow: none ;
+    overflow: hidden;
+    /* 좁은 창에서 한국어 단어 중간이 끊기지 않게 하고, 띄어쓰기 없는 긴 값만 아무 데서나 끊는다. */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+.common-alert-modal .modal-header .btn-close {
+    opacity: 1;
+}
+body.common-alert-mask .modal-backdrop {
+    /* 계열마다 다르던 값을 --modal-backdrop 하나로 모았다. 이전 값
+       (#c9ced3 / 0.32)은 너무 옅어 모달로 읽히지 않았다.
+       농도는 --modal-backdrop 의 알파 한 곳에서만 쓴다. Bootstrap 의
+       opacity 레이어를 그대로 두면 0.45 × 0.45 = 0.20 으로 두 번 곱해진다. */
+    background-color: var(--modal-backdrop);
+    z-index: 1075;
+}
+body.common-alert-mask .modal-backdrop.show {
+    opacity: 1;
+}
+body.common-alert-mask .modal-backdrop.fade {
+    transition: none !important;
+}
+body.popup-draggable-mask.common-alert-mask .modal-backdrop:not(:last-of-type) {
+    --ct-backdrop-bg: transparent;
+    --ct-backdrop-opacity: 0;
+    background-color: transparent !important;
+}
+body.popup-draggable-mask.common-alert-mask .modal-backdrop:not(:last-of-type).show {
+    opacity: 0 !important;
+}
+body.popup-draggable-mask:not(.common-alert-mask) .modal-backdrop {
+    /* 이전에는 transparent !important 로 백드롭을 지워, 컬럼설정·내정보가
+       뒤 화면 위에 그냥 떠 있는 것처럼 보였다. 다른 계열과 같은 값을 준다. */
+    background-color: var(--modal-backdrop) !important;
+}
+body.popup-draggable-mask:not(.common-alert-mask) .modal-backdrop.show {
+    opacity: 1 !important;
+}
+body.popup-draggable-mask:not(.common-alert-mask) .modal-backdrop.fade {
+    transition: none !important;
+}
+
+/* daterangepicker가 Bootstrap modal 뒤로 숨지 않도록 z-index 상향 */
+.daterangepicker {
+    z-index: 2000 !important;
+}
+
+/*Grid*/
+[data-ax5grid] [data-ax5grid-container="root"] {
+    border-radius: 10px;
+    border: 0;
+    font-size: 14px;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-panel] table tr td, [data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-panel] table tr td [data-ax5grid-cellHolder] {
+    font-weight: 500;
+    font-size: 14px;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="body"] [data-ax5grid-panel] table tr td [data-ax5grid-cellHolder] {
+    font-size: 14px;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-column-sort]:before, [data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-column-sort][data-ax5grid-column-sort-order="asc"]:before {
+   right: -15px;
+   left: auto;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-column-sort]:after, [data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-column-sort][data-ax5grid-column-sort-order="desc"]:after  {
+    right: -15px;
+   left: auto;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-column-sort] {
+    position: relative;
+    width: auto; 
+    height: auto;
+    display: inline-block;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-panel] table tr td:hover {
+    background-color: #d4d9e3;
+    background-image: -webkit-linear-gradient(top, #e1e6f0, #d4d9e3);
+    background-image: linear-gradient(to bottom, #e1e6f0, #d4d9e3);
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-panel] table tr td.hasBorder {
+    border-right: 1px solid #bcc1cc;
+    border-bottom: 1px solid #bcc1cc;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="header"] [data-ax5grid-panel] table tr td {
+    box-shadow: none;
+    background-color: #e1e6f0;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="page"] {
+    background-color: #edeff1;
+    background-image: -webkit-linear-gradient(top, #edeff1, #edeff1);
+    background-image: linear-gradient(to bottom, #edeff1, #edeff1);
+    border-top: 1px solid #d8d8d8;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="page"] [data-ax5grid-page="holder"] [data-ax5grid-page="status"] {
+    color: #666;
+} 
+
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="body"] [data-ax5grid-panel] table tr td .btn-default {
+    background: #fff;
+    border: 1px solid #d7d7d7;
+    border-radius: 999px;
+    font-size: 13px !important;
+    color: #666;
+    padding: 10px 0 !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="body"] [data-ax5grid-panel] table tr td .btn-default:hover {
+    background: #f8fde3;
+    border: 1px solid #c2c5b8;
+}
+
+.modal-content {
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, .25);
+}
+/* .grid-table-radius { wezongrid 적용x
+    margin-top: 10px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #8d8e90;
+    height: auto;
+    color:#242424;
+} */
+.upper-wezongrid {
+    padding-bottom: 1px;
+}
+/* 목록 머리 오른쪽 위의 보조 버튼(등록·배포본 받기 등)은 흰 바탕 — 회색 화면 바탕 위에서 버튼으로 보이게 한다 */
+.upper-wezongrid .btn-input {
+    background: var(--brand-surface-1);
+}
+.upper-wezongrid .btn-input:hover, .upper-wezongrid .btn-input:active {
+    background: var(--brand-surface-2);
+}
+/* 좌측 메뉴 잎의 건수 배지(입고 조회의 검사 대기) — data-badge 속성으로 그려 메뉴 이름(text())에 섞이지 않는다 */
+.menu-leaf-link[data-badge]::after {
+    content: attr(data-badge);
+    display: inline-block;
+    min-width: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+    color: var(--brand-surface-1);
+    background: var(--brand-primary);
+}
+
+label {
+    margin-bottom: 0;
+}
+
+/*높이 값*/
+.h-auto {
+    height: auto;
+    min-height: 100%;
+}
+.h-350 {
+    height: 350px;
+}
+
+.ifram-wrapper {
+    height: calc(100vh - 0px);
+    overflow: auto;
+    padding: 12px;
+}
+.container-fluid {
+    padding: 0;
+}
+/*내정보 팝업*/
+.password-criteria {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 5px;
+}
+
+.password-criteria li {
+  display: flex;
+  align-items: center;
+}
+
+.password-criteria i.uil {
+  width: 20px;
+  margin-right: 5px;
+}
+
+.password-criteria i.uil-times {
+  color: red;
+}
+.password-criteria i.uil-check {
+  color: green;
+}
+
+/*아이프레임 팝업 */
+.table_box {
+    border-radius: 10px;
+    background-color:#fff;
+    border: 1px solid #d7d7d7;
+    padding: 10px;
+}
+.ax5modal .ax-modal-body {
+    border-radius: 10px;
+}
+.form-group {
+    margin-bottom: 0px;
+}
+.ifarm-popup {
+    margin: 0;
+    padding: 0;
+    font-size: 13px;
+}
+.ifarm-popup header {
+    background: var(--brand-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    padding: 3px 15px;
+}
+.ifarm-popup header h4 {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.ifarm-popup .title_box {
+    font-size: 13px;
+    font-weight: 600;
+    color: #8a7d7d;
+}
+.ifarm-popup .table_box_sub {
+    background: rgba(255, 255, 255, .1);
+    border-radius: 10px;
+    padding: 15px;
+}
+.ifarm-popup .form-label {
+    font-size: 13px;
+}
+
+.ax5-ui-toast-container {
+    padding: 12px;
+}
+
+.ax5modal.primary .ax-modal-header {
+    color: #fff;
+    background: var(--brand-primary);
+    margin: 12px 12px 0 12px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 500;
+}
+.ax5modal .ax-modal-header .ax-modal-header-addon {
+    position: absolute;
+    right: 12px;
+    top: 6px;
+    padding: 10px 10px;
+    color: #fff;
+}
+.ax-modal-header-addon i {
+    font-size: 1.25rem;
+}
+.gap-2 {
+    gap: .4rem !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        @media (max-width: 768px) {
+
+
+
+        }
+
+
+/* 260511 jhm 
+ - popup에서 padding이 과도하게 보여서 축소
+ - popup 내부의 검색조건 card, 입력 card에 bootstrap col로 인해 줄바꿈 시 popup model의 height도 커지도록 변경
+*/
+/* ===== PopupDraggable: .content_wrap.popup padding/gutter 축소 (addPartsTemplate 등) ===== */
+/* .content_wrap.popup.p-2 {
+    padding: 6px !important;
+}
+.content_wrap.popup .card.p-15 {
+    padding: 8px;
+}
+.content_wrap.popup .card.mb-2 {
+    margin-bottom: 4px !important;
+}
+.content_wrap.popup .row.g-2 {
+    --bs-gutter-y: 4px;
+    --bs-gutter-x: 8px;
+}
+.content_wrap.popup .row.mb-2 {
+    margin-bottom: 4px !important;
+}
+.content_wrap.popup .row > [class*="col-"] {
+    margin-top: 4px;
+} */
+.popup .form-label {
+    display: inline-flex;
+    justify-content: center;
+    flex: 0 0 90px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 0;
+    /* padding-right: 20px; */
+}
+  /* ===== PopupDraggable: 콘텐츠 길이에 따라 높이 자동 조정 (CSS-only) ===== */
+  .modal[id^="popupDraggableModal_"] .modal-content {
+      height: auto !important;          /* common.js가 박는 인라인 height 무력화 */
+      max-height: calc(100vh - 40px);   /* 화면 위/아래 여유 20px씩 */
+  }
+  .modal[id^="popupDraggableModal_"] .popup-draggable-body {
+      flex: 1 1 auto;                   /* 남은 공간 차지 (modal-content가 flex column) */
+      min-height: 0;                    /* flex item이 스크롤 가능해지는 트릭 */
+      overflow-y: auto;                 /* 화면 한계 초과 시 body만 스크롤 */
+  }
+
+/* 비밀번호 규칙 — 아직 입력하지 않은 상태. 빨간 ×로 보이면 오류로 읽힌다. */
+.password-criteria .criteria-idle {
+    color: #a9a9a9;
+}
+
+/* 상세 영역의 이미지 칸(검사 결과/이력·Overlay 관리). 옆 표와 같은 높이(.row 의 stretch)로 맞추고
+   이미지는 비율을 지켜 칸 안에 담는다 — 이미지가 칸 높이를 정하지 않아 아래 여백이 생기지 않는다. */
+.detail-image-box {
+    position: relative;
+    height: 100%;
+    min-height: 240px;
+    background: var(--brand-surface-2);
+    border: 1px solid var(--brand-line);
+    border-radius: 4px;
+}
+.detail-image-box > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.detail-image-box > p {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    text-align: center;
+}
+/* 이미지 상세 보기(assets/js/image_zoom.js). 확대한 그림은 칸 밖으로 나가지 않는다 */
+.image-zoom-viewport { overflow: hidden; cursor: zoom-in; }
+.image-zoom-viewport.is-zoomed { cursor: grab; touch-action: none; }
+.image-zoom-viewport.is-dragging { cursor: grabbing; }
+.image-zoom-viewport img { user-select: none; -webkit-user-drag: none; }
+/* 표와 나란히 설 때는 표 높이를 따른다. 표가 비었을 때(행 선택 전)만 안내 문구가 보일 높이 */
+@media (min-width: 992px) {
+    .detail-image-box { min-height: 120px; }
+}
+
+/* 상세 영역의 켜고 끄는 값(클라이언트 사용·Overlay 표시). 입력칸(.form-control 32px + 위아래 3px)과 같은 줄·같은 높이로 둔다.
+   Bootstrap .form-switch 는 입력칸보다 작고(1em) float 로 떠서 줄이 어긋난다. */
+.form-check.form-switch.detail-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    min-height: 0;
+    margin: 3px 0;
+    padding-left: 0;
+}
+.detail-switch .form-check-input {
+    float: none;
+    width: 44px;
+    height: 24px;
+    margin: 0;
+}
+.detail-switch .form-check-label {
+    font-size: 14px;
+}
+
+/* 상세 영역 입력칸 옆 버튼(클라이언트 API Key [재발급]). 입력칸(.form-control 32px + 위아래 3px)과 위아래를 맞춘다. */
+.btn.detail-inline-btn {
+    flex: none;
+    height: 32px;
+    margin: 3px 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 30px;
+}
+
+/* 검사항목 홈 — 영역 높이를 데이터 양과 무관하게 고정한다(표 한 줄 38px).
+   라벨 클래스(측정점)·최근 스냅샷은 한 줄에 나란히 머리글 + 5줄(최근 스냅샷은 최대 5개), 넘치면 세로 스크롤.
+   최근 데이터는 썸네일 한 줄만 보이고 넘치는 것은 다음 줄로 넘어가 가려진다(가로 스크롤이 생기지 않는다). */
+.item-home-body {
+    height: 230px;
+    overflow-y: auto;
+}
+.item-home-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    height: 98px;
+    overflow: hidden;
+}
+
+/* 비전검사항목 탭 — 머리 카드 아래 변에 내부 탭(홈·데이터 목록·라벨링·검수·스냅샷)을 붙인다.
+   첫 탭 글자의 왼쪽 선을 머리 제목에 맞추고(탭 좌우 여백 1rem + 5px = 제목 왼쪽 21px), 카드 아래 변이 탭 밑줄 자리다. */
+.item-head .item-tabs {
+    padding: 0 5px;
+    border-bottom: 0;
+}
+.item-head .item-tabs li a {
+    padding: .5rem 1rem;
+}
+/* 하위 화면 iframe — 높이는 화면이 남은 높이로 맞춘다(item.html fitFrame). 그동안 바깥은 스크롤하지 않는다 */
+.item-frame {
+    display: block;
+    width: 100%;
+    border: 0;
+}
+.ifram-wrapper.item-framed {
+    overflow: hidden;
+}
+.item-desc-toggle .uil-angle-down {
+    transition: transform .2s;
+}
+.item-desc-toggle[aria-expanded="true"] .uil-angle-down {
+    transform: rotate(180deg);
+}
+
+/* 비전검사항목 탭 안의 하위 화면(?embed=1, layout_page 의 body.embedded) — 화면 이름·항목명·즐겨찾기는 바깥 머리 카드와
+   탭이 보이므로 감춘다. 제목뿐인 머리는 통째로, 버튼·진행 표시가 있는 머리(라벨링)는 제목만 감춘다.
+   바깥 패딩은 0 — 하위 화면의 카드가 바깥 머리 카드와 같은 왼쪽·오른쪽 선에 선다. */
+body.embedded .ifram-wrapper {
+    padding: 0;
+}
+body.embedded .card-header > .header-title {
+    display: none;
+}
+body.embedded .card-header:not(:has(> :not(.header-title))) {
+    display: none !important;   /* 머리는 .d-flex(display:flex !important)다 */
+}
+
+/* 패널 머리(DESIGN §5.8) — 카드 안 한 덩어리의 제목(왼쪽)과 그 패널의 글자 링크(오른쪽), 아래 1px 선 */
+.panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--brand-line);
+}
+.panel-head .sub-tit { margin-bottom: 0; }
+.panel-link { font-size: 12px; color: var(--brand-muted); }
+.panel-link:hover, .panel-link:focus-visible { color: var(--brand-primary); }
+
+/* 입력칸·선택칸 모서리 — 벤더가 .25rem 을 직접 박아 --ct-border-radius 를 따르지 않는다. 입력 그룹의 붙은 쪽(0)은 벤더 규칙이 더 구체적이라 그대로다 */
+.form-control, .form-select { border-radius: var(--radius); }
+/* 입력칸 포커스 — 벤더는 포커스 때 테두리를 그대로 두고 그림자도 없애 어디에 커서가 있는지 보이지 않는다. 테두리만 잉크로 */
+.form-control:focus, .form-select:focus { border-color: var(--brand-ink); }
+
+/* 키보드 포커스 링(DESIGN §9.2) — 벤더가 a·button 의 outline 을 !important 로 끄고(app.min.css) 버튼은 보라 그림자다.
+   잉크 2px 선으로 맞춘다. :focus-visible 이 더 구체적이라 !important 끼리 이긴다. 어두운 좌측 메뉴 위에서는 흰 선이다.
+   outline 은 레이아웃을 움직이지 않는다 */
+a:focus-visible, button:focus-visible, .btn:focus-visible, .nav-link:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible {
+    outline: 2px solid var(--brand-ink) !important;
+    outline-offset: 2px;
+    box-shadow: none;
+}
+.leftside-menu a:focus-visible { outline-color: var(--brand-surface-1) !important; }

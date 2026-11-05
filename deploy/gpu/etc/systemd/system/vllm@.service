@@ -1,0 +1,19 @@
+[Unit]
+Description=vLLM %i (chatbot)
+After=network-online.target nvidia-persistenced.service
+Wants=network-online.target
+
+[Service]
+User=vllm-admin
+Group=vllm-admin
+WorkingDirectory=/opt/yest/chatbot/vllm
+ExecStart=/opt/yest/chatbot/vllm/app/run-%i.sh
+Restart=always
+RestartSec=10
+TimeoutStartSec=900
+UMask=0027
+StandardOutput=append:/mnt/a/chatbot/vllm/logs/%i.log
+StandardError=append:/mnt/a/chatbot/vllm/logs/%i-error.log
+
+[Install]
+WantedBy=multi-user.target

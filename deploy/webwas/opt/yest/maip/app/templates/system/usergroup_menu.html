@@ -1,0 +1,349 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="#"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="userGroupMenuSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label for="cboUserGroup" class="form-label" data-labelCd="사용자 그룹">사용자 그룹</label>
+                            <select class="form-select" id="cboUserGroup" name="cboUserGroup"></select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label for="cboMenuFolder" class="form-label" data-labelCd="메뉴폴더">메뉴폴더</label>
+                            <select class="form-select" id="cboMenuFolder" name="cboMenuFolder"></select>
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#userGroupMenuSearchCollapse" role="button" aria-expanded="true" aria-controls="userGroupMenuSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <div class="sub-tit" data-labelCd="메뉴 권한 설정">메뉴 권한 설정</div>
+        <div class="text-muted" data-labelCd="사용자·사용자 그룹·메뉴 권한은 관리자 그룹만 씁니다.">사용자·사용자 그룹·메뉴 권한은 관리자 그룹만 씁니다.</div>
+    </div>
+    <div class="flex-wrap gap-2">
+        <button type="button" class="btn btn-band y_write_auth" id="btnSave" data-commonCd="저장">저장</button>
+    </div>
+</div>
+<div class="grid-table-radius p-2">
+    <div id="usergroupmenu-grid" style="height: 600px"></div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+
+
+    class UserGroupMenuPage {
+        constructor() {
+            this.grid = null;
+            this.gridRows = [];
+            this.init();
+        }
+
+        init() {
+            let _this = this;
+            this.grid = WeZonGrid.create('#usergroupmenu-grid', {
+                columnLayout: [
+                    { dataField: 'name', headerText: '메뉴', width: 250, align: 'left' },
+                    {
+                        dataField: 'r',
+                        headerText: "<input type='checkbox' id='checkReadAll'/>읽기",
+                        width: 100,
+                        align: 'center',
+                        renderer: {
+                            type: 'html',
+                            template: function (value, item) {
+                                if (item.is_folder) {
+                                    return '<input type="checkbox" tabindex="-1" style="pointer-events:none;" ' + (_this.areFolderChildrenChecked(item, 'r') ? 'checked' : '') + '>';
+                                }
+                                return '<input type="checkbox" tabindex="-1" style="pointer-events:none;" ' + (_this.toBool(value) ? 'checked' : '') + '>';
+                            }
+                        }
+                    },
+                    {
+                        dataField: 'w',
+                        headerText: "<input type='checkbox' id='checkWriteAll' />쓰기",
+                        width: 100,
+                        align: 'center',
+                        renderer: {
+                            type: 'html',
+                            template: function (value, item) {
+                                if (item.is_folder) {
+                                    return '<input type="checkbox" tabindex="-1" style="pointer-events:none;" ' + (_this.areFolderChildrenChecked(item, 'w') ? 'checked' : '') + '>';
+                                }
+                                return '<input type="checkbox" tabindex="-1" style="pointer-events:none;" ' + (_this.toBool(value) ? 'checked' : '') + '>';
+                            }
+                        }
+                    }
+                ],
+                props: {
+                    height: 600,
+                    headerHeight: 38,
+                    enableSorting: false,
+                    selectionMode: 'singleRow',
+                    fixedColumnCount: 1
+                }
+            });
+            GridUtil.fitWidth(this.grid);
+
+            this.grid.on('cellClick', function (e) {
+                if (e.dataField === 'r' || e.dataField === 'w') {
+                    _this.togglePermission(e.item, e.dataField);
+                }
+            });
+
+            // 콤보를 비동기로 채우므로 그 전에 조회하면 group_id 가 비어 빈 목록이
+            // 돌아온다. 두 콤보가 모두 채워진 뒤에 한 번 조회한다.
+            AjaxUtil.fillSelectOptions($('#cboMenuFolder'), 'menu_folder', 'all', '', null, null, null, function () {
+                AjaxUtil.fillSelectOptions($('#cboUserGroup'), 'user_group', '', '', null, null, null, function () {
+                    _this.searchDataBind();
+                });
+            });
+
+            $('#btnSave').click(function (e) {
+                _this.saveUserGroupMenu()
+            });
+        }
+
+        toBool(value) {
+            return value === true || value === 'true' || value === 'True' || value === 'Y' || value === 'y' || value === 1;
+        }
+
+        isMenuRow(item) {
+            return !!item && !item.is_folder && !!item.menu_code;
+        }
+
+        getChildMenuRows(folderItem) {
+            if (!folderItem || !folderItem.is_folder) {
+                return [];
+            }
+
+            let _this = this;
+            let childMenus = [];
+            let parentIds = [folderItem.tree_id];
+
+            while (parentIds.length > 0) {
+                let parentId = parentIds.pop();
+                _this.gridRows.forEach(function (row) {
+                    if (row.tree_pid !== parentId) {
+                        return;
+                    }
+
+                    if (row.is_folder) {
+                        parentIds.push(row.tree_id);
+                        return;
+                    }
+
+                    if (_this.isMenuRow(row)) {
+                        childMenus.push(row);
+                    }
+                });
+            }
+
+            return childMenus;
+        }
+
+        areFolderChildrenChecked(folderItem, field) {
+            let childMenus = this.getChildMenuRows(folderItem);
+            return childMenus.length > 0 && childMenus.every(function (item) {
+                return item[field] === true;
+            });
+        }
+
+        prepareTreeRows(rows) {
+            let _this = this;
+            return (rows || []).map(function (item) {
+                let isFolder = item.is_folder === true || item.is_folder === 'true' || item.is_folder === 'True' || item.is_folder === 1;
+                let treeId = isFolder ? 'folder-' + String(item.id) : 'menu-' + String(item.menu_code);
+                let treePid = item.pid == null ? null : 'folder-' + String(item.pid);
+
+                return Object.assign({}, item, {
+                    is_folder: isFolder,
+                    tree_id: treeId,
+                    tree_pid: treePid,
+                    r: isFolder ? null : _this.toBool(item.r),
+                    w: isFolder ? null : _this.toBool(item.w)
+                });
+            });
+        }
+
+        bindHeaderCheckboxes() {
+            let _this = this;
+            window.requestAnimationFrame(function () {
+                let menuRows = _this.gridRows.filter(function (item) {
+                    return _this.isMenuRow(item);
+                });
+                let readAll = menuRows.length > 0 && menuRows.every(function (item) {
+                    return _this.toBool(item.r);
+                });
+                let writeAll = menuRows.length > 0 && menuRows.every(function (item) {
+                    return _this.toBool(item.w);
+                });
+
+                $('#checkReadAll').prop('checked', readAll).off('click').on('click', function (e) {
+                    e.stopPropagation();
+                    _this.applyAllPermission('r', e.target.checked);
+                });
+
+                $('#checkWriteAll').prop('checked', writeAll).off('click').on('click', function (e) {
+                    e.stopPropagation();
+                    _this.applyAllPermission('w', e.target.checked);
+                });
+            });
+        }
+
+        refreshTree() {
+            this.grid.setTreeData(this.gridRows, { treeColumn: 'name', idField: 'tree_id', parentField: 'tree_pid', expandAll: true });
+            this.bindHeaderCheckboxes();
+        }
+
+        togglePermission(item, field) {
+            if (!item) {
+                return;
+            }
+
+            if (item.is_folder) {
+                this.applyFolderPermission(item, field);
+                return;
+            }
+
+            if (!this.isMenuRow(item)) {
+                return;
+            }
+
+            let target = this.gridRows.find(function (row) {
+                return row.tree_id === item.tree_id;
+            });
+
+            if (!target) {
+                return;
+            }
+
+            target[field] = !this.toBool(target[field]);
+            this.refreshTree();
+        }
+
+        applyFolderPermission(folderItem, field) {
+            let _this = this;
+            let childMenus = this.getChildMenuRows(folderItem);
+
+            if (childMenus.length === 0) {
+                return;
+            }
+
+            let checked = !childMenus.every(function (item) {
+                return _this.toBool(item[field]);
+            });
+
+            childMenus.forEach(function (item) {
+                item[field] = checked;
+            });
+            this.refreshTree();
+        }
+
+        applyAllPermission(field, checked) {
+            let _this = this;
+            this.gridRows.forEach(function (item) {
+                if (_this.isMenuRow(item)) {
+                    item[field] = checked;
+                }
+            });
+            this.refreshTree();
+        }
+
+        searchDataBind() {
+            let _this = this;
+            let url = '/api/system/usergroupmenu';
+            let param = {
+                'action': 'read',
+                'group_id': $('#cboUserGroup').val(),
+                'folder_id': $('#cboMenuFolder').val(),
+            };
+            AjaxUtil.getAsyncData(url, param, function (result) {
+                if (result != null) {
+                    _this.gridRows = _this.prepareTreeRows(result);
+                    _this.refreshTree();
+                }
+
+                //page.setButtonDisable(true, false, false);
+            });
+        }//searchDataBind
+
+        saveUserGroupMenu() {
+            let _this = this;
+            let url = '/api/system/usergroupmenu?action=save';
+            let group_id = $('#cboUserGroup').val();
+            let data = {group_id: group_id, Q : ''};
+
+            let items = [];
+            $.each(_this.gridRows, function (idx, item) {
+                let menu_code = item.menu_code;
+                if (_this.isMenuRow(item)) {
+                    items.push({
+                        menu_code: item.menu_code,
+                        r: _this.toBool(item.r),
+                        w: _this.toBool(item.w),
+                        ugm_id: item.ugm_id,
+                    });
+                }
+            });
+            data.Q = JSON.stringify(items);
+
+            Alert.confirm('', '저장하시겠습니까?', function () {
+                let fnSuccess = function (res) {
+                    if (res.success) {
+                        Notify.success('저장되었습니다.'); // Notification
+                        _this.searchDataBind();
+                    } else {
+                        Alert.alert('', res.message || '저장 중 오류가 발생했습니다.');
+                    }
+                };
+                AjaxUtil.postAsyncData(url, data, fnSuccess);
+            }, function () { });
+
+        }
+
+    }
+
+    let page = null;
+
+    $(document).ready(function (e) {
+        page = new UserGroupMenuPage();
+        page.searchDataBind();
+        $('#btnSearch').click(function (ex) {
+            page.searchDataBind();
+        });
+
+        $('#cboUserGroup,#cboMenuFolder').change(function (ex) {
+            page.searchDataBind();
+        });
+
+    });
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,27 @@
+# 지능형 작업표준 안내 AI(RAG) Vector DB — yest-vector-db: /opt/yest/chatbot/qdrant/docker-compose.yml (sychoi:qdrant 640)
+# 변수(UID/GID)는 compose.env. 명령은 늘 --env-file compose.env 를 붙인다(qdrant.service). 설명: docs/design/운영배포_가이드_서버별_v1.1.md §2
+name: chatbot-qdrant
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.18.2      # backend qdrant-client >=1.17,<2 와 맞는 개발 compose 와 같은 버전
+    pull_policy: never                # 폐쇄망: 받으려 하지 않고, 없으면 바로 실패
+    container_name: chatbot_qdrant
+    user: "${QDRANT_UID:?compose.env 에 QDRANT_UID 가 없습니다}:${QDRANT_GID:?compose.env 에 QDRANT_GID 가 없습니다}"
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"   # 사용 통계 외부 전송 끔(절대 규칙 7, N-5)
+      QDRANT__LOG_LEVEL: INFO
+      TZ: Asia/Seoul
+      # QDRANT__SERVICE__API_KEY: P-4(backend QDRANT_API_KEY) 반영 후 켠다
+    ports:
+      - "6333:6333"                   # HTTP(backend). 접근은 ACG 에서 WAS 만. gRPC 6334 는 열지 않는다
+    volumes:
+      - /mnt/a/chatbot/qdrant/storage:/qdrant/storage
+      - /mnt/a/chatbot/qdrant/snapshots:/qdrant/snapshots
+    restart: unless-stopped
+    mem_limit: 8g                     # 서버 64GB. 데이터가 늘면 조정
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

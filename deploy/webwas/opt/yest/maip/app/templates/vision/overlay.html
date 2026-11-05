@@ -1,0 +1,163 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="비전검사 Overlay 관리">비전검사 Overlay 관리</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="card-body py-2">
+        <form id="searchForm" autocomplete="off" class="d-flex align-items-center justify-content-between gap-2">
+            <p class="text-muted mb-0" id="screenDescription">비전검사항목마다 클라이언트 화면에 겹쳐 보일 Overlay 이미지를 등록하고 표시 여부를 관리합니다.</p>
+            <button type="button" class="btn btn-search" id="btnSearch">조회</button>
+        </form>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">비전검사항목별 Overlay</span></div>
+</div>
+<div id="main-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit"><span class="right_align rpt">상세 정보</span></div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit">수정</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off">
+        <input type="hidden" id="id" name="id">
+        <input type="hidden" id="item_id" name="item_id">
+        <div class="row g-2">
+            <div class="col-12 col-lg-5">
+                <div class="detail-image-box" id="overlayImageBox">
+                    <img id="overlayPreview" class="d-none" alt="Overlay 미리보기">
+                    <p class="text-muted mb-0" id="overlayImageEmpty">목록에서 비전검사항목을 선택합니다.</p>
+                </div>
+            </div>
+            <div class="col-12 col-lg-7">
+                <table class="table table-sm table-bordered align-middle mb-0" id="overlayDetail">
+                    <tbody>
+                        <tr><th class="table-light" style="width:160px">비전검사항목</th>
+                            <td><input type="text" class="form-control-plaintext py-0" id="item_label" name="item_label" disabled></td></tr>
+                        <tr><th class="table-light">버전</th>
+                            <td><input type="text" class="form-control-plaintext py-0" id="version" name="version" disabled></td></tr>
+                        <tr><th class="table-light"><label for="visible" class="mb-0">표시</label></th>
+                            <td><div class="form-check form-switch detail-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="visible" name="visible">
+                                <label class="form-check-label" for="visible" id="visibleLabel" data-on="활성화" data-off="비활성화">비활성화</label></div></td></tr>
+                        <tr><th class="table-light"><label for="opacity" class="mb-0">불투명도 (0.0~1.0)</label></th>
+                            <td><input type="number" class="form-control form-control-sm" id="opacity" name="opacity" step="0.05" min="0" max="1"></td></tr>
+                        <tr><th class="table-light"><label for="image" class="mb-0">이미지 파일 <span id="imageRequired" class="d-none">(필수)</span></label></th>
+                            <td><span id="imageView">-</span>
+                                <input type="file" class="form-control form-control-sm d-none" id="image" name="image" accept="image/png,image/jpeg"></td></tr>
+                        <tr><th class="table-light">수정일</th>
+                            <td><input type="text" class="form-control-plaintext py-0" id="updated_at" name="updated_at" disabled></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
+</div>
+<div class="alert alert-secondary mt-2 mb-0" style="font-size:13px">이미지를 교체하면 버전이 올라갑니다. 현장 클라이언트는 그 값으로 캐시를 지웁니다. 숨기려면 [수정]에서 표시를 비활성화합니다.</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'assets/js/image_zoom.js' %}"></script>
+<script type="text/javascript">
+    class Page {
+        init() {
+            const _this = this;
+            ImageZoom.attach(document.getElementById('overlayImageBox'), document.getElementById('overlayPreview'));
+            this.grid = WeZonGrid.create('#main-grid', {
+                columnLayout: [
+                    { dataField: 'item_code', headerText: '비전검사항목 코드', width: 120 }
+                    , { dataField: 'item_name', headerText: '비전검사항목명', width: 200, align: 'left' }
+                    , { dataField: 'has_overlay', headerText: 'Overlay', width: 80, align: 'center',
+                        labelFunction: function (rowIndex, columnIndex, value) { return value ? '있음' : '없음'; } }
+                    , { dataField: 'version', headerText: '버전', width: 80, align: 'right' }
+                    , { dataField: 'visible', headerText: '표시', width: 80, align: 'center',
+                        labelFunction: function (rowIndex, columnIndex, value, item) { return !item.has_overlay ? '-' : (value ? '표시' : '숨김'); } }
+                    , { dataField: 'opacity', headerText: '불투명도', width: 100, align: 'right' }
+                    , { dataField: 'updated_at', headerText: '수정일', width: 160 }]
+                , props: { height: 340, enableSorting: true, selectionMode: 'singleRow', enablePaging: true, pageSize: 20, rowIdField: 'item_id' }
+            });
+            GridUtil.fitWidth(this.grid);
+            // 행이 곧 검사항목이라 등록·삭제가 없다. 숨기려면 "표시"를 해제한다.
+            this.detail = DetailForm.create({
+                form: '#detailForm', grid: this.grid, rowIdField: 'item_id', fields: '#opacity, #image, #visible', editOnly: '#image',
+                buttons: { edit: '#btnEdit', save: '#btnSave', cancel: '#btnCancel' },
+                onSave: function (row) { _this.saveOverlay(row); }
+            });
+            this.grid.on('cellClick', function (e) { _this.detail.select(_this.formRow(e.item), function (row) { _this.showDetail(row); }); });
+            $('#btnSearch').on('click', function () { _this.searchMainData(); });
+            // 파일 칸은 [수정] 때만 보인다(editOnly). 읽기 모드에서는 그 자리에 등록 여부를 글로 보인다.
+            $('#btnEdit, #btnCancel').on('click', function () { _this.syncImageView(); });
+            this.searchMainData();
+        }
+
+        // select: 다시 읽은 뒤 고를 검사항목 id. 그 행을 상세에 다시 넣는다(읽기 전용). 없으면 상세를 비운다.
+        searchMainData(select) {
+            const _this = this;
+            AjaxUtil.getAsyncData('/api/vision/overlay?action=list', {}, function (rows) {
+                rows = rows || [];
+                GridUtil.setRows(_this.grid, rows, { select: select, firstPage: select === undefined });
+                const row = rows.find(function (r) { return r.item_id === select; });
+                if (row) { _this.detail.bind(_this.formRow(row)); } else { _this.detail.clear(); }
+                _this.showDetail(row || null);
+            });
+        }
+
+        // 상세에 넣을 값. 아직 Overlay 가 없으면 처음 올릴 때 표시하도록 "표시"를 켜 둔다(목록의 "표시"는 없음=false).
+        formRow(row) {
+            const label = { item_label: row.item_name + ' (' + row.item_code + ')' };
+            return $.extend({}, row, label, row.has_overlay ? {} : { visible: true });
+        }
+
+        syncImageView() {
+            $('#imageView').toggleClass('d-none', !$('#image').hasClass('d-none'));
+        }
+
+        // 미리보기(없으면 안내 문구)와, Overlay 가 아직 없는 검사항목이면 이미지가 필수라는 표시
+        showDetail(row) {
+            const url = row && row.image_url ? row.image_url : '';
+            $('#overlayPreview').attr('src', url).toggleClass('d-none', !url);
+            $('#overlayImageEmpty').toggleClass('d-none', !!url)
+                .text(row ? 'Overlay 이미지가 없습니다. [수정]에서 올립니다.' : '목록에서 비전검사항목을 선택합니다.');
+            $('#image').prop('required', !!row && !row.has_overlay);
+            $('#imageRequired').toggleClass('d-none', !row || row.has_overlay);
+            $('#imageView').text(row && row.has_overlay ? '등록됨' : '-');
+            this.syncImageView();
+        }
+
+        saveOverlay(row) {
+            const _this = this;
+            const form = new FormData();
+            form.append('item_id', row.item_id);
+            form.append('opacity', $('#opacity').val() || '0.7');
+            form.append('visible', $('#visible').is(':checked') ? '1' : '0');
+            const file = $('#image')[0].files[0];
+            if (file) { form.append('image', file); }
+            form.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+            $.ajax({
+                url: '/api/vision/overlay?action=save', type: 'POST', data: form,
+                processData: false, contentType: false,
+                success: function (res) {
+                    if (res && res.success === false) { Alert.alert('실패', res.message); return; }
+                    Notify.success('저장되었습니다.');
+                    _this.searchMainData(row.item_id);
+                }
+            });
+        }
+    }
+
+    let page = new Page();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

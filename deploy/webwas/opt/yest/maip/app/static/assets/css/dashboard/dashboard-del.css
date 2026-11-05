@@ -1,0 +1,171 @@
+html, body {
+    margin: 0;
+}
+/* 전체 스크롤 크기 */
+::-webkit-scrollbar {
+  width: 10px;   /* 세로 스크롤 */
+  height: 10px;  /* 가로 스크롤 */
+   border-radius: 6px; 
+}
+/* 스크롤 막대 */
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .4);
+    border-radius: 6px; 
+}
+/* 스크롤 배경 */
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255, .2);
+}
+.del-body {
+    background-color: #202634;
+    font-family: 'Pretendard', sans-serif;
+    color: #f4f7f9;
+    padding: 0;
+    margin: 12px;
+}
+/*
+.del-root .flex-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+    */
+.del-root .section {
+    background-color: #2c3e50;
+    padding: 20px;
+    border-radius: 12px;
+    flex: 1;
+    min-width: 300px;
+}
+ul {
+    padding-left: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #dfe6ee;
+}
+.del-section {
+    background-color: #293042;
+    border-radius: 10px;
+    padding: 20px;
+    flex: 1;
+    min-width: 0;
+    box-shadow: 0 4px 12px rgba(20, 20, 26, 0.35);
+}
+.del-root .bar-vertical-wrapper {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 200px;
+    padding-top: 20px;
+}
+.del-root .bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 60px;
+}
+.del-root .bar-vertical {
+    width: 30px;
+    background-color: #00bfff;
+    border-radius: 6px 6px 0 0;
+}
+.del-root .bar-label {
+    margin-top: 8px;
+    font-size: 13px;
+    text-align: center;
+}
+.del-root .bar-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.del-root .bar-table td {
+    padding: 8px;
+    vertical-align: middle;
+    font-size: 14px;
+    color: #dfe6ee;
+}
+.del-root .bar-table .del-label {
+    width: 140px;
+    white-space: nowrap;
+}
+.del-root .bar-table .bar {
+    height: 18px;
+    background-color: #00bfff;
+    border-radius: 8px;
+}
+.del-root .alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.mg-0 {
+    margin-top: 0;
+}
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.del-root .dot {
+    background-color: #3f80ea;
+}
+.del-root .mt-30 {
+    margin-top: 30px;
+}
+.del-root .gap-20 {
+    gap: 20px;
+}
+
+.del-section-title {
+    font-weight: 700;
+    font-size: 18px;
+    color: #d0d5e3;
+    margin-bottom: 20px;
+}
+.del-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+}
+
+.del-th {
+    background-color: #333b4c;
+    font-weight: bold;
+    color: #f4f7f9;
+    padding: 10px;
+    border-bottom: 1px solid #4e5566;
+}
+
+.del-td {
+    padding: 10px;
+    text-align: center;
+    color: #e2e2e2;
+}
+
+.del-table tbody tr:nth-child(even) .del-td {
+    background: rgb(32 38 52 / 70%);
+}
+
+.del-table tbody tr:nth-child(odd) .del-td {
+    background-color: #293042;
+}
+.del-body .del-th {
+    height: 16px;
+}
+.del-body .del-td {
+    height: 25px;
+}
+/* 지브라 */
+.del-body .eqp .del-table tbody tr:nth-child(even) .del-td {
+    background: rgb(32 38 52 / 70%);
+}
+
+.fer-grid {
+    gap: 20px;
+}
+.status-group {
+    border-radius: 10px;
+}

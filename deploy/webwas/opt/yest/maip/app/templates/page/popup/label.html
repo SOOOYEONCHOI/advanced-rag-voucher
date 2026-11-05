@@ -1,0 +1,191 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+{% block content %}
+
+<div class="ifarm-popup" >
+    <form id="labelForm" autocomplete="off">
+        <input type="hidden" id="lable_code_id" name="lable_code_id" />
+        <input type="hidden" id="label_lang_id" name="label_lang_id" />
+        <header class="d-flex justify-content-between align-items-center">
+            <h4>Label Setting</h4>
+            <button type="button" class="btn-close" id="modal-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </header>
+        <div class="table_box" id="labelcode_info_section">
+            <div class="title_box d-flex justify-content-between">
+                <div>Label Info</div>
+                <div id="mode"></div>
+            </div>
+            <div class="table_box_sub">
+                <div class="row">
+                    <input type="hidden" id="ModuleName" name="ModuleName" value="{{gparam.gui_code}}" />
+                    <div class="col-xl-12 col-sm-12 col-lg-12" >
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Name">Menu Name</label>
+                            <input type="text" class="form-control" id="MenuName" name="menu_name" readonly />
+                        </div>
+                    </div>
+
+                    <div class="col-xl-12 col-sm-12 col-lg-12" >
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Template">Template</label>
+                            <input type="text" class="form-control" id="TemplateKey" name="TemplateKey" value="{{gparam.template_key}}" readonly />
+                        </div>
+                    </div>
+
+                    <div class="col-xl-12 col-sm-12 col-lg-12" >
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Labelcode">Label Code</label>
+                            <input type="text" class="form-control" id="LabelCode" name="LabelCode" value="{{gparam.label_code}}" readonly />
+                        </div>
+                    </div>
+
+                    <div class="col-xl-12 col-sm-12 col-lg-12">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Description">Description</label>
+                            <textarea class="form-control"id="Description" name="Description" rows="2"></textarea>
+                        </div>
+                    </div> 
+                </div>
+            </div>
+        </div>
+        <div class="table_box">
+            <div class="title_box">
+                <span>Language Text</span>
+            </div>
+            <div class="table_box_sub">
+                <div class="row">
+                   <div class="col-xl-12 col-sm-12 col-lg-12" >
+                         <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Language">Language</label>
+                            <select class="form-select" id="LangCode" name="LangCode"></select>
+                        </div>
+                    </div>
+                    <div class="col-xl-12 col-sm-12 col-lg-12">
+                        <div class="d-flex align-items-center">
+                            <label class="form-label" data-labelCd="Menu Displaytext">Display Text</label>
+                            <input class="form-control" type="text" id="DispText" name="DispText">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </form>
+   <div class="mt-2 d-flex justify-content-center gap-1">
+        <button type="button" class="btn btn-band" id="saveLabelCodeLang" data-commonCd="저장">save</button>
+        <button type="button" class="btn btn-dell" id="modal-close-button" data-bs-dismiss="modal" data-commonCd="닫기">Close</button>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script type="text/javascript">
+
+    class LabelSettingPage {
+        constructor() {
+            this.url = '/api/common/labels';
+            this.$form = $('#labelForm');
+            this.init();
+            $("body").css("overflow", "hidden"); 
+        }
+
+        init() {
+
+
+            let _this = this;
+            let gui_code = $('#ModuleName').val();
+            let template_key = $('#TemplateKey').val();
+            let label_code = $('#LabelCode').val();
+            let $LangCode = $('#LangCode');
+
+            let lang_code = i18n.getLanguageCode();
+            AjaxUtil.fillSelectOptions($LangCode, 'system_code', '', lang_code, 'lang_code');
+            if (gui_code == '') {
+                gui_code = 'common';
+                $('#ModuleName').val('common');
+            }
+
+            this.getLabelCodeLanguageDetail(lang_code, gui_code, template_key, label_code,
+                function (result) {
+                    if (!result) { return; }
+                    FormUtil.BindDataForm(result, _this.$form);
+
+                    if (gui_code == 'common') {
+                        $('#MenuName').val('Common');
+                        $('#labelcode_info_section').css('display', 'none');
+                    }
+
+                    if (result.lable_code_id == null) {
+                        $('#mode').text('(new)');
+                    }
+
+                    $LangCode.on('change', function (e) {
+                        let lcd = $(this).val();
+                        _this.getLabelCodeLanguageDetail(lcd, gui_code, template_key, label_code,
+                            function (resultdata) {
+                                $('#DispText').val(resultdata ? resultdata.DispText : '');
+                            });
+                    });
+                });
+        }
+
+        getLabelCodeLanguageDetail(lang_code, gui_code, template_key, label_code, fn_done) {
+            let data = {
+                gui_code: gui_code,
+                template_key: template_key,
+                label_code: label_code,
+                lang_code: lang_code,
+                action: 'labelcodelang_detail'
+            };
+            AjaxUtil.getAsyncData(this.url, data, fn_done);
+        }
+
+        saveData() {
+            let _this = this;
+            let data = FormUtil.extractForm(_this.$form);
+            let url = '/api/common/labels?action=save_labelcode_lang';
+            let fnsuccess = function (result) {
+                if (result.success) {
+                    Notify.success('저장했습니다.');
+                    i18n.initialize();
+                }
+            };
+            AjaxUtil.postAsyncData(url, data, fnsuccess);
+        }
+    }
+
+    var page = null;
+    $(document).ready(function (e) {
+        page = new LabelSettingPage();
+
+        // 저장
+        $('#saveLabelCodeLang').click(function (e) {
+            Alert.confirm('', '저장하시겠습니까?', function (e) { page.saveData(); });
+        });
+
+        // 닫기
+        function closeLabelModal() {
+            try {
+                if (window.parent && window.parent !== window && parent.i18n && parent.i18n.modal) {
+                    if (typeof parent.i18n.modal.close === 'function') {
+                        parent.i18n.modal.close();
+                        return;
+                    }
+                    if (typeof parent.i18n.modal.hide === 'function') {
+                        parent.i18n.modal.hide();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
+
+        $('#modal-close, #modal-close-button, [data-bs-dismiss="modal"]').on('click', function (e) {
+            e.preventDefault();
+            closeLabelModal();
+        });
+    });
+</script>
+
+{% endblock %}

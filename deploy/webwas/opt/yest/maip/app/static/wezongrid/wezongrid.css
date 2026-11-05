@@ -1,0 +1,1241 @@
+/**
+ * WeZonGrid v1.3.1 - Stylesheet
+ * Built: 2026-07-28T01:54:50.245Z
+ */
+
+/* ====== theme/variables.css ====== */
+/**
+ * WeZonGrid - CSS Variables (Theme Customization)
+ *
+ * 사용자가 이 변수들을 오버라이드하여 전체 그리드 스타일을 커스터마이징할 수 있습니다.
+ *
+ * 사용법 (Django 템플릿에서):
+ *   <style>
+ *     :root {
+ *       --wzg-primary-color: #1a73e8;
+ *       --wzg-header-bg: #e3f2fd;
+ *       --wzg-row-height: 36px;
+ *     }
+ *   </style>
+ *
+ * 또는 특정 그리드에만 적용:
+ *   #my-grid .wzg-container {
+ *     --wzg-primary-color: #ff5722;
+ *   }
+ */
+
+ /* 
+  grid-table-radius 적용x. grid.prop 높이조정, radius, margin-top 따로 조정.
+  styleFunction이 정상 적용되도록 WeZonGrid 내부의 descendant selector 사용 시 specificity를 주의해야 한다.
+ */
+
+:root {
+  /* ===== Colors ===== */
+  --wzg-primary-color: #003597;
+  --wzg-primary-light: #e0ebff;
+  --wzg-primary-hover: #002a7a;
+
+  --wzg-bg: #ffffff;
+  --wzg-text: #333333;
+  --wzg-text-secondary: #666666;
+  --wzg-border: #d0d0d0;
+  --wzg-border-light: #e8e8e8;
+
+  /* ===== Header ===== */
+  --wzg-header-bg: #f0f2f5;
+  --wzg-header-text: #333333;
+  --wzg-header-border: #999999;
+  --wzg-header-hover: #e0e4ea;
+  --wzg-header-font-weight: 600;
+
+  /* ===== Body / Rows ===== */
+  --wzg-row-bg: #ffffff;
+  --wzg-row-even-bg: #fafafa;
+  --wzg-row-hover-bg: #e8f0fe;
+  --wzg-row-selected-bg: #cce0ff;
+  --wzg-row-selected-text: #333333;
+  /* Faint row-level tint shown in cell-selection mode. Translucent so it is
+     layered OVER any custom cell/row background (via inset box-shadow) instead
+     of replacing it, preserving conditional/status colors underneath. */
+  /* --wzg-row-selected-soft-tint: rgba(0, 53, 151, 0.07); */
+  --wzg-row-selected-soft-tint: rgba(113, 163, 255, 0.3);
+
+  /* ===== Cell ===== */
+  --wzg-cell-padding: 0 8px;
+  --wzg-cell-edit-bg: #ffffee;
+  --wzg-cell-edit-border: #003597;
+  --wzg-cell-error-bg: #fff0f0;
+  --wzg-cell-error-border: #f44336;
+  --wzg-cell-selected-bg: #e0ebff;
+  --wzg-cell-selected-border: #003597;
+
+  /* ===== Footer ===== */
+  --wzg-footer-bg: #f0f2f5;
+  --wzg-footer-text: #003597;
+  --wzg-footer-font-weight: 600;
+
+  /* ===== Pager ===== */
+  --wzg-pager-bg: #f5f5f5;
+  --wzg-pager-border: #d0d0d0;
+  --wzg-pager-active-bg: #003597;
+  --wzg-pager-active-text: #ffffff;
+
+  /* ===== Sizes ===== */
+  --wzg-font-size: 13px;
+  --wzg-font-family: 'Malgun Gothic', 'Noto Sans KR', -apple-system, sans-serif;
+  --wzg-row-height: 32px;
+  --wzg-header-height: 36px;
+  --wzg-footer-height: 32px;
+
+  /* ===== Fixed Column ===== */
+  --wzg-fixed-border: #999999;
+  --wzg-fixed-shadow: 4px 0 6px rgba(0,0,0,0.08);
+
+  /* ===== Scrollbar ===== */
+  --wzg-scrollbar-width: 10px;
+  --wzg-scrollbar-track: #f0f0f0;
+  --wzg-scrollbar-thumb: #c0c0c0;
+  --wzg-scrollbar-thumb-hover: #999999;
+
+  /* ===== Context Menu ===== */
+  --wzg-menu-bg: #ffffff;
+  --wzg-menu-border: #d0d0d0;
+  --wzg-menu-hover-bg: #e8f0fe;
+  --wzg-menu-shadow: 0 2px 8px rgba(0,0,0,0.15);
+
+  /* ===== Status Colors ===== */
+  --wzg-status-added: #2196F3;
+  --wzg-status-edited: #FF9800;
+  --wzg-status-deleted: #F44336;
+  --wzg-status-softdel: #999999;
+
+  /* ===== Group Summary ===== */
+  --wzg-group-summary-depth-1-bg: #d6e3f4;
+  --wzg-group-summary-depth-1-image: none;
+  --wzg-group-summary-depth-2-bg: #e2ebf8;
+  --wzg-group-summary-depth-2-image: none;
+  --wzg-group-summary-depth-3-bg: #eef3fb;
+  --wzg-group-summary-depth-3-image: none;
+
+  /* ===== Tree (Story US-02) ===== */
+  /* Fixed icon box + baseline alignment + color are variable-driven so a
+     product can swap/recolor tree icons with pure CSS (no JS). */
+  --wzg-tree-icon-size: 18px;
+  --wzg-tree-icon-font-size: 10px;
+  --wzg-tree-icon-color: var(--wzg-primary-color);
+  --wzg-tree-icon-gap: 4px;
+  --wzg-tree-icon-align: middle;
+  --wzg-tree-node-icon-size: 16px;
+
+  /* ===== WordWrap uniform multi-line (Story US-08a) ===== */
+  /* Default N=1 (regression guard: unset wordWrapLines => single line, current
+     behavior). VirtualScroller sets a per-cell `--wzg-wordwrap-lines:N`
+     override on wordWrap cells when uniform multi-line height is active.
+     DOCUMENTED LIMIT: content longer than N lines is clamped/truncated —
+     this is uniform, NOT AUIGrid's content-adaptive per-row height (08b). */
+  --wzg-wordwrap-lines: 1;
+
+  /* ===== Misc ===== */
+  --wzg-loading-bg: rgba(255,255,255,0.85);
+  --wzg-no-data-color: #999999;
+  --wzg-resize-handle-color: rgba(0,53,151,0.3);
+  --wzg-sort-icon-color: #003597;
+  --wzg-search-highlight: #fff176;
+  --wzg-copy-border: #003597;
+
+  /* ===== Border Radius ===== */
+  --wzg-border-radius: 10px;
+
+  /* ===== Transition ===== */
+  --wzg-transition-speed: 0.15s;
+}
+
+
+/* ====== theme/wezongrid.css ====== */
+/**
+ * WeZonGrid - Default Theme Base Layout Layer (Light)
+ * Variables are defined in variables.css; state, tree, widgets, and dark
+ * overrides live in sibling layer files.
+ */
+
+/* ===== Container ===== */
+.wzg-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--wzg-border);
+  border-radius: var(--wzg-border-radius);
+  background: var(--wzg-bg);
+  font-family: var(--wzg-font-family);
+  font-size: var(--wzg-font-size);
+  color: var(--wzg-text);
+  line-height: 1.4;
+  overflow: hidden;
+}
+.wzg-container * { box-sizing: border-box; }
+.wzg-container:focus { outline: none; }
+
+/* ===== Header ===== */
+
+.editable-header { color: #448dcd; }/* headerStyle 직접 적용 */
+
+.wzg-header-area {
+  display: flex;
+  border-bottom: 2px solid var(--wzg-header-border);
+  background: var(--wzg-header-bg);
+  color: var(--wzg-header-text); /* inherited by th; specificity 0-1-0 user classes (WeZonGrid headerStyle) can override */
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.wzg-header-fixed {
+  flex-shrink: 0;
+  border-right: 2px solid var(--wzg-fixed-border);
+  z-index: 2;
+  box-shadow: var(--wzg-fixed-shadow);
+}
+.wzg-header-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+.wzg-header-area table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.wzg-header-area th {
+  padding: var(--wzg-cell-padding);
+  font-weight: var(--wzg-header-font-weight);
+  border-right: 1px solid var(--wzg-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background var(--wzg-transition-speed);
+}
+.wzg-header-area th:last-child { border-right: none; }
+.wzg-header-area th:hover { background: var(--wzg-header-hover); }
+
+.wzg-header-text { vertical-align: middle; }
+
+.wzg-sort-icon {
+  font-size: 10px;
+  color: var(--wzg-sort-icon-color);
+  margin-left: 2px;
+  vertical-align: middle;
+}
+.wzg-sort-icon[data-sort-order]::after {
+  content: attr(data-sort-order);
+  font-size: 8px;
+  color: var(--wzg-primary-color, #003597);
+  vertical-align: super;
+  margin-left: 1px;
+  font-weight: 700;
+}
+
+.wzg-header-checkbox {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--wzg-primary-color);
+}
+
+/* ===== Resize Handle ===== */
+.wzg-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 3;
+}
+.wzg-resize-handle:hover {
+  background: var(--wzg-resize-handle-color);
+}
+
+
+/* ===== Body ===== */
+.wzg-body-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+.wzg-body-fixed {
+  flex-shrink: 0;
+  overflow: hidden;
+  border-right: 2px solid var(--wzg-fixed-border);
+  z-index: 1;
+  box-shadow: var(--wzg-fixed-shadow);
+}
+.wzg-body-fixed::-webkit-scrollbar { display: none; }
+.wzg-body-scroll {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Scrollbar styling */
+.wzg-body-scroll::-webkit-scrollbar { width: var(--wzg-scrollbar-width); height: var(--wzg-scrollbar-width); }
+.wzg-body-scroll::-webkit-scrollbar-track { background: var(--wzg-scrollbar-track); }
+.wzg-body-scroll::-webkit-scrollbar-thumb { background: var(--wzg-scrollbar-thumb); border-radius: 5px; }
+.wzg-body-scroll::-webkit-scrollbar-thumb:hover { background: var(--wzg-scrollbar-thumb-hover); }
+
+.wzg-body-area table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Spacer for virtual scroll */
+.wzg-spacer {
+  position: relative;
+  overflow: hidden;
+}
+.wzg-spacer table {
+  position: absolute;
+  left: 0;
+  right: 0;
+  will-change: transform;
+}
+
+
+/* ===== Rows ===== */
+/*
+ * 행 배경색을 CSS custom property(--_cell-bg)로 선언하여 자식 TD(.wzg-cell)가 상속받는 방식.
+ *
+ * [변경 이전 방식과 문제점]
+ *   .wzg-row td    { background: var(--wzg-row-bg); }    -- specificity 0-1-1
+ *   .wzg-row-even td { background: var(--wzg-row-even-bg); } -- specificity 0-1-1
+ *
+ *   사용자가 styleFunction/rowStyleFunction에서 반환하는 단일 클래스
+ *   (예: .temp-yellow, .row-vip)는 specificity 0-1-0 이므로,
+ *   `.wzg-row td`(0-1-1)에 항상 패배하여 배경색이 적용되지 않는 문제가 있었다.
+ *
+ * [변경 후 방식]
+ *   .wzg-row      { --_cell-bg: var(--wzg-row-bg); }     -- 변수만 선언 (TD에 적용 안 함)
+ *   .wzg-row-even { --_cell-bg: var(--wzg-row-even-bg); } -- even 행에서 재선언
+ *   .wzg-cell     { background: var(--_cell-bg); }        -- specificity 0-1-0
+ *
+ *   CSS custom property는 자식으로 상속되므로 TR에서 선언한 --_cell-bg를
+ *   자식 TD(.wzg-cell)가 그대로 사용한다.
+ *   .wzg-cell의 specificity가 0-1-0으로 낮아져 사용자 클래스(0-1-0)와 동일해지고,
+ *   나중에 로드되는 사용자 CSS가 CSS cascade(source order)로 자연스럽게 우선한다.
+ *
+ * [상태 규칙]
+ *   AUIGrid 호환 기본값은 JS가 실제 hovered TD 하나에 .wzg-cell-hover를 붙이는 방식.
+ *   hoverMode:'row'가 명시된 경우에만 .wzg-row:hover td 규칙을 활성화한다.
+ *   .wzg-row-selected td / .wzg-row-selected-merge-covered td 등 !important 규칙은 의도적으로 유지.
+ *   .wzg-row-added td, .wzg-row-edited td 는 border-left만 설정하여 background 충돌 없음.
+ */
+.wzg-row {
+  transition: background var(--wzg-transition-speed);
+  --_cell-bg: var(--wzg-row-bg);
+  --_cell-bg-image: none;
+}
+.wzg-row-even {
+  --_cell-bg: var(--wzg-row-even-bg);
+}
+
+/* ===== Cells ===== */
+.wzg-cell {
+  padding: var(--wzg-cell-padding);
+  border-right: 1px solid var(--wzg-border-light);
+  border-bottom: 1px solid var(--wzg-border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  background: var(--_cell-bg) var(--_cell-bg-image, none) 50% 50% no-repeat; /* TR/TD에서 상속받은 cell background 토큰 사용 */
+}
+.wzg-cell:last-child { border-right: none; }
+
+/* WordWrap uniform multi-line clamp (Story US-08a).
+ * Applied by VirtualScroller ONLY to wordWrap cells when uniform multi-line
+ * row height is active (wordWrapLines:N > 1). The row height is a SINGLE
+ * scaled scalar (baseRowHeight * N) shared by EVERY row — there is no per-row
+ * variance. The cell text wraps and is clamped to exactly N lines.
+ * DOCUMENTED LIMIT: content exceeding N lines is truncated with an ellipsis
+ * (uniform, NOT AUIGrid's content-adaptive auto height — that is the
+ * explicitly-deferred 08b). The tree column keeps its US-02 icon/indent
+ * baseline (this rule only governs wrap/clamp, not the tree-cell layout). */
+.wzg-cell.wzg-cell-wordwrap-clamp {
+  white-space: normal;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wzg-cell.wzg-cell-wordwrap-clamp > .wzg-cell-wordwrap-clamp-box {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--wzg-wordwrap-lines, 1);
+  line-clamp: var(--wzg-wordwrap-lines, 1);
+  max-height: calc(var(--wzg-wordwrap-lines, 1) * 1.4em);
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* ── 그리드 셀 버튼: 행 높이(rowHeight) 자동 추종 (opt-in) ───────────────────────
+   사용법: 셀 렌더러에서 버튼을 <div class="wzg-btn-fill">…</div> 로 감싼다.
+   셀이 table-cell이라 자식 height:100%가 안 먹으므로, inset:0 절대배치 래퍼로 셀을 채우고
+   그 안의 버튼을 height:100%로 늘린다. td는 table-cell 유지(내부 div만 absolute) → 컬럼 폭 안 깨짐.
+   props.rowHeight만 바꾸면 버튼 높이도 같이 조정됨(버튼 = rowHeight - 상하 padding).
+   셀↔버튼 간격은 .wzg-btn-fill 의 padding으로 조절(버튼 margin 금지: height:100%와 충돌해 깨짐). */
+.wzg-cell:has(.wzg-btn-fill) { position: relative; }
+.wzg-btn-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 6px 10px;
+}
+.wzg-btn-fill > .btn { height: 100%; }
+
+
+/* ====== theme/wezongrid-state.css ====== */
+/**
+ * WeZonGrid - State and Selection Layer
+ * Row/cell state hooks, selection overlays, merge/status styling, editing,
+ * validation, search, copy range, and product styleFunction class hooks.
+ */
+
+.wzg-hover-row-enabled .wzg-row:hover td {
+  background: var(--wzg-row-hover-bg) !important;
+}
+/* Row selection: cell-level single fill class (Pass1 + Pass2 union of H_cells).
+   Plan: .sisyphus/plans/groupSelectionRowBgBd.md §3.2 */
+.wzg-selection-row-mode .wzg-cell.wzg-cell-row-selection-fill {
+  background: var(--wzg-row-selected-bg) !important;
+  color: var(--wzg-row-selected-text);
+}
+
+/* Cell-selection mode: faint row indicator (CSS-only).
+   _syncRowSelectionFillCells attaches .wzg-cell-row-selection-fill to the
+   selected row's cells regardless of mode, but the strong row-mode fill above
+   only applies under .wzg-selection-row-mode. In cell mode we tint the row
+   holding the active cell, while the selected cell(s) keep their stronger
+   .wzg-cell-selected background (excluded via :not).
+
+   The tint is a translucent layer composited ON TOP of any custom cell/row
+   background (conditional formatting, status colors) via background-color, so it
+   never clobbers it; text stays crisp because the layer sits below content
+   (unlike a plain opacity, which would fade the text too).
+
+   IMPLEMENTATION NOTE: a translucent linear-gradient layer is used rather than
+   `box-shadow: inset 0 0 0 9999px <tint>`. An inset box-shadow is clipped to the
+   PADDING box, so under `border-collapse: collapse` (where every cell carries a
+   ~1px collapsed grid-line border) the shadow stops 1px short of each edge —
+   leaving an untinted seam along every internal grid line that reads as a "gap
+   between cells" when a multi-cell range is tinted. A background-image gradient
+   paints the full BORDER box (background-clip defaults to border-box), so the
+   tint is seamless. The cell's own background-image layer (--_cell-bg-image,
+   used by image renderers) is preserved as the second layer; background-color
+   (the row/custom color) is untouched and shows through the translucent tint. */
+.wzg-selection-cell-mode .wzg-cell.wzg-cell-row-selection-fill:not(.wzg-cell-selected) {
+  background-image:
+    linear-gradient(var(--wzg-row-selected-soft-tint), var(--wzg-row-selected-soft-tint)),
+    var(--_cell-bg-image, none);
+}
+
+/* Row selection: external-edge stroke overlay container (per .wzg-body-area).
+   Plan: .sisyphus/plans/groupSelectionRowBgBd.md §3.3 */
+.wzg-selection-border-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+.wzg-selection-border-overlay-edge {
+  position: absolute;
+  background: var(--wzg-cell-selected-border);
+  pointer-events: none;
+}
+
+/* Group header row */
+.wzg-group-header td {
+  background: var(--wzg-header-bg) !important;
+  border-bottom: 1px solid var(--wzg-border) !important;
+  font-weight: 600;
+}
+.wzg-group-header:hover td {
+  background: var(--wzg-header-hover) !important;
+}
+
+.wzg-row-synthetic td {
+  color: var(--wzg-text);
+}
+
+.wzg-group-row td {
+  background: #f3f6fb !important;
+  font-weight: 700;
+}
+
+.wzg-group-summary-row td {
+  font-weight: 600;
+  border-top: 1px solid var(--wzg-border);
+}
+.wzg-group-summary-row td.wzg-group-summary-cell-depth-1 {
+  --_cell-bg: var(--wzg-group-summary-depth-1-bg, #d6e3f4);
+  --_cell-bg-image: var(--wzg-group-summary-depth-1-image, none);
+}
+.wzg-group-summary-row td.wzg-group-summary-cell-depth-2 {
+  --_cell-bg: var(--wzg-group-summary-depth-2-bg, #e2ebf8);
+  --_cell-bg-image: var(--wzg-group-summary-depth-2-image, none);
+}
+.wzg-group-summary-row td.wzg-group-summary-cell-depth-3 {
+  --_cell-bg: var(--wzg-group-summary-depth-3-bg, #eef3fb);
+  --_cell-bg-image: var(--wzg-group-summary-depth-3-image, none);
+}
+.wzg-group-summary-row td.wzg-group-summary-label-cell {
+  font-weight: 700;
+  color: var(--wzg-primary-color);
+}
+
+/* Row Merge */
+.wzg-merged-cell {
+  background: var(--wzg-row-bg) !important;
+  font-weight: 500;
+}
+.wzg-merged-hidden {
+  display: none !important;
+}
+.wzg-merged-blank {
+  color: transparent;
+}
+.wzg-hover-cell-enabled .wzg-row:not(.wzg-row-selected) > .wzg-cell.wzg-cell-hover {
+  background: var(--wzg-row-hover-bg) !important;
+  color: var(--wzg-text);
+}
+
+
+/* Row status styles */
+.wzg-row-added td { border-left: 3px solid var(--wzg-status-added); }
+.wzg-row-edited td { border-left: 3px solid var(--wzg-status-edited); }
+.wzg-row-deleted td {
+  text-decoration: line-through;
+  color: var(--wzg-status-deleted, #999);
+}
+.wzg-row-softdeleted td {
+  text-decoration: line-through;
+  color: var(--wzg-status-softdel);
+}
+
+
+/* Cell selection
+ * 외곽선은 셀 내부 inset shadow가 아니라 ::after overlay로 그린다.
+ * 실제 grid line(border-right/bottom)보다 위에서 렌더링해야 여러 행 범위 선택 시
+ * 좌/우 세로 외곽선이 행 경계선에 의해 끊겨 보이지 않는다. */
+.wzg-cell-selected {
+  position: relative;
+  outline: none;
+  /* background: var(--wzg-cell-selected-bg) !important; */
+  /* No fill: the active cell keeps its own (possibly custom) background as-is.
+     Selection is indicated solely by the 2px border drawn via ::after below.
+     The row-level tint excludes this cell via :not(.wzg-cell-selected). */
+}
+.wzg-cell-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0;
+}
+.wzg-cell-selected-top {
+  /* edge class hook */
+}
+.wzg-cell-selected-bottom {
+  /* edge class hook */
+}
+.wzg-cell-selected-left {
+  /* edge class hook */
+}
+.wzg-cell-selected-right {
+  /* edge class hook */
+}
+.wzg-cell-selected-top::after {
+  border-top-width: 2px;
+  border-top-color: var(--wzg-cell-selected-border);
+}
+.wzg-cell-selected-bottom::after {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--wzg-cell-selected-border);
+}
+.wzg-cell-selected-left::after {
+  border-left-width: 2px;
+  border-left-color: var(--wzg-cell-selected-border);
+}
+.wzg-cell-selected-right::after {
+  border-right-width: 2px;
+  border-right-color: var(--wzg-cell-selected-border);
+}
+
+/* Cell editing */
+.wzg-cell-editing {
+  padding: 0 !important;
+  background: var(--wzg-cell-edit-bg) !important;
+  outline: 2px solid var(--wzg-cell-edit-border);
+  outline-offset: -2px;
+  /* MultiSelect/Combo dropdowns 가 셀 밖으로 자연스럽게 빠져나오도록 — 편집 중인 셀만. */
+  overflow: visible !important;
+  position: relative;
+  z-index: 10;
+}
+.wzg-cell-editing input,
+.wzg-cell-editing select {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 8px;
+  font-family: var(--wzg-font-family);
+  font-size: var(--wzg-font-size);
+  background: transparent;
+}
+
+/* Cell validation error */
+.wzg-cell-error {
+  outline: 2px solid var(--wzg-cell-error-border) !important;
+  background: var(--wzg-cell-error-bg) !important;
+}
+
+/* WeZonGrid styleFunction cell background classes (styleFunction, rowStyleFunction 선언해서 직접사용.) */
+.grid-cell-yellow  { background-color: #fffde7; }
+.grid-cell-blue    { background-color: #dcf0f8; }
+.grid-cell-white   { background-color: #ffffff; }
+.grid-cell-red     { background-color: #f8d2cb; }
+.grid-cell-green   { background-color: #e8f5e9; }
+
+/* Row checkbox */
+.wzg-row-checkbox {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--wzg-primary-color);
+}
+
+/* ===== Row Drag & Drop (행 드래그 이동) ===== */
+/* 드래그 knob (grip dots) — radial-gradient 도트라 폰트에 의존하지 않음 */
+.wzg-drag-knob-cell {
+  cursor: grab;
+  user-select: none;
+}
+.wzg-drag-knob-cell--disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.wzg-drag-knob {
+  display: inline-block;
+  width: 9px;
+  height: 15px;
+  background-image: radial-gradient(circle, var(--wzg-drag-knob-dot, #9aa3af) 1.5px, transparent 1.6px);
+  background-size: 5px 5px;
+  background-position: 0 1px;
+  vertical-align: middle;
+}
+.wzg-row-dnd-active .wzg-drag-knob-cell { cursor: grabbing; }
+
+/* 드래그 소스 행(이동 중인 행) */
+.wzg-row-drag-source .wzg-cell { opacity: 0.45; }
+
+.wzg-row-drag-inside-target .wzg-cell {
+  background: var(--wzg-selection-bg, #dbeafe);
+}
+
+/* 드롭 위치 인디케이터 — bodyArea 기준 absolute, fixed+scroll 두 패인 가로 전체 */
+.wzg-row-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--wzg-primary-color, #003597);
+  z-index: 30;
+  pointer-events: none;
+}
+.wzg-row-drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -3px;
+  border: 4px solid transparent;
+  border-left-color: var(--wzg-primary-color, #003597);
+}
+
+/* 드래그 프록시(고스트) — document.body에 부착되므로 :root 변수/fallback 사용 */
+.wzg-row-drag-proxy {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  padding: 6px 14px;
+  background: var(--wzg-primary-color, #003597);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.wzg-row-drag-proxy--cross {
+  box-sizing: border-box;
+  min-width: 128px;
+  text-align: center;
+  white-space: nowrap;
+}
+.wzg-row-drag-target--valid {
+  cursor: grabbing;
+}
+.wzg-row-drag-target--invalid {
+  cursor: not-allowed;
+}
+
+/* Search highlight */
+.wzg-search-highlight {
+  background: var(--wzg-search-highlight) !important;
+}
+
+/* Copy border animation (Excel-style marching ants) */
+.wzg-copy-range {
+  outline: 2px dashed var(--wzg-copy-border);
+  outline-offset: -2px;
+  animation: wzg-marching-ants 0.5s linear infinite;
+}
+@keyframes wzg-marching-ants {
+  0% { outline-offset: -2px; }
+  100% { outline-offset: -4px; }
+}
+
+
+/* ====== theme/wezongrid-tree.css ====== */
+/**
+ * WeZonGrid - Tree Layer
+ * Tree cell, depth, node-icon, and lazy-loading hooks.
+ */
+
+/* Tree grid (Story US-02)
+ *
+ * State/depth hooks emitted by VirtualScroller._renderTreeCell:
+ *   wrapper : .wzg-tree-cell .wzg-tree-depth-{n}   (n = 1-based depth)
+ *   toggle  : .wzg-tree-icon (delegated-click hook, DO NOT remove)
+ *             + .wzg-tree-toggle
+ *             + .wzg-tree-toggle--expanded | --collapsed | --leaf
+ *   node    : .wzg-tree-node-icon
+ *             + .wzg-tree-branch | .wzg-tree-branch-open | .wzg-tree-leaf
+ *             + optional product class from the treeIcon callback
+ *   img     : .wzg-tree-icon-img  (present only for treeIcon URL / iconField)
+ *
+ * Size/alignment/color are CSS-variable driven (--wzg-tree-icon-*). Products
+ * override these classes (or the variables) to swap icons with pure CSS.
+ */
+.wzg-tree-cell {
+  align-items: center;
+}
+.wzg-tree-icon {
+  cursor: pointer;
+  color: var(--wzg-tree-icon-color);
+  font-size: var(--wzg-tree-icon-font-size);
+  user-select: none;
+}
+.wzg-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--wzg-tree-icon-size);
+  vertical-align: var(--wzg-tree-icon-align);
+}
+/* State hooks — emitted by _renderTreeCell, intentionally minimal so a
+ * product can override (e.g. swap the glyph via ::before) with pure CSS.
+ * Kept as explicit selectors so the hook is discoverable, not dead. */
+.wzg-tree-toggle--expanded,
+.wzg-tree-toggle--collapsed {
+  cursor: pointer;
+}
+/* Leaf toggle is a non-interactive spacer (keeps label alignment). */
+.wzg-tree-toggle--leaf {
+  cursor: default;
+}
+.wzg-tree-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--wzg-tree-node-icon-size);
+  height: var(--wzg-tree-node-icon-size);
+  margin-right: var(--wzg-tree-icon-gap);
+  vertical-align: var(--wzg-tree-icon-align);
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+}
+/* Empty node-icon (no glyph/img/bg) collapses so the default has no gap. */
+.wzg-tree-node-icon:empty {
+  width: 0;
+  margin-right: 0;
+}
+.wzg-tree-node-icon.wzg-tree-branch:empty,
+.wzg-tree-node-icon.wzg-tree-branch-open:empty,
+.wzg-tree-node-icon.wzg-tree-leaf:empty {
+  /* product CSS can set width/background here to draw folder/leaf icons */
+}
+.wzg-tree-icon-img {
+  width: var(--wzg-tree-node-icon-size);
+  height: var(--wzg-tree-node-icon-size);
+  object-fit: contain;
+  display: block;
+}
+.wzg-tree-label {
+  vertical-align: var(--wzg-tree-icon-align);
+}
+
+/*
+ * Tree depth row-class hooks (Story US-03).
+ *
+ * These are INTENTIONALLY EMPTY user-override placeholders, not forced
+ * styling. A `setTreeData({ rowClass: (viewIndex, item, depth) => ... })`
+ * callback can return e.g. `'wzg-tree-depth-' + depth` (1-based) to tag a
+ * row by its tree level; the product theme then defines the actual look.
+ *
+ * They are deliberately left with NO background/color/font so they remain a
+ * true no-op for the Exporter: Exporter._cssClassToExcelStyle /
+ * _cssClassToPdfStyle fall back to DOM computed-style resolution for unknown
+ * classes, so any visual rule here would otherwise leak into xlsx/PDF export.
+ * Keeping these empty preserves the documented export no-op (US-03 spec #4).
+ * RECOMMENDED: override these (or your own class names) in product CSS.
+ */
+.wzg-tree-depth-1 {}
+.wzg-tree-depth-2 {}
+.wzg-tree-depth-3 {}
+.wzg-tree-depth-4 {}
+.wzg-tree-depth-5 {}
+
+/* Tree lazy-loading placeholder row (Story US-09).
+ *
+ * TreeManager's incremental splice inserts ONE synthetic row under a lazy
+ * branch while its children are being fetched. VirtualScroller tags the <tr> with
+ * .wzg-tree-loading (ROW-state class only — _renderTreeCell is NOT touched)
+ * and emits a .wzg-tree-loading-spinner + .wzg-tree-loading-label in the tree
+ * column cell. The spinner animation is pure CSS so a product can re-theme it.
+ */
+.wzg-tree-loading > .wzg-cell {
+  color: var(--wzg-no-data-color, #94a3b8);
+  font-style: italic;
+}
+.wzg-tree-loading-cell {
+  white-space: nowrap;
+}
+.wzg-tree-loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border: 2px solid var(--wzg-border, #cbd5e1);
+  border-top-color: var(--wzg-sort-icon-color, #003597);
+  border-radius: 50%;
+  animation: wzg-tree-loading-spin 0.7s linear infinite;
+}
+.wzg-tree-loading-label {
+  vertical-align: middle;
+}
+@keyframes wzg-tree-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ====== theme/wezongrid-widgets.css ====== */
+/**
+ * WeZonGrid - Feature Widgets Layer
+ * Filter widgets, footer, pager, context menu, loading/no-data overlays, and
+ * renderer widgets.
+ */
+
+/* ===== Filter Area ===== */
+.wzg-filter-area {
+  display: flex;
+  border-bottom: 1px solid var(--wzg-border);
+  background: var(--wzg-header-bg);
+  overflow: hidden;
+}
+.wzg-filter-area input,
+.wzg-filter-area select {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--wzg-border-light);
+  border-radius: 2px;
+  font-size: calc(var(--wzg-font-size) - 1px);
+  font-family: var(--wzg-font-family);
+}
+.wzg-filter-area input:focus,
+.wzg-filter-area select:focus {
+  outline: none;
+  border-color: var(--wzg-primary-color);
+}
+
+/* Header filter class hooks are owned by ThemeTokenContract. HeaderFilter
+   still sets inline fallback styles for legacy compatibility, so these selectors
+   must stay additive and token-driven. */
+.wzg-header-filter-icon {
+  color: var(--wzg-text-secondary) !important;
+}
+.wzg-header-filter-icon.is-active {
+  color: var(--wzg-primary-color) !important;
+}
+.wzg-header-filter-popup {
+  background: var(--wzg-menu-bg) !important;
+  border-color: var(--wzg-menu-border) !important;
+  color: var(--wzg-text) !important;
+  box-shadow: var(--wzg-menu-shadow) !important;
+}
+.wzg-header-filter-loading {
+  color: var(--wzg-text-secondary) !important;
+}
+.wzg-header-filter-error {
+  border-color: var(--wzg-cell-error-border) !important;
+  background: var(--wzg-cell-error-bg) !important;
+}
+
+
+/* ===== Footer ===== */
+.wzg-footer-area {
+  display: flex;
+  border-top: 2px solid var(--wzg-header-border);
+  background: var(--wzg-footer-bg);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+/* Header Summary 모드: footer 가 body 위에 출력될 때 시각 구분.
+ * non-sticky — 페이지 스크롤 컨테이너 안에 그리드를 배치할 때 sticky 가 필요하면
+ * 호출자가 wrapper 에 별도 처리. 표준 사용 (wzg-body-area 가 자체 스크롤 컨테이너) 에서는
+ * footer 가 자동으로 헤더 직하단에 고정된 것처럼 보이므로 추가 처리 불필요.
+ */
+.wzg-footer-area--top {
+  border-top: none;
+  border-bottom: 2px solid var(--wzg-header-border);
+}
+.wzg-footer-fixed {
+  flex-shrink: 0;
+  border-right: 2px solid var(--wzg-fixed-border);
+}
+.wzg-footer-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+.wzg-footer-area table { border-collapse: collapse; table-layout: fixed; }
+.wzg-footer-area td {
+  padding: var(--wzg-cell-padding);
+  font-weight: var(--wzg-footer-font-weight);
+  color: var(--wzg-footer-text);
+  border-right: 1px solid var(--wzg-border);
+  border-bottom: 1px solid var(--wzg-border-light);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wzg-footer-area td:last-child { border-right: none; }
+.wzg-footer-cell { box-sizing: border-box; }
+
+/* ===== Pager ===== */
+.wzg-pager-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--wzg-pager-bg) !important;
+  border-top: 1px solid var(--wzg-pager-border);
+  border-top-color: var(--wzg-pager-border) !important;
+  font-size: calc(var(--wzg-font-size) - 1px);
+}
+.wzg-page-info,
+.wzg-pager-info { color: var(--wzg-text-secondary); }
+.wzg-page-btn,
+.wzg-pager-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--wzg-border);
+  border-color: var(--wzg-border) !important;
+  background: var(--wzg-bg) !important;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  transition: all var(--wzg-transition-speed);
+}
+.wzg-page-btn:hover,
+.wzg-pager-btn:hover { background: var(--wzg-row-hover-bg) !important; }
+.wzg-page-btn.active,
+.wzg-pager-btn.wzg-pager-active {
+  background: var(--wzg-pager-active-bg) !important;
+  color: var(--wzg-pager-active-text) !important;
+  border-color: var(--wzg-pager-active-bg) !important;
+}
+.wzg-page-btn:disabled,
+.wzg-pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.wzg-page-size,
+.wzg-pager-size-select {
+  padding: 3px 6px;
+  border: 1px solid var(--wzg-border);
+  border-color: var(--wzg-border) !important;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* ===== Context Menu ===== */
+.wzg-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--wzg-menu-bg);
+  border: 1px solid var(--wzg-menu-border);
+  border-radius: 4px;
+  box-shadow: var(--wzg-menu-shadow);
+  min-width: 160px;
+  padding: 4px 0;
+}
+.wzg-context-menu ul { list-style: none; margin: 0; padding: 0; }
+.wzg-context-menu li {
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: var(--wzg-font-size);
+  transition: background var(--wzg-transition-speed);
+}
+.wzg-context-menu li:hover { background: var(--wzg-menu-hover-bg); }
+.wzg-context-menu .separator {
+  height: 1px;
+  background: var(--wzg-border-light);
+  margin: 4px 0;
+  cursor: default;
+}
+.wzg-context-menu .disabled {
+  color: #bbb;
+  cursor: not-allowed;
+}
+
+/* ===== Loading ===== */
+.wzg-loading {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--wzg-loading-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  font-size: 14px;
+  color: var(--wzg-text-secondary);
+}
+
+/* Server-mode subsequent loads: non-blocking top bar so existing rows
+   and the header/pager/footer frame stay visible (no white-out). */
+.wzg-loading--inline {
+  bottom: auto;
+  height: 3px;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wzg-loading--inline::after {
+  content: '';
+  position: absolute;
+  left: -35%;
+  top: 0;
+  height: 3px;
+  width: 35%;
+  background: var(--wzg-sort-icon-color, #003597);
+  animation: wzg-loading-slide 0.9s ease-in-out infinite;
+}
+@keyframes wzg-loading-slide {
+  0% { left: -35%; }
+  100% { left: 100%; }
+}
+
+/* ===== No Data ===== */
+.wzg-no-data {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--wzg-no-data-color);
+  font-size: 14px;
+}
+
+/* ===== Bar Renderer ===== */
+.wzg-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+.wzg-bar-track {
+  flex: 1;
+  height: 14px;
+  background: #eee;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.wzg-bar-fill {
+  height: 100%;
+  background: var(--wzg-primary-color);
+  border-radius: 7px;
+  transition: width var(--wzg-transition-speed);
+}
+.wzg-bar-label {
+  font-size: 11px;
+  color: var(--wzg-text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ===== Switch Renderer ===== */
+.wzg-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+.wzg-switch input { opacity: 0; width: 0; height: 0; }
+.wzg-switch-slider {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background var(--wzg-transition-speed);
+}
+.wzg-switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  left: 2px; bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--wzg-transition-speed);
+}
+.wzg-switch input:checked + .wzg-switch-slider {
+  background: var(--wzg-primary-color);
+}
+.wzg-switch input:checked + .wzg-switch-slider::before {
+  transform: translateX(16px);
+}
+
+/* ===== Button Renderer ===== */
+.wzg-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--wzg-border);
+  /* background: var(--wzg-bg); 다른 css와 같이 적용 시 글자 안보임*/
+  height: auto !important; /* 다른 css 지정 시 그리드 cell 높이가 wzgrid 설정 height 과 안맞아 wzgrid row 높이 계산이 깨짐 */
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: calc(var(--wzg-font-size) - 1px);
+  font-family: var(--wzg-font-family);
+  transition: all var(--wzg-transition-speed);
+}
+.wzg-btn:hover {
+  background: var(--wzg-primary-color);
+  color: white;
+  border-color: var(--wzg-primary-color);
+}
+
+/* ===== Link Renderer ===== */
+.wzg-link {
+  color: var(--wzg-primary-color);
+  text-decoration: none;
+}
+.wzg-link:hover {
+  text-decoration: underline;
+}
+
+
+/* ====== theme/wezongrid-dark.css ====== */
+/**
+ * WeZonGrid - Dark Theme
+ * Override CSS Variables for dark mode.
+ *
+ * Usage:
+ *   grid.setTheme('dark');
+ *   // or
+ *   <div class="wzg-container wzg-theme-dark">
+ */
+
+.wzg-theme-dark {
+  /* Colors */
+  --wzg-primary-color: #4da6ff;
+  --wzg-primary-light: #1a3a5c;
+  --wzg-primary-hover: #3d8be0;
+
+  --wzg-bg: #1e1e1e;
+  --wzg-text: #e0e0e0;
+  --wzg-text-secondary: #999999;
+  --wzg-border: #3a3a3a;
+  --wzg-border-light: #2d2d2d;
+
+  /* Header */
+  --wzg-header-bg: #2a2a2a;
+  --wzg-header-text: #e0e0e0;
+  --wzg-header-border: #4a4a4a;
+  --wzg-header-hover: #333333;
+
+  /* Body / Rows */
+  --wzg-row-bg: #1e1e1e;
+  --wzg-row-even-bg: #242424;
+  --wzg-row-hover-bg: #2a3a50;
+  --wzg-row-selected-bg: #1a3a5c;
+  --wzg-row-selected-text: #ffffff;
+  /* Faint row-level tint shown in cell-selection mode. Translucent so it layers
+     OVER any custom cell/row background (via inset box-shadow) rather than
+     replacing it. */
+  --wzg-row-selected-soft-tint: rgba(77, 166, 255, 0.12);
+
+  /* Cell */
+  --wzg-cell-edit-bg: #2a2a1e;
+  --wzg-cell-edit-border: #4da6ff;
+  --wzg-cell-error-bg: #3a1e1e;
+  --wzg-cell-error-border: #ff5555;
+  --wzg-cell-selected-bg: #1a3a5c;
+  --wzg-cell-selected-border: #4da6ff;
+
+  /* Footer */
+  --wzg-footer-bg: #2a2a2a;
+  --wzg-footer-text: #4da6ff;
+
+  /* Pager */
+  --wzg-pager-bg: #242424;
+  --wzg-pager-border: #3a3a3a;
+  --wzg-pager-active-bg: #4da6ff;
+  --wzg-pager-active-text: #1e1e1e;
+
+  /* Fixed Column */
+  --wzg-fixed-border: #4a4a4a;
+  --wzg-fixed-shadow: 4px 0 6px rgba(0,0,0,0.3);
+
+  /* Scrollbar */
+  --wzg-scrollbar-track: #2a2a2a;
+  --wzg-scrollbar-thumb: #4a4a4a;
+  --wzg-scrollbar-thumb-hover: #666666;
+
+  /* Context Menu */
+  --wzg-menu-bg: #2a2a2a;
+  --wzg-menu-border: #4a4a4a;
+  --wzg-menu-hover-bg: #333333;
+  --wzg-menu-shadow: 0 2px 8px rgba(0,0,0,0.4);
+
+  /* Tree (Story US-02) — synced with light theme; size/alignment vars are
+     inherited from :root, only the color follows the dark primary so tree
+     icons stay legible on the dark surface. */
+  --wzg-tree-icon-color: #4da6ff;
+
+  /* Misc */
+  --wzg-loading-bg: rgba(30,30,30,0.9);
+  --wzg-no-data-color: #666666;
+  --wzg-resize-handle-color: rgba(77,166,255,0.3);
+  --wzg-sort-icon-color: #4da6ff;
+  --wzg-search-highlight: #665500;
+  --wzg-copy-border: #4da6ff;
+}

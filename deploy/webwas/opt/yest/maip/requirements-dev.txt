@@ -1,0 +1,8 @@
+# 개발·검증 도구. 운영 서버에는 설치하지 않는다(requirements.txt 만).
+#   pip install -r requirements-dev.txt && python -m playwright install chromium
+-r requirements.txt
+
+requests==2.34.2      # scripts/dev/send_inspections.py
+urllib3==2.8.0        # requests 의존 — 1.26 계열은 취약점이 있어 고정한다
+pytest==9.1.1         # e2e 러너
+playwright==1.63.0    # e2e 브라우저

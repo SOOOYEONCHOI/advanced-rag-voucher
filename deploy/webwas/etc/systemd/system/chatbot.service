@@ -1,0 +1,20 @@
+# 지능형 작업표준 안내 AI(RAG) backend — docker compose. 설치: docs/design/운영배포_가이드_서버별_v1.1.md §4.3 ⑩
+# /etc/systemd/system/chatbot.service 로 복사한다(root 644).
+# 이 유닛은 docker 를 부르므로 root 로 돈다. 컨테이너 안의 앱은 chatbot 계정 UID 로 돈다(compose user:).
+# 운영자는 `sudo systemctl start|stop|restart chatbot` 만 쓴다. restart 는 컨테이너를 새로 만든다(새 이미지·.env 반영)
+[Unit]
+Description=Chatbot backend - 지능형 작업표준 안내 AI (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/yest/chatbot
+ExecStart=/usr/bin/docker compose --env-file /opt/yest/chatbot/compose.env -f /opt/yest/chatbot/docker-compose.prod.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --env-file /opt/yest/chatbot/compose.env -f /opt/yest/chatbot/docker-compose.prod.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

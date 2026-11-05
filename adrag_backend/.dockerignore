@@ -1,0 +1,81 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.eggs
+.pytest_cache
+.hypothesis
+.mypy_cache
+.ruff_cache
+*.cover
+.coverage
+htmlcov
+
+# Virtual Environment (중요: 호스트 가상환경 제외)
+.venv
+venv/
+ENV/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Data (빌드에 포함하지 않음)
+data/
+uploads/
+logs/
+*.db
+*.sqlite
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.log
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 2026.10.28(sooyeon.choi) 추가 - P-3 원본 문서·추출 이미지·DB·평가 자료가 이미지에 들어가지 않게 (CLAUDE.md 절대 규칙 3·7)
+instance/
+asr_test.wav
+offline_evaluation/
+app/graphs/workflow-graphs/

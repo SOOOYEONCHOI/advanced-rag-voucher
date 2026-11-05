@@ -1,0 +1,93 @@
+<script type="text/javascript">
+    // 사진 넣기 — 비전검사항목이 연결된 이미지 칸(서버 dig_form.capture). 촬영 화면은 공용 CameraCapture(data/camera_capture.html)
+    class DigFormCapture {
+        // cell: 렌더러의 칸(id, vision_item{code, name, overlay_opacity}) · fnUse(assetId): 올라간 이미지 id 를 칸 값으로 둔다
+        constructor(cell, fnUse) { this.cell = cell; this.fnUse = fnUse; }
+        open() {
+            const cell = this.cell, fnUse = this.fnUse, v = cell.vision_item;
+            new CameraCapture({
+                popupTitle: '사진 넣기', title: v.code + ' · ' + v.name, filePrefix: 'dig-form',
+                overlayUrl: '/media/dig-form-overlay/' + cell.id + '/', overlayOpacity: v.overlay_opacity,
+                upload: function (file, done) {
+                    const fd = new FormData();
+                    fd.append('item_id', cell.id);
+                    fd.append('uploadfile', file);
+                    AjaxUtil.postFileAsyncData('/api/dig_form/dig_form?action=capture', fd, function (res) {
+                        if (!res || !res.success) { done((res && res.message) || '사진을 넣지 못했습니다. 다시 시도해 주세요.'); return; }
+                        fnUse(res.asset_id);
+                        done(null);
+                    }, function (req, status, error) { done(''); AjaxUtil.failureCallback(req, status, error); });
+                }
+            }).open();
+        }
+    }
+
+
+    // 거치대 결과 불러오기 — 거치대 비전검사항목 칸에 그 항목의 최근 30일 검사 결과를 골라 넣는다(서버 dig_form.rig_results·use_rig_result).
+    // 썸네일은 없다 — 고르기 전에는 사진 제공(/media/dig-form-asset/)이 내주지 않는다. 고른 뒤 칸의 [사진 보기]로 본다(설계 2026-10-21 §7)
+    class DigFormRigResult {
+        // cell: 렌더러의 칸(id, vision_item{code, name}) · fnUse(assetId): 고른 결과의 이미지 id 를 칸 값으로 둔다
+        constructor(cell, fnUse) {
+            this.url = '/api/dig_form/dig_form';
+            this.cell = cell;
+            this.fnUse = fnUse;
+            this.popup = null;
+        }
+
+        open() {
+            let _this = this;
+            let v = this.cell.vision_item;
+            let $c = this.$content = $(`<div class="content_wrap popup p-2 d-flex flex-column h-100 gap-2">
+                <div class="fw-bold rig-title"></div>
+                <div class="rig-body flex-grow-1 overflow-auto"></div>
+                <div class="small text-danger rig-message"></div>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-outline-light" id="modal-close-button"><span data-commonCd="닫기">닫기</span></button>
+                </div>
+            </div>`);
+            $c.find('.rig-title').text(v.code + ' · ' + v.name + ' — 최근 30일 거치대 검사 결과');
+            this.popup = new PopupDraggable('거치대 결과 불러오기');
+            this.popup.open({ width: Math.min(900, document.documentElement.clientWidth - 32), height: Math.min(600, $(window).height() - 64), $content: $c });
+            AjaxUtil.getAsyncData(this.url, { action: 'rig_results', item_id: this.cell.id }, function (res) {
+                if (!res || res.success === false) { _this.message((res && res.message) || '검사 결과를 불러오지 못했습니다.'); return; }
+                _this.render(res.rows || []);
+            });
+        }
+
+        render(rows) {
+            let _this = this;
+            if (!rows.length) { this.message('최근 30일 거치대 검사 결과가 없습니다.'); return; }
+            let $tbody = $('<tbody>');
+            rows.forEach(function (r) {
+                let $measured = $('<td>');
+                (r.measured || []).forEach(function (m) { $measured.append($('<div>').toggleClass('text-danger', !m.ok).text(m.label + ' ' + m.text)); });
+                $tbody.append($('<tr>').append(
+                    $('<td class="text-nowrap">').text(r.created), $('<td>').text(r.client_name),
+                    $('<td>').toggleClass('text-danger', r.abnormal === true).text(r.judgement), $measured,
+                    $('<td class="text-center">').append($('<button type="button" class="btn btn-input py-0 px-2 rig-use">').text('선택')
+                        .on('click', function () { _this.use(r); }))));
+            });
+            this.$content.find('.rig-body').empty().append($('<table class="table table-bordered table-sm align-middle mb-0">').append(
+                $('<thead>').append($('<tr>').append($('<th>').text('검사 시각'), $('<th>').text('클라이언트'), $('<th>').text('판정'),
+                    $('<th>').text('측정값'), $('<th>').text(''))), $tbody));
+        }
+
+        use(row) {
+            let _this = this;
+            this.$content.find('button').prop('disabled', true);
+            AjaxUtil.postAsyncData(this.url + '?action=use_rig_result', { item_id: this.cell.id, inspection_id: row.id }, function (res) {
+                _this.$content.find('button').prop('disabled', false);
+                if (!res || !res.success) { _this.message((res && res.message) || '결과를 넣지 못했습니다.'); return; }
+                _this.fnUse(res.asset_id);
+                _this.popup.close();
+            }, function (req, status, error) {
+                _this.$content.find('button').prop('disabled', false);
+                AjaxUtil.failureCallback(req, status, error);
+            });
+        }
+
+        message(text) {
+            this.$content.find('.rig-message').text(text);
+        }
+    }
+</script>

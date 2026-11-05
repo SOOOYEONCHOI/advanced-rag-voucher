@@ -1,0 +1,19 @@
+# Qdrant Vector DB — docker compose. yest-vector-db: /etc/systemd/system/qdrant.service (root 644)
+# 이 유닛은 docker 를 부르므로 root 로 돈다. 컨테이너 안 Qdrant 는 qdrant 계정 UID 로 돈다(compose user:)
+# 운영자는 `sudo systemctl start|stop|restart qdrant` 만 쓴다. 설명: docs/design/운영배포_가이드_서버별_v1.1.md §2
+[Unit]
+Description=Qdrant vector DB (chatbot, docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/yest/chatbot/qdrant
+ExecStart=/usr/bin/docker compose --env-file /opt/yest/chatbot/qdrant/compose.env -f /opt/yest/chatbot/qdrant/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --env-file /opt/yest/chatbot/qdrant/compose.env -f /opt/yest/chatbot/qdrant/docker-compose.yml down
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

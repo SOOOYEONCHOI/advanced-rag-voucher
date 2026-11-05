@@ -1,0 +1,2954 @@
+{
+  "timestamp": "20260626_020336",
+  "summary": {
+    "kpi": {
+      "retrieval_recall_at_10": {
+        "value": 0.8167,
+        "threshold": 0.8,
+        "pass": true
+      },
+      "rerank_hit_at_5": {
+        "value": 0.8167,
+        "threshold": 0.75,
+        "pass": true
+      },
+      "citation_accuracy": {
+        "value": 0.3667,
+        "threshold": 0.7,
+        "pass": false
+      },
+      "unanswerable_refusal": {
+        "value": null,
+        "threshold": 0.8,
+        "pass": null
+      }
+    },
+    "retrieval": {
+      "count": 60,
+      "avg_recall_at_10": 0.8167,
+      "hit_rate_at_10": 0.8167,
+      "avg_evidence_count": 0.8167
+    },
+    "rerank": {
+      "count": 60,
+      "avg_mrr": 0.7096,
+      "avg_ndcg_at_5": 0.7333,
+      "hit_rate_at_5": 0.8167,
+      "above_threshold_rate": 0.8,
+      "avg_evidence_rank": 1.5882
+    },
+    "threshold_fallback": {
+      "count": 60,
+      "correct_rate": 1.0,
+      "false_fallback_rate": 0.0,
+      "false_answer_rate": 0.0,
+      "avg_retry_count": 0.0667
+    },
+    "citation": {
+      "count": 60,
+      "valid_number_rate": 0.55,
+      "avg_relevance": 0.4172,
+      "missing_citation_rate": 0.0667
+    },
+    "answer": {
+      "count": 60,
+      "format_correct_rate": 0.15,
+      "refusal_correct_rate": null,
+      "avg_faithfulness": null,
+      "avg_correctness": null
+    },
+    "total_records": 60
+  },
+  "failure_cases": [
+    {
+      "record_id": "cand_1d7d4568_4101",
+      "question": "위험성평가를 실시하는 주체는 누구인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_1d7d4568_2758",
+      "question": "위험성평가의 대상에는 어떤 사항이 포함되나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_0702703e_8460",
+      "question": "빈도·강도법은 어떤 목적을 가지고 사용되나요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_0702703e_7394",
+      "question": "빈도·강도법을 사용할 때 위험성의 크기를 판단하기 위해 어떤 방법을 사용하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_444ad1f1_6550",
+      "question": "위험성 감소대책의 유효성에 대한 평가를 포함하는 항목은 무엇인가?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_444ad1f1_3289",
+      "question": "위험성평가 인정 신청이 가능한 사업장에 대한 제도는 어디에서 운영될 수 있나?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_3b252420_7144",
+      "question": "위험성의 수준과 그 판단기준을 미리 정하는 이유는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_3b252420_2459",
+      "question": "사업장에서 허용 가능한 위험성의 수준은 어떻게 결정하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_22f849da_8916",
+      "question": "위험성 평가의 수준을 5단계로 나누었을 때, '높음' 단계에 해당하는 위험은 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_1cb98154_1126",
+      "question": "위험성평가는 어떤 목적을 위해 실시되나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_194df1c1_3333",
+      "question": "위험성수준의 '높음'은 어떤 상황을 의미합니까?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_0b9f02b5_5489",
+      "question": "위험성 수준을 판단하는 방법 중 하나는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_0b9f02b5_7233",
+      "question": "위험성 수준을 나누는 예시 기준은 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_39517494_1805",
+      "question": "위험성평가의 평가절차에서 '사전준비' 단계는 얼마나 지속되나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_3b477354_6406",
+      "question": "이 문서 청크에 포함된 숫자 중 하나는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation missing"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_3b477354_1804",
+      "question": "이 문서 청크에 포함된 숫자 중 두 개의 예를 들어보세요.",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "citation missing"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_8909a7bf_5089",
+      "question": "공종별 협력업체 소장의 주요 역할은 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_8909a7bf_1017",
+      "question": "위험성 감소대책 수립 후 다음 단계는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_34d57e57_4706",
+      "question": "위험성평가의 방법, 절차, 시기 등은 어디에 자세하게 규정되어 있습니까?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_39c798f2_7682",
+      "question": "이 문서 청크에 포함된 gid00042의 개수는 몇 개인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "hard",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "citation missing"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_39c798f2_9990",
+      "question": "이 문서 청크에 gid00001이 포함되어 있나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False",
+        "citation missing"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_70105119_6507",
+      "question": "싱가포르의 위험성평가 제도에서 사업주에게 부여된 의무는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_4541908f_2932",
+      "question": "위험성 감소대책 수립 단계에서 '상'등급 대책의 우선순위는 어떻게 되나요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_02468cc6_1019",
+      "question": "'허용 가능한 위험성'이란 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_02468cc6_5614",
+      "question": "사업장에서 '허용 가능한 위험성'에 안주해서는 안 되는 이유는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "hard",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_62f5d55b_4241",
+      "question": "위험성평가 기록은 몇 년간 보관해야 하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_62f5d55b_3277",
+      "question": "위험성 평가 기록은 누가 승인해야 하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_1875b1e9_6384",
+      "question": "우리 현장의 위험성평가 방법은 어떤 방법을 사용하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_1875b1e9_8996",
+      "question": "임시·수시·비정형 작업의 위험성평가는 어떤 방법을 사용하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_58dd576d_9861",
+      "question": "중대재해가 발생했을 때 사업주는 어떤 조치를 해야 하나요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_58dd576d_9217",
+      "question": "위험성평가를 실시할 때 근로자가 참여해야 하는 경우는 언제인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "hard",
+      "failed_stages": [
+        "retrieval recall@10=0.00 < 0.8",
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_384df9a5_1408",
+      "question": "수시평가를 실시해야 하는 경우는 어떤 경우인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "normal",
+      "failed_stages": [
+        "rerank hit@5=False",
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_295c4199_8706",
+      "question": "반응기 및 원료투입구에 설치된 안전보건조치는 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_8641e06a_8331",
+      "question": "위험성평가 담당자의 주요 역할은 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    },
+    {
+      "record_id": "cand_8641e06a_8490",
+      "question": "공종별 협력업체 소장의 주요 역할은 무엇인가요?",
+      "expected_behavior": "answer",
+      "difficulty": "easy",
+      "failed_stages": [
+        "citation number out of range"
+      ],
+      "error": null
+    }
+  ],
+  "stage_metrics": {
+    "cand_1d7d4568_4101": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_1d7d4568_2758": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 7,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0702703e_8460": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 2,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0702703e_7394": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 3,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.3333333333333333,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_444ad1f1_6550": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 31,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_444ad1f1_3289": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 13,
+        "unique_citation_count": 6,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3ea03576_5149": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3ea03576_8699": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 8,
+        "unique_citation_count": 2,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3b252420_7144": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 2,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3b252420_2459": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 19,
+        "unique_citation_count": 6,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_22f849da_6177": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_22f849da_8916": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 1,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_1cb98154_4798": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 4,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_1cb98154_1126": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 4,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_82b3e06f_1408": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_82b3e06f_8961": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 13,
+        "unique_citation_count": 4,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_194df1c1_3333": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 3,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_194df1c1_4334": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_694b8dbd_9192": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_694b8dbd_5485": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 2,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0baf3440_8113": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0baf3440_1122": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 5,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0b9f02b5_5489": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 5,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_0b9f02b5_7233": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 29,
+        "unique_citation_count": 7,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.2,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_198984aa_3832": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_198984aa_2411": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_39517494_1805": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 3,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_39517494_6653": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 2,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3b477354_6406": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 20,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.3333333333333333,
+        "ndcg_at_k": 0.5,
+        "hit_at_k": true,
+        "evidence_rank": 3,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 1,
+        "retry_recovered": true
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 0,
+        "unique_citation_count": 0,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": true
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_3b477354_1804": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 20,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.25,
+        "ndcg_at_k": 0.43067655807339306,
+        "hit_at_k": true,
+        "evidence_rank": 4,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 1,
+        "retry_recovered": true
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 0,
+        "unique_citation_count": 0,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": true
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_7b0fbac1_3644": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_7b0fbac1_4522": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 2,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.5,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_8909a7bf_5089": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 1,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_8909a7bf_1017": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.125,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": 8,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_34d57e57_3374": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 3,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.3333333333333333,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_34d57e57_4706": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_68b2f277_5662": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_68b2f277_8423": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_39c798f2_7682": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 20,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.2,
+        "ndcg_at_k": 0.38685280723454163,
+        "hit_at_k": true,
+        "evidence_rank": 5,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 1,
+        "retry_recovered": true
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 0,
+        "unique_citation_count": 0,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": true
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_39c798f2_9990": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 20,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 1,
+        "retry_recovered": false
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 0,
+        "unique_citation_count": 0,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": true
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_70105119_7186": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_70105119_6507": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 8,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_4541908f_2566": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_4541908f_2932": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 9,
+        "unique_citation_count": 3,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_02468cc6_1019": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_02468cc6_5614": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 12,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_5ed57d17_3803": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_5ed57d17_6075": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_62f5d55b_4241": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 3,
+        "all_numbers_valid": true,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_62f5d55b_3277": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 2,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_1875b1e9_6384": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 10,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_1875b1e9_8996": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 3,
+        "unique_citation_count": 3,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.3333333333333333,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_58dd576d_9861": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 8,
+        "unique_citation_count": 5,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_58dd576d_9217": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_count": 0,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.0,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": null,
+        "evidence_above_threshold": false,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 12,
+        "unique_citation_count": 5,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_384df9a5_1408": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.16666666666666666,
+        "ndcg_at_k": 0.0,
+        "hit_at_k": false,
+        "evidence_rank": 6,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 6,
+        "unique_citation_count": 4,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.25,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_384df9a5_8724": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 1,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_295c4199_2979": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 2,
+        "unique_citation_count": 1,
+        "all_numbers_valid": true,
+        "citation_relevance": 1.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_295c4199_8706": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_rank": 1,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": true,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 8,
+        "unique_citation_count": 1,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_8641e06a_8331": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 7,
+        "unique_citation_count": 3,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.3333333333333333,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": false,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    },
+    "cand_8641e06a_8490": {
+      "retrieval": {
+        "skipped": false,
+        "recall_at_k": 1.0,
+        "hit_at_k": true,
+        "evidence_count": 1,
+        "total_retrieved": 10,
+        "k": 10
+      },
+      "rerank": {
+        "skipped": false,
+        "mrr": 0.5,
+        "ndcg_at_k": 0.6309297535714575,
+        "hit_at_k": true,
+        "evidence_rank": 2,
+        "evidence_above_threshold": true,
+        "top1_is_relevant": false,
+        "k": 5,
+        "threshold": 0.3
+      },
+      "threshold_fallback": {
+        "correct": true,
+        "false_fallback": false,
+        "false_answer": false,
+        "retry_count": 0,
+        "retry_recovered": null
+      },
+      "citation": {
+        "skipped": false,
+        "citation_count": 4,
+        "unique_citation_count": 1,
+        "all_numbers_valid": false,
+        "citation_relevance": 0.0,
+        "missing_citation": false
+      },
+      "answer": {
+        "format_correct": true,
+        "refusal_correct": null,
+        "faithfulness": null,
+        "correctness": null
+      }
+    }
+  }
+}

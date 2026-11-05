@@ -1,0 +1,285 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title"><span data-labelCd="프라퍼티 마스터 관리">프라퍼티 마스터 관리</span></h4>
+    </div>
+    <div class="collapse show" id="propMasterSearchCollapse">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-xl-4 col-sm-6 col-lg-12" >
+                    <div class="d-flex align-items-center" >
+                        <label for="cboTable_name" class="form-label" data-labelCd="테이블">테이블</label>
+                        <select class="form-select" id="cboTable_name" name="cboTable_name"></select>
+                    </div>
+                </div>
+                <div class="col-1" >
+                        <button type="button" class="btn btn-search" id="btnSearch" title="조회" data-commonCd="조회" data-labelTarget="title"><i class="uil uil-search"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#propMasterSearchCollapse" role="button" aria-expanded="true" aria-controls="propMasterSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt" data-labelCd="테이블 데이터">테이블 데이터</span></div>
+    <div class="flex-wrap gap-2"></div>
+</div>
+<div class="h-350" id="data-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit"></div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input" id="btnNew" title="데이터추가" data-labelCd="데이터추가" data-labelTarget="title"><i class="uil uil-plus"></i></button>
+            <button type="button" class="btn btn-band y_write_auth" id="btnSave" title="데이터저장" data-labelCd="데이터저장" data-labelTarget="title"><i class="uil uil-save"></i></button>
+            <button type="button" class="btn btn-dell y_write_auth" id="btnDelete" title="데이터삭제" data-labelCd="데이터삭제" data-labelTarget="title"><i class="uil uil-trash-alt"></i></button>
+        </div>
+    </div>
+    <div class="mb-2" id="detailBox">
+            <form id="prop_master_form">
+            <div class="row">
+                <input class="form-control2" type="text" id="id" name="id" hidden/>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="input-group" >
+                        <div class="input-group-prepend">
+                            <span class="input-group-text fit_box_t7" data-labelCd="테이블">테이블</span>
+                        </div>
+                        <select class="form-control2 "  id="table_name" name="table_name" disabled="disabled" required></select>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-3 col-lg-3" >
+                    <div class="input-group" >
+                        <div class="input-group-prepend">
+                            <span class="input-group-text fit_box_lg" data-commonCd="코드">코드</span>
+                        </div>
+                        <input type="text" class="form-control2" id="table_code" name="table_code" disabled="disabled" required/>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-lg-3" >
+                    <div class="input-group" >
+                        <div class="input-group-prepend">
+                            <span class="input-group-text fit_box_lg" data-commonCd="설명">설명</span>
+                        </div>
+                        <input type="text" class="form-control2" id="description" name="description" disabled="disabled" />
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="input-group" >
+                        <div class="input-group-prepend">
+                            <span class="input-group-text fit_box_t7" data-labelCd="값유형">값유형</span>
+                        </div>
+                        <select class="form-control2 "  id="val_type" name="val_type" disabled="disabled" required></select>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-3 col-lg-2 col-xl-2 mt-5 tac" >
+                    <input type="checkbox" id="new_data" name="new_data" value="Y" disabled />
+                    <span data-labelCd="새 데이터로 저장">새 데이터로 저장</span>
+                </div>
+            </div>
+            </form>
+        </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+
+<script type="text/javascript">
+
+    class PropMasterPage {
+        constructor() {
+            this.url = '/api/system/property_master';
+            this.init();
+
+        }
+
+        init() {
+            let _this = this;
+
+            _this.grid = WeZonGrid.create('#data-grid', {
+                columnLayout: [
+                    { dataField: 'table_name', headerText: '테이블', width: 100, align: 'center' }
+                    , { dataField: 'table_code', headerText: '코드', width: 100, align: 'left' }
+                    , { dataField: 'description', headerText: '설명', width: 150, align: 'left' }
+                    , { dataField: 'val_type', headerText: '값유형', width: 100, align: 'left' }
+                ]
+                , props: { height: 350, enableSorting: true, selectionMode: 'singleRow' }
+            });
+            GridUtil.fitWidth(_this.grid);
+
+            _this.grid.on('cellClick', function(e) {
+                _this.showDetailPropMaster(e.item.id);
+            });
+
+
+            AjaxUtil.fillSelectOptions($('#cboTable_name'), 'system_code', 'all', false, 'prop_master');
+            AjaxUtil.fillSelectOptions($('#table_name'), 'system_code', 'choose', false, 'prop_master');
+            AjaxUtil.fillSelectOptions($('#val_type'), 'system_code', 'choose', false, 'value_type');
+        }
+
+        searchMainData() {
+            let _this = this;
+            let url = '/api/system/property_master';
+            let data = {
+                'tb_name': $('#cboTable_name').val(),
+                'action' : 'read'
+            };
+
+            AjaxUtil.getAsyncData(url, data, function (result) {
+                if (result != null) {
+                    _this.grid.setData(result);
+                }
+                $('#prop_master_form')[0].reset();
+                $('#prop_master_form').find('#id').val();
+
+                $('#detailBox').find('input, select').each(function () {
+                    if (!$(this).is(':disabled')) {
+                        $(this).attr('disabled', 'disabled');
+                    }
+                });
+                page.setButtonState();
+            });
+        }
+
+
+
+        setButtonState() {
+            let pk = $('#id').val();
+            $('#btnNew').prop('disabled', false);
+            $('#btnSave').prop('disabled', false);
+            if (pk) {
+                $('#btnDelete').prop('disabled', false);
+            }
+            else {
+                $('#btnDelete').prop('disabled', true);
+            }
+        }
+
+        showDetailPropMaster(id) {
+            let param = { 'id': id, 'action': 'detail' };
+            console.log('Detail 함수 id', id);
+            let url = '/api/system/property_master';
+            AjaxUtil.getAsyncData(url, param, function (result) {
+
+                if (result != null) {
+                    FormUtil.BindDataForm(result, $('#prop_master_form'));
+                }
+                 $('#new_data').prop('disabled', false);
+                page.setButtonState();
+            });
+        }
+
+
+
+        savePropMaster() {
+            console.log('savePropMaster함수 실행');
+            let _this = this;
+            let validate = true;
+            let $target = null
+            let url = '/api/system/property_master?action=save';
+
+
+            let data = FormUtil.extractForm($('#prop_master_form'));
+
+            console.log('save data', data);
+            let fnSuccess = function (res) {
+                if (!res.success) {
+                    Alert.alert('', res.message);
+                } else {
+                    Notify.success("저장되었습니다."); // Notification
+
+                    _this.searchMainData();
+                    _this.showDetailPropMaster(res.id);
+                }
+            }
+            $('#detailBox').find('input, select').each(function () {
+                if ($(this).is(':required')) {
+                    if (!$(this).val()) {
+                        validate = false;
+                        $target = $(this);
+                        return false;
+                    }
+                }
+            });
+
+            if (validate) {
+                AjaxUtil.postAsyncData(url, data, fnSuccess);
+            } else {
+                Alert.alert('', '필수 항목 [ 테이블, 코드, 값유형 ]을  입력해주세요.', function () {
+                    $target.focus();
+                });
+            }
+        }
+
+        deletePropMaster() {
+            let _this = this;
+            let url = '/api/system/property_master?action=delete';
+            let id = $('#prop_master_form').find('#id').val();
+
+            let data = { 'id': id };
+            let fnsuccess = function (result) {
+                Notify.success('삭제했습니다.');
+                _this.searchMainData();
+            };
+            let result = AjaxUtil.postAsyncData(url, data, fnsuccess);
+        }
+
+    }
+
+    let page = null;
+    $(document).ready(function (e) {
+        page = new PropMasterPage();
+
+        $('#btnSearch').click(function (e) {
+            page.searchMainData();
+        });
+
+        $('#btnNew').click(function (e) {
+
+            $('#prop_master_form')[0].reset();
+            $('#prop_master_form').find('#id').val('');
+
+            $('#detailBox').find('input, select').each(function () {
+                if ($(this).is(':disabled')) {
+                    $(this).removeAttr('disabled');
+                }
+            });
+
+            page.setButtonState();
+        });
+
+         $('#btnSave').click(function (e) {
+            Alert.confirm('',
+                '저장하시겠습니까?',
+                function () { page.savePropMaster() },
+                function () { }
+            );
+        });
+
+        $('#btnDelete').click(function (e) {
+            Alert.confirm('',
+                '삭제하시겠습니까?',
+                function () { page.deletePropMaster() },
+                function () { }
+            );
+        });
+
+        page.searchMainData();
+    });
+
+</script>
+
+
+{% endblock %}

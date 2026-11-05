@@ -1,0 +1,773 @@
+/* mach 네임스페이스 */
+.del-body .mach {
+    background: transparent !important;
+    color: inherit !important;
+}
+.del-body .mach.mach--dst {
+    padding: 0 !important;
+}
+
+/* 12-col grid */
+.del-body .mach .mach-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 10px;
+    /* 기존 가로 간격 */
+    row-gap: 20px;
+    /* 상하 섹션 간 간격 ↑ */
+}
+.del-body .mach .mach-span-6 {
+    grid-column: span 6;
+}
+@media (max-width: 1200px) {
+    .del-body .mach .mach-span-6 {
+        grid-column: span 12;
+    }
+}
+
+/* 카드 헤더 */
+.del-body .mach .mach-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: -16px;
+}
+
+/* 내부 2분할 (테이블/차트) */
+.del-body .mach .mach-split {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 12px;
+}
+@media (max-width: 1200px) {
+    .del-body .mach .mach-split {
+        grid-template-columns: 1fr;
+    }
+}
+.del-body .mach .mach-pane {
+    min-width: 0;
+}
+
+/* 테이블 스크롤 래퍼 */
+.del-body .mach .mach-table-wrap {
+    overflow: auto;
+    max-height: 420px;
+}
+
+/* 숫자 우측 정렬 유틸 */
+.del-body .mach .del-td.is-right,
+.del-body .mach .del-th.is-right {
+    text-align: right;
+}
+
+/* tfoot 합계 스타일(가독성 강화) */
+.del-body .mach .del-table tfoot .del-td {
+    background: rgb(255 255 255 / 3%);
+    border-top: 1px solid #4e5566;
+    font-weight: 500;
+    height: 0;
+}
+
+/* 탭 */
+.del-body .mach .mach-tabs {
+    display: inline-flex;
+    gap: 6px;
+}
+.del-body .mach .mach-tab {
+    border: 1px solid #444c5f;
+    color: #cfd6e4;
+    font-size: 12px;
+    background-color: #293042;
+    border-radius: 999px;
+    padding: 2px 20px;
+    cursor: pointer;
+}
+.del-body .mach .mach-tab.is-active {
+    background: rgba(63,128,234,0.12);
+    border-color: #3f80ea;
+    color: #cdd9ff;
+}
+
+/* 차트 상단 헤더(좌 제목 / 우 메타) */
+.del-body .mach .mach-chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding: 0 2px;
+}
+.del-body .mach .mach-chart-title {
+    font-size: 14px;
+    font-weight: 300;
+    color: #e9edf7;
+    letter-spacing: -0.2px;
+    border-left: 3px solid #3d98fc;
+    padding-left: 8px; /* ← 보더와 텍스트 사이 여백 */
+}
+
+.del-body .mach .mach-chart-meta {
+    font-size: 12px;
+    color: #9aa3b2;
+}
+
+/* 차트 placeholder */
+.del-body .mach .mach-chart {
+    border: 1px solid #3e424d;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 195px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.del-body .mach .mach-chart-placeholder {
+    color: #9aa3b2;
+    font-size: 12px;
+}
+
+/* 최소 대비(공통 CSS 누락 대비) */
+.del-body {
+    background-color: #202634;
+    color: #f4f7f9;
+}
+.del-section {
+    background-color: #293042;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 0;
+}
+
+/* ===== 스팀사용량 레이아웃 ===== */
+.del-body .mach .mach-steam-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* 좌=출고현황 폭, 우=폐기물 출고 폭 */
+    gap: 12px;
+}
+@media (max-width:1200px) {
+    .del-body .mach .mach-steam-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.del-body .mach .mach-steam-left {
+    min-width: 0;
+}
+.del-body .mach .mach-steam-right {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 우측 상단 서브 헤더 */
+.del-body .mach .mach-subhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px;
+    margin-bottom: 6px;
+    /* 살짝 여백 + */
+}
+.del-body .mach .mach-subhead-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e9edf7;
+    letter-spacing: -0.2px;
+}
+.del-body .mach .mach-subhead-meta {
+    font-size: 12px;
+    color: #9aa3b2;
+}
+
+.del-body .mach .mach-card {
+    background: transparent;
+}
+
+/* ===== 원형 차트 (순수 CSS, conic-gradient) ===== */
+.del-body .mach .mach-pie-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    border: 1px solid #3e424d;
+    border-radius: 8px;
+    min-height: 220px;
+}
+.del-body .mach .mach-pie {
+    --p1: 45;
+    --p2: 30;
+    --p3: 25;
+    /* 합 100 */
+    --c1: #3f80ea;
+    --c2: #24db64;
+    --c3: #9aa3b2;
+    width: 140px;
+    height: 140px;
+    position: relative;
+    border-radius: 50%;
+    background: conic-gradient(var(--c1) 0deg calc(var(--p1)*3.6deg), var(--c2) calc(var(--p1)*3.6deg) calc((var(--p1)+var(--p2))*3.6deg), var(--c3) calc((var(--p1)+var(--p2))*3.6deg) 360deg);
+    border-radius: 50%;
+}
+.del-body .mach .mach-pie-ring {
+    position: absolute;
+    inset: 12px;
+    background: #343a4b;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px #495057;
+}
+.del-body .mach .mach-pie-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+.del-body .mach .mach-pie-total {
+    font-size: 16px;
+    font-weight: 800;
+    color: #f4f7f9;
+}
+.del-body .mach .mach-pie-desc {
+    font-size: 11px;
+    color: #cfd6e4;
+}
+
+.del-body .mach .mach-pie-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.del-body .mach .wo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #cfd6e4;
+}
+.del-body .mach .wo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+.del-body .mach .mach-dot--a {
+    background: #3f80ea;
+}
+.del-body .mach .mach-dot--b {
+    background: #24db64;
+}
+.del-body .mach .mach-dot--c {
+    background: #9aa3b2;
+}
+
+/* 메인 그리드 간격: del 기준과 동일 */
+.del-body .mach .mach-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 10px;
+    row-gap: 10px;
+    /* 상하 간격 */
+}
+
+/* 스팀사용량 섹션: 출고현황/폐기물출고와 같은 폭으로 정렬 */
+.del-body .mach .mach-steam-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 10px;
+    row-gap: 10px;
+}
+.del-body .mach .mach-steam-left {
+    grid-column: span 6;
+    min-width: 0;
+}
+.del-body .mach .mach-steam-right {
+    grid-column: span 6;
+    min-width: 0;
+}
+
+/* 우측 내부: 차트 2개를 '한 줄'에 나란히 */
+.del-body .mach .mach-steam-right-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* ← 가로 2열 */
+    column-gap: 10px;
+    row-gap: 10px;
+    /* 모바일에서 1열로 접힐 때 간격 유지용 */
+}
+@media (max-width: 1200px) {
+    .del-body .mach .mach-steam-left,
+    .del-body .mach .mach-steam-right {
+        grid-column: span 12;
+    }
+    .del-body .mach .mach-steam-right-grid {
+        grid-template-columns: 1fr;
+        /* 좁은 화면에서는 세로 스택 */
+    }
+}
+/* ===== YOY 듀얼 도넛 ===== */
+:root {
+    --yoy-nomi: #e85b5b;
+    /* 빨강 */
+    --yoy-own: #cbd1df;
+    /* 연회색 */
+}
+
+.del-body .mach .mach-yoy-duo {
+    position: relative;
+    border: 1px solid #3e424d;
+    border-radius: 8px;
+    min-height: 220px;
+    padding: 18px 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+}
+
+/* 상단 좌측 범례 */
+.del-body .mach .mach-yoy-legend {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 12px;
+    color: #cfd6e4;
+}
+.del-body .mach .mach-legend {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+.del-body .mach .mach-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+}
+.del-body .mach .mach-swatch.nomi {
+    background: #24db64;
+}
+.del-body .mach .mach-swatch.own {
+    background: var(--yoy-own);
+}
+
+/* 중앙 연결 브리지 */
+.del-body .mach .mach-yoy-bridge {
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    top: 52%;
+    height: 14px;
+    transform: skewX(-18deg) translateY(-50%);
+    background: linear-gradient(90deg, rgba(203,209,223,.18), rgba(203,209,223,.28), rgba(203,209,223,.18));
+    filter: blur(0.2px);
+}
+
+/* 도넛 기본 */
+.del-body .mach .mach-yoy {
+    --p: 40;
+    /* NOMI % */
+    width: 140px;
+    height: 140px;
+    position: relative;
+    border-radius: 50%;
+    background: conic-gradient(#24db64 0deg calc(var(--p) * 3.6deg), var(--yoy-own) calc(var(--p) * 3.6deg) 360deg);
+}
+.del-body .mach .mach-yoy--sm {
+    width: 140px;
+    height: 140px;
+    margin-right: 6px;
+}
+.del-body .mach .mach-yoy--lg {
+    width: 210px;
+    height: 210px;
+    margin-left: 6px;
+}
+
+/* 도넛 구멍 */
+.del-body .mach .mach-yoy-ring {
+    position: absolute;
+    inset: 30px;
+    background: #343a4b;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px #495057;
+}
+
+/* 가운데 라벨 */
+.del-body .mach .mach-yoy-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.del-body .mach .mach-yoy-label {
+    font-weight: 500;
+    color: #e9edf7;
+    font-size: 14px;
+    letter-spacing: -0.2px;
+}
+.mb-20 {
+    margin-bottom: 20px;
+}
+/* ==== [FIX] Steam Right Grid over-expansion ==== */
+
+/* 1) rows 강제 지정 제거 + 내용 높이만큼만 */
+.del-body .mach .mach-steam-right-grid {
+    grid-template-rows: none;
+    /* 또는: auto */
+    grid-auto-rows: min-content;
+    /* 내용 기반으로 행 높이 생성 */
+    align-items: start;
+    /* item의 세로 스트레치 방지 */
+    align-content: start;
+    /* 그리드 자체가 위쪽에만 모이도록 */
+}
+
+/* 2) 카드 최소 높이 다이어트(과도한 세로 팽창 방지) */
+.del-body .mach .mach-pie-wrap,
+.del-body .mach .mach-yoy-duo {
+    min-height: 180px;
+    /* 기존 220px → 180px로 하향 */
+    /* 필요시 더 줄이려면 160px까지 권장 */
+}
+
+/* 3) 좌측 메인 차트와 균형(선택) - 동일 카드급 높이로 맞춤 */
+#steam-main-chart.mach-chart {
+    min-height: 180px;
+    /* 우측 카드와 보폭 맞추기 */
+    margin-top: 10px;
+}
+
+/* 4) 좁은 화면 최적화 - 1열 스택 시 과확대 방지(선택) */
+@media (max-width: 1200px) {
+    .del-body .mach .mach-steam-right-grid {
+        grid-template-columns: 1fr;
+        /* 이미 파일에 있으나 확실히 명시 */
+        grid-auto-rows: min-content;
+    }
+}
+
+/* ================================
+   [STEAM] 헤더 정렬 + 그래프 높이 통일
+   ================================ */
+
+/* 1) 좌측 헤더 음수 마진 무력화: 우측 카드 헤더와 baseline 맞춤 */
+.del-body .mach .mach-steam-left .mach-card-head {
+    margin-top: 0;
+    /* 전역 -16px 덮어쓰기 */
+    margin-bottom: 10px;
+    align-items: center;
+    margin-top: -6px;
+}
+
+/* 2) 우측의 비어있는 서브헤더 제거(불필요 여백 방지) */
+.del-body .mach .mach-steam-right .mach-subhead {
+    margin-top: -16px;
+    display: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* 3) 그래프 공통 높이 변수 */
+.del-body .mach {
+    --steam-graph-h: 200px;
+    /* 필요 시 180~220px로 조정 */
+}
+
+/* 4) 좌/우 그래프 영역 높이 통일 */
+#steam-main-chart.mach-chart {
+    min-height: var(--steam-graph-h);
+    margin-top: 0;
+    /* 이전 임시 여백 제거 */
+}
+.del-body .mach .mach-pie-wrap,
+.del-body .mach .mach-yoy-duo {
+    min-height: var(--steam-graph-h);
+}
+
+/* 5) 우측 2칸 카드 상단 정렬 안전장치(혹시 모를 상하 늘어짐 방지) */
+.del-body .mach .mach-steam-right-grid {
+    align-items: start;
+}
+
+/* =========================================
+   [STEAM] 좌측 범례 / 우측 도넛 (채워진 링)
+   ========================================= */
+
+/* 카드 내부: 좌측 범례(160px) + 우측 도넛 */
+.del-body .mach .mach-pie--legend-left {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 0;
+    height: 100%;
+    min-height: var(--steam-card-h, var(--steam-graph-h, 220px));
+}
+
+/* 좌측 범례 */
+.del-body .mach .steam-legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.del-body .mach .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 8px;
+    vertical-align: -1px;
+}
+
+/* 색상 팔레트 (요청 순서 고정) */
+.del-body .mach .steam-c1 {
+    background: #86c554;
+}
+/* OUT발효 */
+.del-body .mach .steam-c2 {
+    background: #a6ff5e;
+}
+/* 증류1  */
+.del-body .mach .steam-c3 {
+    background: #4285f4;
+}
+/* 증류2  */
+.del-body .mach .steam-c4 {
+    background: #87b2f8;
+}
+/* 증류3  */
+.del-body .mach .steam-c5 {
+    background: #7364E2;
+}
+/* 블로우 */
+.del-body .mach .steam-c6 {
+    background: #9aa3b2;
+}
+/* 기타   */
+
+/* 채워진 도넛 — conic-gradient 로 면(채움) 표현 */
+.del-body .mach .steam-donut {
+    justify-self: start;
+    /* 우측 칸에서 왼쪽 정렬 */
+    position: relative;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    /* 각 파이의 각도 계산: var(--pN) = 퍼센트 값(0~100) */
+    background: conic-gradient(#86c554 0deg calc(var(--p1,0)*3.6deg), #a6ff5e calc(var(--p1,0)*3.6deg) calc((var(--p1,0)+var(--p2,0))*3.6deg), #4285f4 calc((var(--p1,0)+var(--p2,0))*3.6deg) calc((var(--p1,0)+var(--p2,0)+var(--p3,0))*3.6deg), #87b2f8 calc((var(--p1,0)+var(--p2,0)+var(--p3,0))*3.6deg) calc((var(--p1,0)+var(--p2,0)+var(--p3,0)+var(--p4,0))*3.6deg), #7364E2 calc((var(--p1,0)+var(--p2,0)+var(--p3,0)+var(--p4,0))*3.6deg) calc((var(--p1,0)+var(--p2,0)+var(--p3,0)+var(--p4,0)+var(--p5,0))*3.6deg), #9aa3b2 calc((var(--p1,0)+var(--p2,0)+var(--p3,0)+var(--p4,0)+var(--p5,0))*3.6deg) 360deg);
+    /* 살짝 입체감 */
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 0 0 1px rgba(0,0,0,.22);
+}
+
+/* 도넛 구멍(두께 설정) → “선”이 아니라 채워진 굵은 링 */
+.del-body .mach .steam-donut::after {
+    content: "";
+    position: absolute;
+    inset: 24px;
+    /* 값이 작을수록 링 두꺼워짐 */
+    background: #343a4b;
+    /* 다크 배경과 동일 톤 */
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px #495057;
+}
+
+/* 중앙 텍스트 */
+.del-body .mach .donut-center {
+    position: absolute;
+    inset: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+.del-body .mach .donut-center .donut-value {
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.2;
+}
+.del-body .mach .donut-center .donut-label {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* 반응형: 폭이 좁아지면 위(도넛) → 아래(범례) 순으로 스택 */
+@media (max-width: 1200px) {
+    .del-body .mach .mach-pie--legend-left {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+    .del-body .mach .steam-legend {
+        align-items: center;
+    }
+}
+/* =============== Donut (standalone) =============== */
+.sdonut {
+    /* 사이즈/두께/색상/비율(%) */
+    --size: 168px;
+    --thickness: 36px;
+    --seg1: 5;
+    --seg2: 68;
+    --seg3: 27;
+    /* 합 100 */
+    --col1: #e9eef2;
+    --col2: #86c554;
+    --col3: #3d98fc;
+    --center-text: '';
+
+    /* 누적 각도 계산 */
+    --a1: calc(var(--seg1)*3.6deg);
+    --a2: calc((var(--seg1) + var(--seg2))*3.6deg);
+
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    background: conic-gradient(var(--col1) 0deg var(--a1), var(--col2) var(--a1) var(--a2), var(--col3) var(--a2) 360deg);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.04);
+    isolation: isolate;
+    /* 내부 레이어 분리 */
+}
+
+/* 안쪽 구멍(링 두께) */
+.sdonut::after {
+    content: "";
+    position: absolute;
+    inset: var(--thickness);
+    background: #2f3444;
+    /* 다크 카드 배경 톤에 맞춤 */
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* 중앙 텍스트 */
+.sdonut-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #e6ecf5;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.2px;
+    pointer-events: none;
+}
+.sdonut-center::after {
+    content: var(--center-text);
+}
+
+/* 컨테이너 안에서 가운데 정렬하고 싶을 때 선택적으로 사용 */
+.sdonut {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* [STEAM 구성] 도넛 팔레트 동기화 (범례 색상과 1:1) */
+/* 범례 팔레트
+   OUT발효  #22c55e
+   증류1    #16a34a
+   증류2    #f59e0b
+   증류3    #fb923c
+   블로우   #3f80ea
+   기타     #9aa3b2
+*/
+
+/* 스팀 섹션 우측 카드 안의 '구성 도넛'만 타겟 */
+.del-body .mach .mach-steam-right-grid .mach-pie {
+    /* 현재 도넛이 3분할(p1/p2/p3) 구조이므로,
+     실제 표시 중인 항목에 맞춰 색상만 매핑합니다. 
+     (샘플: 기타/증류2/블로우 순서) */
+    --c1: #9aa3b2;
+    /* 기타  (작은 조각) */
+    --c2: #86c554;
+    /* 증류2 (오렌지, 큰 조각) */
+    --c3: #4285f4;
+    /* 블로우 (블루) */
+}
+
+/* 필요 시 요렇게 다른 조합으로 바꿔도 됩니다.
+.del-body .mach .mach-steam-right-grid .mach-pie { --c1:#22c55e; --c2:#16a34a; --c3:#fb923c; }  // OUT발효/증류1/증류3
+*/
+/* [STEAM 구성] 도넛 6색/6조각 - 범례 순서와 1:1 매핑 */
+.del-body .mach .mach-steam-right-grid .mach-pie {
+    /* 비율: 필요 시 HTML의 style 속성으로 덮어써도 됩니다 */
+    --p1: 24;
+    /* OUT발효 */
+    --p2: 18;
+    /* 증류1   */
+    --p3: 16;
+    /* 증류2   */
+    --p4: 22;
+    /* 증류3   */
+    --p5: 12;
+    /* 블로우  */
+    --p6: 8;
+    /* 기타    */
+
+    /* 팔레트 (범례 색상과 동일) */
+    --c1: #86c554;
+    /* OUT발효 */
+    --c2: #a6ff5e;
+    /* 증류1   */
+    --c3: #4285f4;
+    /* 증류2   */
+    --c4: #87b2f8;
+    /* 증류3   */
+    --c5: #7364E2;
+    /* 블로우  */
+    --c6: #9aa3b2;
+    /* 기타    */
+
+    /* 누적 각도 */
+    --a1: calc(var(--p1)*3.6deg);
+    --a2: calc((var(--p1)+var(--p2))*3.6deg);
+    --a3: calc((var(--p1)+var(--p2)+var(--p3))*3.6deg);
+    --a4: calc((var(--p1)+var(--p2)+var(--p3)+var(--p4))*3.6deg);
+    --a5: calc((var(--p1)+var(--p2)+var(--p3)+var(--p4)+var(--p5))*3.6deg);
+
+    /* 6조각 도넛 */
+    background: conic-gradient(var(--c1) 0deg var(--a1), var(--c2) var(--a1) var(--a2), var(--c3) var(--a2) var(--a3), var(--c4) var(--a3) var(--a4), var(--c5) var(--a4) var(--a5), var(--c6) var(--a5) 360deg) !important;
+    /* 기존 배경 규칙이 있으면 덮어쓰기 */
+}
+
+/* 링 두께/센터(현재 규칙이 얇으면 살짝 두껍게) */
+.del-body .mach .mach-steam-right-grid .mach-pie .mach-pie-ring {
+    inset: 22px;
+    /* 숫자 ↓ → 더 두꺼운 링 */
+    background: #2f3546;
+    border-radius: 50%;
+}
+/* ============================================
+   FIX: 원형 비율 복구 + 카드 높이만 증가
+   target: dashboard-mach.css (append at end)
+   ============================================ */
+
+/* 1) 카드 공통 높이만 키움 (그래프 사이즈엔 손대지 않음) */
+.del-body .del-section,
+.del-body .mach .mach-card,
+.del-body .mach .mach-pane,
+.del-body .mach .mach-chart,
+.del-body .mach .mach-pie-wrap,
+.del-body .mach .mach-yoy-duo {
+  min-height: 400px !important;
+  box-sizing: border-box;
+}
+.sdonut{
+--size:218px; --thickness:46px;
+            --seg1:5;  --seg2:68; --seg3:27;
+            --center-text:'타피오카';
+}             

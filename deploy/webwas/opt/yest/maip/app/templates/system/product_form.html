@@ -1,0 +1,192 @@
+{% extends "app/layout_page.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+</div>
+
+<!-- 양식 기준 매핑(품번 : 양식 = N : M, 설계 2026-10-21 §6). 공통 CRUD 구조(DESIGN §5.5) — 위 양식 목록, 아래 상세.
+     양식은 검사양식 관리에서 만들므로 [등록]·[삭제]가 없고 [수정]만 둔다. [수정] 중 품목 추가·삭제는 [저장]에서 한 번에 반영한다 -->
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit"><span class="right_align rpt">수입검사 양식 목록</span></div>
+</div>
+<div id="form-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit">상세 정보</div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input y_write_auth" id="btnEdit">수정</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnAddProduct">품목 추가</button>
+            <button type="button" class="btn btn-input y_write_auth d-none" id="btnCancel">취소</button>
+            <button type="button" class="btn btn-band y_write_auth d-none" id="btnSave">저장</button>
+        </div>
+    </div>
+    <form id="detailForm" autocomplete="off" onsubmit="return false">
+        {# 지금 목록의 품번(JSON). 수정 중 바꾼 것을 DetailForm 이 알아보게 폼에 둔다 #}
+        <input type="hidden" id="partNos" name="part_nos" disabled>
+        <div class="card mb-0 p-15"><div class="row g-2 align-items-end">
+            <div class="col-12 col-lg-3"><label for="code" class="form-label">양식코드</label><input type="text" class="form-control" id="code" name="code" disabled></div>
+            <div class="col-12 col-lg-6"><label for="title" class="form-label">양식명</label><input type="text" class="form-control" id="title" name="title" disabled></div>
+            <div class="col-6 col-lg-1"><label for="version" class="form-label">버전</label><input type="text" class="form-control" id="version" name="version" disabled></div>
+            <div class="col-6 col-lg-2"><label for="item_count" class="form-label">품목 수</label><input type="text" class="form-control" id="item_count" name="item_count" disabled></div>
+        </div></div>
+    </form>
+    <div class="sub-tit mt-3 mb-2">검사할 품목</div>
+    <div id="item-grid"></div>
+    <p class="text-muted mt-2 mb-0">매핑한 품목의 입고가 수입검사 작성 목록에 대기 작업으로 나옵니다. 검사할 때는 그 양식의 사용 중인 최신 버전을 엽니다.</p>
+</div>
+
+<div class="modal fade" id="productAddModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="productAddTitle">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="productAddTitle">품목 추가</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      {# 폼이 아니다 — 검색칸의 Enter 가 화면 주소로 제출되지 않게 #}
+      <div class="d-flex gap-2 mb-2">
+        <input type="search" class="form-control" id="productKeyword" placeholder="품번·품목명 검색" maxlength="100">
+        <button type="button" class="btn btn-search" id="btnProductSearch">조회</button>
+      </div>
+      <div id="product-grid"></div>
+      <p class="text-muted mt-2 mb-0">검사할 품목 목록에 없는 품번을 100건까지 보입니다. 체크한 품번을 목록에 더하고, [저장]을 눌러야 반영됩니다.</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-input" data-bs-dismiss="modal">취소</button>
+      <button type="button" class="btn btn-band" id="btnAddChecked">추가</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+    class ProductFormPage {
+        init() {
+            const _this = this;
+            this.url = '/api/system/product_form';
+            this.items = [];    // 고른 양식의 저장된 품목. [취소]하면 이것으로 되돌린다
+            this.formGrid = WeZonGrid.create('#form-grid', {
+                columnLayout: [
+                    { dataField: 'code', headerText: '양식코드', width: 100 }
+                    , { dataField: 'title', headerText: '양식명', width: 400, align: 'left' }
+                    , { dataField: 'version', headerText: '버전', width: 60 }
+                    , { dataField: 'item_count', headerText: '품목 수', width: 70, align: 'right' }
+                ]
+                , props: { height: 240, enableSorting: true, selectionMode: 'singleRow', rowIdField: 'code' }
+            });
+            const columns = [
+                { dataField: 'part_no', headerText: '품번', width: 140, align: 'left' }
+                , { dataField: 'name', headerText: '품목명', width: 240, align: 'left' }
+                , { dataField: 'part_type', headerText: '품목유형', width: 100 }
+                , { dataField: 'spec', headerText: '규격', width: 180, align: 'left' }
+            ];
+            // [삭제] 열은 수정 중에만 보인다
+            this.itemGrid = WeZonGrid.create('#item-grid', {
+                columnLayout: columns.concat([{
+                    dataField: 'remove', headerText: '삭제', width: 70, sortable: false, visible: false,
+                    renderer: { type: 'button', labelText: '삭제', className: 'btn btn-dell py-0 px-2', onClick: function (item) { _this.remove(item); } }
+                }])
+                , props: { height: 300, enableSorting: true, selectionMode: 'singleRow', enablePaging: true, pageSize: 50, rowIdField: 'part_no' }
+            });
+            this.productGrid = WeZonGrid.create('#product-grid', {
+                columnLayout: columns
+                , props: { height: 360, selectionMode: 'singleRow', showRowCheckColumn: true, rowIdField: 'part_no' }
+            });
+            GridUtil.fitWidth(this.formGrid);
+            GridUtil.fitWidth(this.itemGrid);
+            this.detail = DetailForm.create({
+                form: '#detailForm', grid: this.formGrid, rowIdField: 'code', fields: '#partNos', editOnly: '#btnAddProduct',
+                buttons: { edit: '#btnEdit', save: '#btnSave', cancel: '#btnCancel' },
+                onSave: function (row) { _this.save(row); }
+            });
+            // DetailForm 이 모드를 바꾼 뒤에 [삭제] 열과 목록을 맞춘다
+            $('#btnEdit').on('click', function () { _this.syncEditing(); });
+            $('#btnCancel').on('click', function () { _this.setItems(_this.items); _this.syncEditing(); });
+            this.formGrid.on('cellClick', function (e) { _this.detail.select(e.item, function (row) { _this.loadItems(row); }); });
+            $('#btnAddProduct').on('click', function () { _this.openAdd(); });
+            $('#btnProductSearch').on('click', function () { _this.searchProducts(); });
+            $('#productKeyword').on('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); _this.searchProducts(); } });
+            $('#btnAddChecked').on('click', function () { _this.addChecked(); });
+            // 모달이 보인 뒤에 폭을 맞춘다 — 숨은 채로 맞추면 폭이 0 이다
+            $('#productAddModal').on('shown.bs.modal', function () { GridUtil.fitWidth(_this.productGrid); });
+            this.loadForms();
+        }
+
+        // select: 다시 읽은 뒤 고를 양식코드. 그 양식을 상세에 다시 넣는다(읽기 전용). 없으면 상세를 비운다
+        loadForms(select) {
+            const _this = this;
+            AjaxUtil.getAsyncData(this.url, { action: 'forms' }, function (rows) {
+                rows = Array.isArray(rows) ? rows : [];
+                GridUtil.setRows(_this.formGrid, rows, { select: select });
+                const row = rows.find(function (r) { return r.code === select; });
+                if (row) { _this.detail.bind(row); _this.loadItems(row); } else { _this.detail.clear(); _this.items = []; _this.setItems([]); _this.syncEditing(); }
+            });
+        }
+
+        loadItems(row) {
+            const _this = this;
+            AjaxUtil.getAsyncData(this.url, { action: 'items', form_code: row.code }, function (rows) {
+                _this.items = Array.isArray(rows) ? rows : [];
+                _this.setItems(_this.items);
+                _this.syncEditing();
+            });
+        }
+
+        // 품목 목록과 폼의 품번 칸을 함께 바꾼다
+        setItems(rows) {
+            this.itemGrid.setData(rows.slice());
+            $('#partNos').val(JSON.stringify(rows.map(function (r) { return r.part_no; })));
+        }
+
+        syncEditing() {
+            if (this.detail.editing) { this.itemGrid.showColumn('remove'); } else { this.itemGrid.hideColumn('remove'); }
+            this.itemGrid.resize();
+        }
+
+        openAdd() {
+            $('#productKeyword').val('');
+            this.productGrid.setData([]);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('productAddModal')).show();
+            this.searchProducts();
+        }
+
+        searchProducts() {
+            const _this = this;
+            const exclude = this.itemGrid.getData().map(function (r) { return r.part_no; });
+            AjaxUtil.getAsyncData(this.url, { action: 'products', exclude: JSON.stringify(exclude), keyword: $('#productKeyword').val() || '' }, function (rows) {
+                _this.productGrid.setData(Array.isArray(rows) ? rows : []);
+            });
+        }
+
+        addChecked() {
+            const checked = this.productGrid.getCheckedItems();
+            if (!checked.length) { Alert.alert('', '추가할 품목을 체크해 주세요.'); return; }
+            const rows = this.itemGrid.getData().concat(checked.map(function (r) { return Object.assign({}, r); }));
+            rows.sort(function (a, b) { return a.part_no < b.part_no ? -1 : a.part_no > b.part_no ? 1 : 0; });
+            this.setItems(rows);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('productAddModal')).hide();
+        }
+
+        remove(item) {
+            this.setItems(this.itemGrid.getData().filter(function (r) { return r.part_no !== item.part_no; }));
+        }
+
+        save(row) {
+            const _this = this;
+            AjaxUtil.postAsyncData(this.url + '?action=save', { form_code: row.code, part_nos: $('#partNos').val() }, function (res) {
+                if (res && res.success === false) { Alert.alert('', res.message); return; }
+                Notify.success('저장되었습니다.');
+                _this.loadForms(row.code);
+            });
+        }
+    }
+
+    let page = new ProductFormPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

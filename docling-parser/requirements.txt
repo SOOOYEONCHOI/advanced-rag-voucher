@@ -1,0 +1,13 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic>=2.7.0,<3.0.0
+pydantic-settings>=2.3.0,<3.0.0
+docling==2.61.2
+# 2026.10.27(sooyeon.choi) 수정 - Python 3.12에서는 2.0(3.11 이상 전용)이 설치되므로 상한 추가, 3.10 때와 같은 1.x 유지
+pymupdf>=1.23.0,<2.0
+easyocr>=1.7.0
+# 2026.08.12(sooyeon.choi) 추가 - 안전한 OOXML Excel 전용 파싱
+openpyxl==3.1.5
+defusedxml==0.7.1
+pytest==8.3.5

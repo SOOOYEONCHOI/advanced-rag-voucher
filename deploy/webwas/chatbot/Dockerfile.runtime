@@ -1,0 +1,52 @@
+# 지능형 작업표준 안내 AI(RAG) backend 런타임 이미지 — Python 과 의존성만 넣고 소스는 넣지 않는다.
+# 소스는 WAS 의 /opt/yest/chatbot/backend 를 /app 에 읽기 전용으로 붙인다(docker-compose.prod.yml).
+# requirements.txt 나 이 파일이 바뀔 때만 다시 만든다 — 태그는 두 파일의 해시다(build_package.sh).
+# 빌드(저장소 루트에서): docker build -f deploy/webwas/chatbot/Dockerfile.runtime -t chatbot-backend-runtime:<해시> adrag_backend
+# 설명: docs/design/운영배포_가이드_서버별_v1.1.md §4.1 · docs/design/운영배포_수정배포_가이드_v1.1.md §4.1
+#
+# TODO(결정필요: P-2 기본 이미지 패치 버전 — MAIP 와 맞추려면 python:3.12.15-slim 처럼 정확한 태그로 고정한다)
+# TODO(결정필요: P-2 .xls 를 받으면 LibreOffice 가 필요하다(Q-P1-4). 지금 Dockerfile 과 같이 넣지 않았다)
+ARG PYTHON_IMAGE=python:3.12-slim
+
+# ── 1단계: 의존성 빌드 ─────────────────────────────────────
+FROM ${PYTHON_IMAGE} AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+RUN pip install --upgrade pip setuptools wheel
+# CPU 판 torch — adrag_backend/Dockerfile 과 같은 버전
+RUN pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.pytorch.org/whl/cpu
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt && pip check
+
+# ── 2단계: 실행 ────────────────────────────────────────────
+FROM ${PYTHON_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH=/opt/venv/bin:$PATH
+
+# poppler-utils: PDF 처리, curl: 헬스체크
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+EXPOSE 8081
+
+# compose 의 user: 로 chatbot 계정 UID/GID 를 준다. 그것을 빠뜨려도 root 로 돌지 않게 nobody 로 둔다
+USER 65534:65534
+
+# 적재 큐가 앱 프로세스 안에 있어(Phase 3 전) 워커는 1 로 고정한다
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081", "--workers", "1"]

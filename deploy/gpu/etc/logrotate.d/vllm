@@ -1,0 +1,8 @@
+/mnt/a/chatbot/vllm/logs/*.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

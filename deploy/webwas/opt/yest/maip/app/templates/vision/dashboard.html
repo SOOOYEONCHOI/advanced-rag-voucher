@@ -1,0 +1,332 @@
+{% extends "app/layout_page.html" %}
+{% load static %}
+
+{% block css %}
+<style>
+    /* 요약 띠(DESIGN §5.3) — 카드 한 장을 세로 1px 선으로 나눈다. 숫자만 크게(고객사 숫자 서체), 할 일은 주황·실적은 잉크·0 은 회색 */
+    .summary-band { display: flex; flex-direction: row; padding: 18px 0; }   /* .card 는 세로 flex 다 */
+    .band-cell { flex: 1 1 0; min-width: 0; padding: 0 22px; }
+    .band-cell:not(.d-none) ~ .band-cell:not(.d-none) { border-left: 1px solid var(--brand-line); }
+    .band-label { font-size: 13px; font-weight: 500; color: var(--brand-ink); }
+    .band-value { margin: 6px 0 10px; line-height: 1.15; }
+    .band-num { font-family: var(--font-figure); font-size: 32px; font-weight: 700; letter-spacing: -0.02em; color: var(--brand-ink); }
+    .band-unit { margin-left: 4px; font-size: 14px; color: var(--brand-muted); }
+    .band-cell.is-todo .band-num { color: var(--brand-warning-ink); }
+    .band-cell.is-empty .band-num { color: var(--brand-muted); }
+    .band-parts { display: grid; grid-template-columns: max-content max-content; column-gap: 14px; row-gap: 2px; margin: 0; font-size: 13px; }
+    .band-parts dt { font-weight: 400; color: var(--brand-muted); }
+    .band-parts dd { margin: 0; color: var(--brand-ink); font-variant-numeric: tabular-nums; text-align: right; }
+    [data-menu], [data-image], [data-inspection] { cursor: pointer; }
+    [data-menu]:focus-visible, [data-image]:focus-visible, [data-inspection]:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+    /* 누르면 열리는 목록 행 — 그리드 행 hover 와 같은 바탕(DESIGN §2.1 --brand-surface-2).
+       벤더가 칸 바탕을 !important 로 막아 두어 Bootstrap .table-hover 처럼 칸 안쪽 그림자 변수로 칠한다 */
+    .dashboard-table tbody tr[tabindex]:hover > td { --ct-table-bg-state: var(--brand-surface-2); }
+    /* 차트는 칸 높이를 정해 두고 그 안에 맞춘다(Chart.js maintainAspectRatio:false) */
+    .dashboard-chart { position: relative; height: 240px; }
+    /* 표는 한 줄로 두고 긴 이름 칸(양식·비전검사항목)만 text-wrap 으로 줄을 바꾼다 — 카드 밖으로 넘치지 않게 */
+    .dashboard-table td, .dashboard-table th { white-space: nowrap; }
+    .dashboard-table td.text-end { font-variant-numeric: tabular-nums; }
+    .dashboard-thumb { width: 48px; height: 36px; object-fit: cover; vertical-align: middle; }
+    .dashboard-no-thumb { font-size: 20px; color: var(--brand-line-strong); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 대시보드 — 로그인 첫 화면. 1행 요약 띠 → 2행 차트 둘 → 3행 대기 목록 둘 → 4행 최근 비전 검사(설계 2026-10-23, 화면 보완 2026-10-23).
+     할 일 칸은 그 메뉴 W, 현황 칸은 그 메뉴 R 이 있을 때 대시보드 자기 API 가 값을 준다(null 인 칸은 감춘 그대로) —
+     다른 메뉴 API 를 부르면 권한 없는 그룹에서 403. 머리 카드(이름·즐겨찾기·설명)는 감춘다 -->
+<div class="card d-none">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="{{ gui.gui_name }}">{{ gui.gui_name }}</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-off"></i></a>
+        </h4>
+    </div>
+    <div class="card-body py-2">
+        <p class="text-muted mb-0" id="screenDescription">처리할 일과 현황입니다. 메뉴 권한이 있는 것만 보입니다.</p>
+    </div>
+</div>
+
+<div class="card mb-2 summary-band d-none" id="summaryCards">
+    <div class="band-cell d-none is-todo" id="cardInspection">
+        <div class="band-label">작업해야 할 검사</div>
+        <div class="band-value"><span class="band-num"></span><span class="band-unit">건</span></div>
+        <dl class="band-parts"></dl></div>
+    <div class="band-cell d-none" id="cardMonthDone">
+        <div class="band-label">이번 달 검사 완료</div>
+        <div class="band-value"><span class="band-num"></span><span class="band-unit">건</span></div>
+        <dl class="band-parts"></dl></div>
+    <div class="band-cell d-none is-todo" id="cardVision">
+        <div class="band-label">작업해야 할 비전 데이터 검사</div>
+        <div class="band-value"><span class="band-num"></span><span class="band-unit">건</span></div>
+        <dl class="band-parts"></dl></div>
+    <div class="band-cell d-none" id="cardMonthImages">
+        <div class="band-label">이번 달 비전 데이터 합계</div>
+        <div class="band-value"><span class="band-num"></span><span class="band-unit">건</span></div>
+        <dl class="band-parts"></dl></div>
+</div>
+
+<div class="row g-2 mb-2">
+    <div class="col-12 col-xl-6 d-none" id="inspectionCard">
+        <div class="card mb-0 p-15 h-100">
+            <div class="panel-head"><div class="sub-tit">최근 7일 검사 완료 · 부적합</div></div>
+            <div class="chart-area"><div class="dashboard-chart"><canvas id="chartInspection" aria-label="최근 7일 검사 완료 막대와 부적합 항목 선 차트" role="img"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-6 d-none" id="registerCard">
+        <div class="card mb-0 p-15 h-100">
+            <div class="panel-head"><div class="sub-tit">최근 7일 비전 데이터 등록</div>
+                <a href="javascript:void(0);" class="panel-link" data-menu="wm_data_register">전체 조회</a></div>
+            <div class="chart-area"><div class="dashboard-chart"><canvas id="chartRegister" aria-label="최근 7일 비전 데이터 등록 막대 차트" role="img"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-2 mb-2">
+    <div class="col-12 col-xl-6 d-none" id="jobsCard">
+        <div class="card mb-0 p-15 h-100">
+            <div class="panel-head"><div class="sub-tit">대기·작성 중인 검사</div></div>
+            <table class="table table-bordered table-sm align-middle mb-0 dashboard-table">
+                <thead><tr><th>상태</th><th>구분</th><th>입고번호/WO</th><th>양식</th><th>입고일/마지막 저장</th></tr></thead>
+                <tbody id="jobsBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-12 col-xl-6 d-none" id="imagesCard">
+        <div class="card mb-0 p-15 h-100">
+            <div class="panel-head"><div class="sub-tit">대기·작업 중인 비전 데이터 라벨링</div></div>
+            <table class="table table-bordered table-sm align-middle mb-0 dashboard-table">
+                <thead><tr><th class="text-center">이미지</th><th>비전검사항목</th><th>상태</th><th>등록일</th></tr></thead>
+                <tbody id="imagesBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-2 p-15 d-none" id="visionCard">
+    <div class="panel-head"><div class="sub-tit">최근 비전 검사 이력</div></div>
+    <table class="table table-bordered table-sm align-middle mb-0 dashboard-table">
+        <thead><tr><th class="text-center">이미지</th><th>검사 시각</th><th>비전검사항목</th><th>판정</th><th>클라이언트</th></tr></thead>
+        <tbody id="visionBody"></tbody>
+    </table>
+</div>
+
+<p class="text-muted d-none" id="nothing">볼 수 있는 할 일과 현황이 없습니다. 메뉴 권한이 필요하면 관리자에게 요청합니다.</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'assets/vendor/chart.js/chart.umd.js' %}"></script>
+<script type="text/javascript">
+    // 색은 토큰에서 읽는다(DESIGN §2) — 차트 계열은 --chart-*, 상태는 이상 --brand-danger 만(§2.3·§5.9)
+    class DashboardPage {
+        init() {
+            const _this = this;
+            const activate = function (e, run) {
+                if (e.type === 'click' || (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' '))) { e.preventDefault(); run(); }
+            };
+            $(document).on('click keydown', '[data-menu]', function (e) {
+                const menu = $(this).attr('data-menu');
+                activate(e, function () { _this.openMenu(menu); });
+            });
+            $(document).on('click keydown', '#imagesBody tr[data-image]', function (e) {
+                const $row = $(this);
+                activate(e, function () { _this.openItem($row.attr('data-item'), 'wm_data_labeling', $row.attr('data-image')); });
+            });
+            $(document).on('click keydown', '#visionBody tr[data-inspection]', function (e) {
+                const id = $(this).attr('data-inspection');
+                activate(e, function () { _this.openInspection(id); });
+            });
+            this.setupChart();
+            AjaxUtil.getAsyncData('/api/vision/dashboard', { action: 'summary' }, function (res) {
+                if (!res || !res.todo) { return; }
+                const shown = function (o) { return Object.keys(o).some(function (k) { return o[k] !== null; }); };
+                $('#nothing').toggleClass('d-none', shown(res.todo) || shown(res.status));
+                _this.renderCards(res.todo, res.status);
+                _this.renderCharts(res.status);
+                _this.renderLists(res.todo, res.status);
+            });
+        }
+
+        // 셸 좌측 메뉴의 그 메뉴 탭을 연다(query 는 처음 열 때만 주소에 붙는다). 메뉴에 없으면(권한 없음) 열지 않는다
+        openMenu(menuCode, query) {
+            const shell = window.parent !== window && window.parent.myMenu;
+            if (!shell) { return false; }
+            const $link = shell.$leftSideNavi.find('.menu-leaf-link[data-mid="' + menuCode + '"]');
+            if (!$link.length) { return false; }
+            const url = $link.attr('data-url');
+            shell.openMenu(menuCode, shell.leafTitle($link), query ? url + (url.indexOf('?') < 0 ? '?' : '&') + query : url);
+            return true;
+        }
+
+        // 비전 검사 이력 탭을 그 검사 상세로 연다. 이미 열린 탭은 주소가 바뀌지 않으므로 그 화면의 상세만 바꾼다
+        openInspection(id) {
+            const frame = window.parent.document.getElementById('mnb_iframe_wm_vis_inspection');
+            if (this.openMenu('wm_vis_inspection', 'inspection=' + encodeURIComponent(id)) && frame && frame.contentWindow.page) {
+                frame.contentWindow.page.showDetail(id);
+            }
+        }
+
+        // 비전검사항목 탭의 내부 탭(라벨링). 좌측 메뉴의 그 항목 링크로 탭을 열고, 링크가 항목 홈이면 ?screen=·image= 를 붙인다.
+        // 이미 열린 탭이면 그 화면의 내부 탭만 바꾼다. 홈 권한이 없어 링크가 다른 하위 화면이면 그 링크를 그대로 연다
+        openItem(itemId, screen, imageId) {
+            const shell = window.parent !== window && window.parent.myMenu;
+            if (!shell) { return; }
+            const $link = shell.$leftSideNavi.find('.menu-leaf-link[data-mid^="item' + itemId + '_"]').first();
+            if (!$link.length) { return; }
+            const mid = $link.attr('data-mid');
+            const home = mid === 'item' + itemId + '_wm_data_item_detail';
+            const image = imageId ? '&image=' + encodeURIComponent(imageId) : '';
+            const url = $link.attr('data-url') + (home ? '&screen=' + encodeURIComponent(screen) + image : '');
+            const frame = window.parent.document.getElementById('mnb_iframe_' + mid);
+            shell.openMenu(mid, shell.leafTitle($link), url);
+            if (home && frame && frame.contentWindow.page) {
+                frame.contentWindow.page.showScreen(screen, imageId ? '/gui/' + screen + '/?inspection_item=' + encodeURIComponent(itemId) + image : null);
+            }
+        }
+
+        // 요약 띠 칸 하나 — 숫자는 합계(0 은 회색), 아래 구성은 이름·값 쌍(가운뎃점으로 잇지 않는다, DESIGN §5.3).
+        // parts 의 값이 null 이면 권한이 없는 구성이라 뺀다. total 을 주면 그것이 숫자다(이번 달 합계)
+        cell(id, parts, total) {
+            const shown = parts.filter(function (p) { return p[1] !== null; });
+            if (!shown.length) { return false; }
+            const value = total !== undefined ? total : shown.reduce(function (a, p) { return a + p[1]; }, 0);
+            const $cell = $('#' + id).removeClass('d-none').toggleClass('is-empty', !value);
+            $cell.find('.band-num').text(value.toLocaleString());
+            $cell.find('.band-parts').empty().append(shown.flatMap(function (p) {
+                return [$('<dt>').text(p[0]), $('<dd>').text(p[1].toLocaleString() + '건')];
+            }));
+            return true;
+        }
+
+        renderCards(t, s) {
+            const any = [
+                t.inspection && this.cell('cardInspection', [['수입검사', t.inspection.incoming], ['품질검사', t.inspection.outgoing]]),
+                s.month_done && this.cell('cardMonthDone', [['수입검사', s.month_done.incoming], ['품질검사', s.month_done.outgoing]]),
+                t.vision && this.cell('cardVision', [['라벨링', t.vision.labeling], ['검수', t.vision.review]]),
+                s.month_images && this.cell('cardMonthImages', [['미처리', s.month_images.pending], ['처리', s.month_images.done]], s.month_images.total)
+            ];
+            $('#summaryCards').toggleClass('d-none', !any.some(Boolean));
+        }
+
+        emptyRow(cols, message) {
+            return $('<tr>').append($('<td>', { colspan: cols, 'class': 'text-muted text-center' }).text(message));
+        }
+
+        renderLists(t, s) {
+            // 썸네일 칸 — 가운데 정렬. 파일이 없는 이미지는 서버가 주소를 비워 준다 — 빈칸 대신 "이미지 없음" 아이콘
+            const noThumb = function () { return $('<i>', { 'class': 'uil uil-image-alt-slash dashboard-no-thumb', title: '이미지 없음', 'aria-label': '이미지 없음' }); };
+            const thumb = function (url, name) {
+                return $('<td>', { 'class': 'text-center' }).append(url
+                    ? $('<img>', { src: url, alt: name + ' 이미지', 'class': 'rounded border dashboard-thumb' }).on('error', function () { $(this).replaceWith(noThumb()); })
+                    : noThumb());
+            };
+            if (t.jobs) {
+                $('#jobsCard').removeClass('d-none');
+                $('#jobsBody').empty().append(t.jobs.length ? t.jobs.map(function (j) {
+                    return $('<tr>', { 'data-menu': j.menu, tabindex: 0 }).append(
+                        $('<td>').text(j.state_label), $('<td>').text(j.kind_label), $('<td>').text(j.number || '-'),
+                        $('<td>', { 'class': 'text-wrap' }).text(j.title), $('<td>').text(j.when || '-'));
+                }) : this.emptyRow(5, '대기·작성 중인 검사가 없습니다.'));
+            }
+            if (t.images) {
+                $('#imagesCard').removeClass('d-none');
+                $('#imagesBody').empty().append(t.images.length ? t.images.map(function (i) {
+                    return $('<tr>', { 'data-item': i.item_id, 'data-image': i.id, tabindex: 0 }).append(
+                        thumb(i.thumbnail_url, i.item_name), $('<td>', { 'class': 'text-wrap' }).text(i.item_name),
+                        $('<td>').text(i.status_label), $('<td>').text(i.created_at));
+                }) : this.emptyRow(4, '대기·작업 중인 라벨링이 없습니다.'));
+            }
+            if (s.vision) {
+                $('#visionCard').removeClass('d-none');
+                $('#visionBody').empty().append(s.vision.length ? s.vision.map(function (v) {
+                    const judgement = v.abnormal === true ? '이상' : (v.abnormal === false ? '정상' : v.status_label);
+                    return $('<tr>', { 'data-inspection': v.id, tabindex: 0 }).append(thumb(v.thumbnail_url, v.item_name), $('<td>').text(v.created_at.slice(0, 16)), $('<td>', { 'class': 'text-wrap' }).text(v.item_name),
+                        $('<td>', { 'class': v.abnormal === true ? 'text-danger fw-bold' : '' }).text(judgement), $('<td>').text(v.client_id));
+                }) : this.emptyRow(5, '비전 검사 기록이 없습니다.'));
+            }
+        }
+
+        renderCharts(s) {
+            const c = this.colors;
+            const sum = function (list) { return list.reduce(function (a, b) { return a + b; }, 0); };
+            // 막대(DESIGN §5.9) — 굵기 36px 까지, 데이터 끝 4px 둥글게(바닥은 각지게), 쌓은 막대 사이 2px 바탕색 틈
+            const bar = function (label, data, color, stack) {
+                return { type: 'bar', label: label, data: data, backgroundColor: color, stack: stack, maxBarThickness: 36,
+                         borderRadius: 4, borderSkipped: 'start', borderColor: c.surface, borderWidth: { top: 2 } };
+            };
+            // 두 차트 카드의 그림 영역이 같은 자리에서 시작하게 y 축 폭을 맞춘다
+            const yAxis = function (title) {
+                return { stacked: true, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: title },
+                         afterFit: function (scale) { scale.width = 56; } };
+            };
+            if (s.inspection) {
+                const i = s.inspection;
+                $('#inspectionCard').removeClass('d-none');
+                const bars = [['수입검사 완료', i.incoming, c.chart[0]], ['품질검사 완료', i.outgoing, c.chart[1]]].filter(function (b) { return b[1]; });
+                if (!sum(bars.map(function (b) { return sum(b[1]); }))) {
+                    this.noData('#inspectionCard');
+                } else {
+                    // 완료 막대(왼쪽 축)에 부적합 선(오른쪽 축)을 겹친다 — 차트를 나누면 동떨어져 보인다(DESIGN §5.9 예외).
+                    // order 가 작을수록 위에 그린다 — 선을 막대 위에
+                    const ng = { type: 'line', label: '부적합 항목', data: i.ng, borderColor: c.danger, backgroundColor: c.danger,
+                                 borderWidth: 2, tension: 0, pointRadius: 3, yAxisID: 'y1', order: 0 };
+                    new Chart(document.getElementById('chartInspection'), {
+                        data: { labels: i.days, datasets: [ng].concat(bars.map(function (b) { return Object.assign(bar(b[0], b[1], b[2], 'done'), { order: 1 }); })) },
+                        options: {
+                            interaction: { mode: 'index', intersect: false },
+                            scales: {
+                                x: { stacked: true, grid: { display: false } },
+                                y: yAxis('완료(건)'),
+                                y1: { position: 'right', beginAtZero: true, suggestedMax: 5, ticks: { precision: 0 }, grid: { display: false },
+                                      title: { display: true, text: '부적합(건)' } }
+                            },
+                            plugins: { legend: { position: 'top', align: 'end' } }
+                        }
+                    });
+                }
+            }
+            if (s.register) {
+                $('#registerCard').removeClass('d-none');
+                if (!s.register.total) {
+                    this.noData('#registerCard');
+                } else {
+                    // 색은 등록 경로를 따른다 — 경로가 빠져도 남은 경로의 색이 바뀌지 않는다
+                    const byChannel = { CLIENT: c.chart[0], FILE: c.chart[1], CAMERA: c.chart[2], FORM: c.chart[3] };
+                    new Chart(document.getElementById('chartRegister'), {
+                        data: { labels: s.register.days, datasets: s.register.series.map(function (x) {
+                            return bar(x.label, x.counts, byChannel[x.code], 'image');
+                        }) },
+                        options: {
+                            interaction: { mode: 'index', intersect: false },
+                            scales: { x: { stacked: true, grid: { display: false } }, y: yAxis('등록(장)') },
+                            plugins: { legend: { position: 'top', align: 'end' } }
+                        }
+                    });
+                }
+            }
+        }
+
+        // 기록이 없는 차트는 빈 축 대신 한 줄 안내
+        noData(selector) {
+            $(selector).find('.chart-area').replaceWith($('<p>', { 'class': 'text-muted mb-0' }).text('최근 7일 기록이 없습니다.'));
+        }
+
+        setupChart() {
+            const css = getComputedStyle(document.documentElement);
+            const token = function (name) { return css.getPropertyValue(name).trim(); };
+            this.colors = {
+                muted: token('--brand-muted'), line: token('--brand-line'), danger: token('--brand-danger'), surface: token('--brand-surface-1'),
+                chart: [token('--chart-1'), token('--chart-2'), token('--chart-3'), token('--chart-4')]
+            };
+            Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+            Chart.defaults.color = this.colors.muted;
+            Chart.defaults.borderColor = this.colors.line;
+            Chart.defaults.maintainAspectRatio = false;
+            Chart.defaults.plugins.legend.labels.boxWidth = 12;
+        }
+    }
+
+    let page = new DashboardPage();
+    $(document).ready(function () { page.init(); });
+</script>
+{% endblock %}

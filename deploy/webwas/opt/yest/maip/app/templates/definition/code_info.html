@@ -1,0 +1,407 @@
+{% extends "app/layout_page.html" %}
+{% block css %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex card-header justify-content-between align-items-center">
+        <h4 class="header-title">
+            <span data-labelCd="코드정보">코드 정보</span>
+            <a href="javascript:void(0);"><i class="uil uil-favorite favorite-on"></i></a>
+        </h4>
+    </div>
+    <div class="collapse show" id="codeSearchCollapse">
+        <div class="card-body">
+            <form id="searchForm" autocomplete="off">
+                <div class="row">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center">
+                            <label for="parentCode" class="form-label" data-labelCd="상위코드">상위코드</label>
+                            <select class="form-select" id="parentCode" name="parentCode"></select>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-4 col-xxl-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label for="txtCode" class="form-label" data-labelCd="코드명">코드명</label>
+                            <input class="form-control" id="txtCode" name="txtCode" />
+                            <button type="button" class="col-auto-flex btn btn-search" id="btnSearch" data-commonCd="조회">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="floder-close">
+        <a class="text-dark" data-bs-toggle="collapse" href="#codeSearchCollapse" role="button" aria-expanded="true" aria-controls="codeSearchCollapse">
+            <i class="uil uil-angle-down"></i>
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center upper-wezongrid">
+    <div class="sub-tit">
+        <span class="right_align rpt" data-labelCd="코드 정보">코드 정보</span>
+    </div>
+    <div class="flex-wrap gap-2">
+        <button type="button" class="btn rounded-pill btn-icon" id="btnExcel" title="엑셀 다운로드" data-labelCd="엑셀 다운로드" data-labelTarget="title"><i class="uil uil-file-times"></i></button>
+        <button type="button" class="btn rounded-pill btn-icon" id="btnGridSetting" style="visibility:hidden" title="Grid Settings"><i class="uil uil-cog"></i></button>
+    </div>
+</div>
+<div id="code-grid"></div>
+
+<div class="card mb-0 mt-2 p-15">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="sub-tit">
+            <span class="right_align rpt" data-commonCd="상세정보">상세 정보</span>
+        </div>
+        <div class="flex-wrap gap-2">
+            <button type="button" class="btn btn-input" id="btnNew" name="btnNew" data-commonCd="등록">등록</button>
+            <button type="button" class="btn btn-input" id="btnNewChild" name="btnNewChild" data-labelCd="하위추가">하위추가</button>
+            <button type="button" class="btn btn-input" id="btnNewBro" name="btnNewBro" data-labelCd="형제추가">형제추가</button>
+            <button type="button" class="btn btn-dell y_write_auth" id="btnDel" data-commonCd="삭제">삭제</button>
+            <button type="button" class="btn btn-band y_write_auth" id="btnSave" data-commonCd="저장">저장</button>
+        </div>
+    </div>
+
+    <div class="card mb-0 p-15">
+        <form id="codeForm">
+            <input type="hidden" id="parent_id" name="parent_id" value="" />
+            <div class="row">
+                <input class="form-control" type="text" id="id" name="id" hidden />
+
+                <div class="col-xl-4 col-sm-6 col-lg-12">
+                    <div class="d-flex align-items-center">
+                        <label for="parent_name" class="form-label" data-labelCd="상위코드">상위코드</label>
+                        <input class="form-control" type="text" id="parent_name" name="parent_name" readonly disabled />
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-sm-6 col-lg-12">
+                    <div class="d-flex align-items-center">
+                        <label for="code" class="form-label" data-labelCd="*코드">*코드</label>
+                        <input class="form-control" type="text" id="code" name="code" disabled value="" required>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-sm-6 col-lg-12">
+                    <div class="d-flex align-items-center">
+                        <label for="name" class="form-label" data-labelCd="*코드명">*코드명</label>
+                        <input class="form-control" type="text" id="name" name="name" disabled value="" />
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="d-flex align-items-center">
+                        <label for="description" class="form-label" data-commonCd="설명">설명</label>
+                        <textarea class="form-control h-26" id="description" name="description" disabled="disabled" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% include '../common/columns_setting.html' %}
+<script type="text/javascript">
+
+
+    class CodePage {
+        constructor() {
+            this.grid = null;
+            this.init();
+            this.selectedItem = null;
+        }
+
+        init() {
+            let _this = this;
+
+            this.grid = WeZonGrid.create('#code-grid', {
+                columnLayout: [
+                    { dataField: 'code', headerText: '코드', width: 150, align: 'left' }
+                    , { dataField: 'name', headerText: '코드명', width: 200, align: 'left' }
+                    , { dataField: 'description', headerText: '설명', width: 350, align: 'left' }
+                ]
+                , props: { height: 400, enableSorting: true, selectionMode: 'singleRow', fixedColumnCount: 1 }
+            });
+            GridUtil.fitWidth(this.grid);
+
+            _this.grid.on('cellClick', function(e) {
+                _this.selectedItem = e.item;
+                _this.showDetail(e.item.id);
+            });
+
+            // WeZonGrid 전환 중 — tree config 미호환으로 제거
+            // tree: {
+            //     use: true,
+            //     indentWidth: 15,
+            //     arrowWidth: 15,
+            //     iconWidth: 18,
+            //     icons: {
+            //       openedArrow: '<i class="uil uil-angle-down" aria-hidden="true"></i>',
+            //       collapsedArrow: '<i class="uil uil-angle-right" aria-hidden="true"></i>',
+            //       groupIcon: '<i class="uil uil-minus-square" aria-hidden="true"></i>',
+            //       collapsedGroupIcon: '<i class="uil uil-plus-square" aria-hidden="true"></i>',
+            //       itemIcon: '-'
+            //     },
+            //     columnKeys: {
+            //       parentKey: 'parent_id',
+            //       selfKey: 'id'
+            //     }
+            // }
+
+        }
+
+        clickContextMenu(action, param) {
+            let _this = this;
+            console.log('context menu', action, param.item);
+            let pk = param.item.id;
+            let parent_name = param.item.code;
+            let $codeForm = $('#codeForm');
+            if (action == 'create') {
+                let newItem = {
+                    'parent_id': pk,
+                    'parent_name': parent_name,
+                    'id': '',
+                    'code': '',
+                    'name': '',
+                }
+                FormUtil.BindDataForm(newItem, $codeForm);
+                $('#description').text('');
+            }  else if (action == 'delete') {
+                Alert.confirm('', 
+                    '삭제하시겠습니까?',
+                    function () { _this.deleteCode(pk) },
+                    function () { }
+                );
+            }
+        }
+
+
+        //버튼 활성화 
+        setButtonState() {
+            let pk = $('#id').val();
+            $('#btnNew').prop('disabled', false);
+            $('#btnSave').prop('disabled', false);
+            if (pk) {
+                $('#btnDel').prop('disabled', false);
+                $('#btnNewChild').prop('disabled', false);
+                $('#btnNewBro').prop('disabled', false);
+
+            }
+            else {
+                $('#btnDel').prop('disabled', true);
+                $('#btnNewChild').prop('disabled', true);
+                $('#btnNewBro').prop('disabled', true);
+            }
+        }
+
+        showDetail(idx) {
+            let param = { 'id': idx, "action": 'detail' };
+            let url = '/api/system/code';
+            AjaxUtil.getAsyncData(url, param, function (result) {
+                if (result != null) {
+                    FormUtil.BindDataForm(result, $('#codeForm'));
+                    $('#description').text(result.description);
+                }
+
+                //page.setButtonDisable(false, false, false);
+                page.setButtonState();
+            });
+        }
+
+        searchMainData() {
+            let _this = this;
+            let txtCode = $('#txtCode').val();
+            let parentId = $('#parentCode').val();
+
+            $('#codeForm')[0].reset();
+            $('#parent_id').val('');
+            $('#id').val('');
+            $('#description').text('');
+            let url = '/api/system/code';
+
+            let param = {
+                action: 'read',
+                parentId : parentId,
+                txtCode : txtCode,
+            };
+
+            AjaxUtil.getAsyncData(url, param, function (result) {
+                if (result != null) {
+                    _this.grid.setTreeData(result, {
+                        treeColumn: 'name',
+                        idField: 'id',
+                        parentField: 'parent_id',
+                        expandAll: true
+                    });
+                }
+
+                //page.setButtonDisable(true, false, false);
+                page.setButtonState();
+            });
+        }//searchMainData
+
+        saveCode() {
+            let _this = this;
+            let url = '/api/system/code?action=save';
+
+            //let data = $('#codeForm').serialize();
+            let data = FormUtil.extractForm($('#codeForm'));
+
+            if (!data.code || !data.name) {
+                Alert.alert('', '필수항목을 입력해주세요');
+                return;
+            }
+
+            let fnSuccess = function (res) {
+                if (res.success) {
+                    Notify.success('저장되었습니다'); // Notification
+                    _this.searchMainData();
+                } else {
+                    Alert.alert('', res.message)
+                }
+            };
+           AjaxUtil.postAsyncData(url, data, fnSuccess);
+        }
+
+        deleteCode(id) {
+            let _this = this;
+            let url = '/api/system/code?action=delete';
+            let data = { id: id };
+            let fnSuccess = function (res) {
+                if (res.success) {
+                    Notify.success('삭제되었습니다'); // Notification
+                    _this.searchMainData();
+                } else {
+                    Alert.alert('', res.message);
+                }
+            };
+            AjaxUtil.postAsyncData(url, data,fnSuccess);
+        }
+
+    }
+
+    let page = null;
+
+    $(document).ready(function (e) {
+        page = new CodePage();
+
+        AjaxUtil.fillSelectOptions($('#parentCode'), 'parent_code', 'all');
+
+        $('#btnSearch').click(function (ex) {
+            page.searchMainData();
+        });
+
+        // 엔터키 검색
+        $('#txtCode').on('keypress', function (e) {
+            if (event.keyCode == 13) {
+                event.preventDefault();
+                page.searchMainData();
+            }
+        });
+
+        $('#btnNew').click(function (e) {
+            $('#codeForm')[0].reset();
+            $('#parent_id').val('');
+            $('#id').val('');
+            $('#description').text('');
+
+            $('#codeForm #code').attr('readonly', false);
+            $('#codeForm input').each(function () {
+                if ($(this).is(':disabled')) {
+                    $(this).removeAttr('disabled');
+                }
+            });
+
+            $('#codeForm textarea').each(function () {
+                if ($(this).is(':disabled')) {
+                    $(this).removeAttr('disabled');
+                }
+            });
+            //page.setButtonDisable(true, false, true);
+            page.setButtonState();
+
+            //$('#codeForm').reset();
+
+        });
+
+        // 하위추가 
+        $('#btnNewChild').click(function (e) {
+            let data = FormUtil.extractForm($('#codeForm'))
+            console.log('data', data);
+            let newItem = {
+                'parent_id': data.id,
+                'parent_name': data.code,
+                'id': '',
+                'code': '',
+                'name': '',
+                'description':''
+            }
+            FormUtil.BindDataForm(newItem, $('#codeForm'));
+            $('#btnNewChild').prop('disabled', true);
+            $('#btnNewBro').prop('disabled', true);
+        });
+        // 형제추가
+        $('#btnNewBro').click(function (e) {
+            let data = FormUtil.extractForm($('#codeForm'))
+            console.log('data', data);
+            let newItem = {
+                'parent_id': data.parent_id,
+                'parent_name': data.parent_name,
+                'id': '',
+                'code': '',
+                'name': '',
+                'description':''
+            }
+            FormUtil.BindDataForm(newItem, $('#codeForm'));
+            $('#btnNewChild').prop('disabled', true);
+            $('#btnNewBro').prop('disabled', true);
+        });
+
+        $('#btnSave').click(function (e) {
+            Alert.confirm('', 
+                '저장하시겠습니까?',
+                function () {
+                    page.saveCode();
+                },
+                function () { }
+            );
+        });
+
+        $('#btnDel').click(function (e) {
+            let id = $('#codeForm').find('#id').val()
+            Alert.confirm('', 
+                '삭제하시겠습니까?',
+                function () { page.deleteCode(id) },
+                function () { }
+            );
+        });
+
+        // 엑셀 다운로드
+        $('#btnExcel').click(function (e) {
+            GridUtil.exportExcel(page.grid, { fileName: '코드정보.xlsx' });
+        });
+
+        page.popColSetting = new popColSetting();
+        page.popColSetting.loadColumnData(gui.gui_code, gui.template_key, 'grid',  page.grid);
+        
+        if (userinfo.group_code == 'admin') {
+        
+        $('#btnGridSetting').css('visibility','visible');
+        
+        }
+        
+        $('#btnGridSetting').click(function (e) {
+        page.popColSetting.show(gui.gui_code, gui.template_key, 'grid', null, page.grid, { 'order_fix': false, 'fix_cols': 0 });
+        });
+
+        page.searchMainData();
+
+    });
+</script>
+
+
+{% endblock %}

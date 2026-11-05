@@ -1,0 +1,86 @@
+
+/* add-on styles to complement dashboard-del.css without overriding its core look */
+.del-unit{
+  float:right;
+  font-size:12px;
+  color:#aab3c7;
+  background:rgba(255,255,255,.04);
+  padding:4px 10px;
+  border-radius:6px;
+  border:1px solid rgba(255,255,255,.06);
+  margin-bottom:8px;
+}
+.del-num{ text-align:right; font-variant-numeric:tabular-nums; }
+.del-empty{ background-color:#293042 !important; color:#8a93a7; }
+.del-highlight{ border: 1px solid rgb(117 126 147 / 28%); border-radius:2px;}
+.del-error{ color:#ff6b6b; font-weight:500; }
+
+/* Slight header differentiation that stays within the del palette */
+.del-th-cat{ font-weight:500; }
+
+/* ===== spacing update ===== */
+.del-section-title { margin-bottom: 12px !important; }
+
+/* ===== 2열 배치: 스팀 사용 현황 + 스팀 공급량 ===== */
+.del-row.del-two-col > .del-section{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+@media (max-width: 1280px){
+  .del-row.del-two-col{
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+.del-light{
+  border: 1px solid rgba(66, 153, 225, .18);
+}
+/* 섹션 간격은 gap으로 관리 */
+.del-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 섹션 하단 간격 */
+}
+
+/* 섹션 자체 margin 제거 */
+.del-section {
+  margin: 0;
+}
+
+/* 두 개 섹션이 나란히 배치될 때 */
+.del-row.del-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px; /* 두 섹션 사이 간격 */
+}
+.del-row.del-two-col > .del-section {
+  margin: 0;
+}
+.del-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 제목 좌측, 단위 우측 */
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.del-section-header .del-unit {
+  float: none;
+  margin: 0;
+}
+
+.del-section-header .del-section-title {
+  margin: 0;
+}
+td.del-td.del-num.del-highlight.del-row-altcolor, td.del-td.del-highlight.del-row-altcolor{
+      background-color: #333b4c !important;
+      text-align: center;
+}
+.del-text-left{
+  text-align: left !important;
+  padding-left: 20px !important;
+}
+
+.del-body .del-td {
+    height: 15px !important;
+}

@@ -1,0 +1,1587 @@
+html, body {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	overflow: hidden;
+	background-color: #3f3f3f;
+	background-image: url(/static/resource/cps/images/background_pattern.jpg);
+	background-position: center center;
+	background-repeat: repeat;
+	position: relative;
+	font-family: 'roboto','Pretendard', 'malgun gothic',sans-serif;
+}
+/* 공통 */
+.mp {
+  position: absolute;
+}
+.mp_2f_background {
+  top:0;
+  left:0;
+  z-index:1;   
+}
+.mp_2f {
+  top:60px;
+  left:50px;
+  z-index:2;
+}
+.mp_text_green {
+  color:#9cce7c
+}
+.mp_text_blue {
+  color:#3993ff
+}
+.mp_text_red {
+  color:#ff5c5c
+}
+.mp_text_white {
+  color:#fff
+}
+.mp_header_blue .mp_equ_header, .markup_blue
+{
+  background-color: rgba(47,53,100,.85);
+}
+.mp_header_green .mp_equ_header, .markup_green
+{
+  background-color:#6caf41;
+}
+.mp_header_red .mp_equ_header, .markup_red
+{
+  background-color:#ff3636;
+}
+/* 설비정보 미니 박스 */
+.mp_equ_info_area {
+  width:100%;
+  height:100%;
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom: 0;
+}
+.mp_equ_info_box {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 400px;
+    height: 90px;
+    background-color: transparent;
+    box-shadow: 0 3px 15px rgba(0,0,0,.25);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 20;
+    cursor: pointer;
+}
+.mp_equ_info_box.mp_num_1, .mp_equ_info_box.mp_num_2, .mp_equ_info_box.mp_num_3, .mp_equ_info_box.mp_num_4, .mp_equ_info_box.mp_num_5, .mp_equ_info_box.mp_num_6, .mp_equ_info_box.mp_num_7,
+.mp_equ_info_box.mp_num_8, .mp_equ_info_box.mp_num_9
+{
+  width:280px;  
+}
+.mp_equ_info_box.mp_num_4, .mp_equ_info_box.mp_num_5, .mp_equ_info_box.mp_num_7, .mp_equ_info_box.mp_num_8 {
+  height:112px;
+}
+.mp_equ_info_box.mp_num_4 .mp_equ_header, .mp_equ_info_box.mp_num_5 .mp_equ_header, .mp_equ_info_box.mp_num_7 .mp_equ_header, .mp_equ_info_box.mp_num_8 .mp_equ_header
+{
+  height:58px;
+}
+.mp_top_header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 45px;
+    font-size: 21px;
+    font-weight: 600;
+    /* background-color: #1584ce; */
+	background-color: #2b66b9;
+    color: #fff;
+}
+.mp_equ_header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 45px;
+    font-size: 21px;
+    font-weight: 600;
+    /* background-color: #1584ce; */
+	background-color: #2b66b9;
+    color: #fff;
+}
+.mp_equ_header span {
+  position:absolute;
+  font-family: 'roboto';
+  font-weight: 400;
+  color:#fff;
+  font-weight: normal;
+  top:9px;
+  left:14px
+}
+.mp_equ_info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 45px;
+  color:#707070;
+  font-weight: 400;
+  font-size: 30px;
+}
+.mp_equ_info em{
+  margin:0 5px;
+  color:#fff;
+  font-family: 'roboto';
+  font-weight: 400;
+  font-size: 16px;
+  font-style: normal;
+}
+/*설비정보 미니박스 좌표*/
+.mp_num_1{
+  top:50px;
+  right:25px;
+}
+.mp_num_2{
+  top:150px;
+  right:25px;
+}
+.mp_num_3{
+  top:250px;
+  right:25px;
+}
+.mp_num_4{
+  top:350px;
+  right:25px;
+}
+.mp_num_5{
+  top:472px;
+  right:25px;
+}
+.mp_num_6{
+  top:594px;
+  right:25px;
+}
+.mp_num_7{
+  top:694px;
+  right:25px;
+}
+.mp_num_8{
+  top:816px;
+  right:25px;
+}
+.mp_num_9{
+  top:938px;
+  right:25px;
+}
+.mp_num_10{
+  top:50px;
+  right:315px;
+}
+.mp_num_11{
+  top:150px;
+  right:315px;
+}
+.mp_num_12{
+  top:250px;
+  right:315px;
+}
+.mp_num_13{
+  top:350px;
+  right:315px;
+}
+.mp_num_8_{
+  top:900px;
+  left:685px;
+}
+.mp_num_9_{
+  top:700px;
+  left:465px;
+}
+.mp_num_10_{
+  top:800px;
+  left:465px;
+}
+.mp_num_11_{
+  top:900px;
+  left:465px;
+}
+.mp_num_14{
+  top:300px;
+  left:25px;
+  width:430px
+}
+.mp_num_15{
+  top:400px;
+  left:245px;
+}
+.mp_num_16{
+  top:500px;
+  left:245px;
+}
+.mp_num_17{
+  top:600px;
+  left:245px;
+}
+.mp_num_18{
+  top:700px;
+  left:245px;
+}
+.mp_num_19{
+  top:800px;
+  left:245px;
+}
+.mp_num_20{
+  top:900px;
+  left:245px;
+}
+.mp_num_21{
+  top:400px;
+  left:25px;
+}
+.mp_num_22{
+  top:500px;
+  left:25px;
+}
+.mp_num_23{
+  top:600px;
+  left:25px;
+}
+.mp_num_24{
+  top:700px;
+  left:25px;
+}
+.mp_num_25{
+  top:800px;
+  left:25px;
+}
+.mp_silo_1 {
+	right: 480px;
+	top: 10px;
+  }
+
+.mp_silo_1 .mp_equ_info, .mp_silo_2 .mp_equ_info {	
+	padding:0 20px;
+	height:180px
+  }
+  .silo_none {
+	width:86px;
+	height:113px;
+	background-image: url(/static/resource/cps/images/silo_background_none.png);
+	position: relative;
+  }
+  .silo_label {
+	display: flex;
+	margin-left:10px;
+	flex-direction: column;
+	align-items: flex-end;
+	font-size:32px;
+  }
+  .silo_label em {
+	font-size: 16px;
+  }
+  .silo-percent {
+	  width: 100%;
+	  position: absolute;
+	  bottom: 0;
+	  background-image: url(/static/resource/cps/images/silo_background_full.png);
+	  background-position: bottom center;
+	  z-index: initial;
+  }
+  .mp_equ_info_box.mp_silo_1, .mp_equ_info_box.mp_silo_2{
+	width:225px;
+	height: 225px;
+    background-color: rgba(0,0,0,.5);
+  }
+
+  /* 터널오븐 소성 */
+.mp_table_r01 {
+  top:10px;
+  right:10px;
+  width:460px;
+  height:135px;
+  z-index: 12;
+}
+.mp_table_r01 .mp_equ_info {
+	height:90px;
+}
+.mp_table_r01 .mp_equ_info table {
+	margin:0;
+	padding:0;
+	border:0;
+	border-spacing:0;
+	width:100%;
+}
+.mp_table_r01 .mp_equ_info .mp_equ_title {
+    font-size: 16px;
+    color: #fff;
+    background-color: #000;
+    border: 0;
+    font-weight: 600;
+	box-shadow:inset 0 1px 0px rgba(255,255,255,.2);
+}
+.mp_table_r01 .mp_equ_info table th, .mp_table_r01 .mp_equ_info table td {
+	color:#fff;
+	height:45px;
+	box-sizing:border-box;
+	text-align:center;
+	table-layout:fixed;
+}
+.mp_table_r01 .mp_equ_info table th {
+		background-color:rgba(0,0,0,.75);
+		font-size:16px;
+		font-weight:500;
+		color: #bbb;
+}
+.mp_table_r01 .mp_equ_info table td {
+	background-color:rgba(0,0,0,.5);
+	font-size:20px;
+	font-weight:500;
+	color:#9dff5f;
+	border-top:1px solid rgba(76,76,76,1);
+}
+.mp_table_r01 .mp_equ_info table td em {
+	font-style:normal;
+	font-weight:400;
+	font-size:16px;
+	color:#bbbbbb;
+}
+.mp_equ_info table tbody tr:nth-child(2n+2) td{	
+	background-color:rgba(0,0,0,.75);
+}
+.mp_table_r01 .mp_equ_info table tbody th {
+	border-top:1px solid rgba(76,76,76,1);
+}
+ /* 터널오븐 소성 */
+.table_r02 {
+  top:155px;
+  right:10px;
+  width:460px;
+  height:225px;
+  z-index: 12;
+}
+.table_r02 .mp_equ_info {
+	height:180px;
+}
+/* PRE MIXER */
+.table_r03 {
+  top:390px;
+  right:245px;
+  width:225px;
+  height:135px;
+  z-index: 12;
+}
+.table_r03 .mp_equ_info {
+	height:90px;
+}
+ /* 피자 PRESS */
+.table_r04 {
+  top:390px;
+  right:10px;
+  width:225px;
+  height:135px;
+  z-index: 12;
+}
+.table_r04 .mp_equ_info {
+	height:90px;
+}
+ /* 피자 성형 */
+.table_r05 {
+  top:535px;
+  right:10px;
+  width:225px;
+  height:135px;
+  z-index: 12;
+}
+.table_r05 .mp_equ_info {
+	height:90px;
+}
+ /* 피자 회수 */
+.table_r06 {
+  top:680px;
+  right:10px;
+  width:225px;
+  height:135px;
+  z-index: 12;
+}
+.table_r06 .mp_equ_info {
+	height:90px;
+}
+ /* 피자 회수 */
+.table_r07 {
+  top:825px;
+  right:10px;
+  width:225px;
+  height:180px;
+  z-index: 12;
+}
+.table_r07 .mp_equ_info {
+	height:135px;
+}
+ /* 피자 회수 */
+.table_r08 {
+	top: 245px;
+	right: 480px;
+	width: 235px;
+	height: 135px;
+	z-index: 12;
+	}
+.table_r08 .mp_equ_info {
+	height:90px;
+}
+ /* 에셔믹스 2 */
+.table_r09 {
+	top:auto;
+	bottom: 10px;
+	left: 1110px;
+	width: 500px;
+	height: 225px;
+	z-index: 12;
+	}
+.table_r09 .mp_equ_info {
+	height:180px;
+}
+.table_r09 .mp_equ_info table tbody tr td:first-child {
+	color:#fff;
+}
+ /* 에셔믹스 1 */
+.table_r10 {
+	top:auto;
+	bottom: 10px;
+	left: 600px;
+	width: 500px;
+	height: 225px;
+	z-index: 12;
+	}
+.table_r10 .mp_equ_info {
+	height:180px;
+}
+.table_r10 .mp_equ_info table tbody tr td:first-child {
+	color:#fff;
+}
+ /* 수축포장기 */
+.table_r11 {
+	top:220px;
+	left: 10px;
+	width: 420px;
+	height: 135px;
+	z-index: 12;
+	}
+.table_r11 .mp_equ_info {
+	height:90px;
+}
+ /* 수축포장기 */
+.table_r12 {
+	top:365px;
+	left: 10px;
+	width: 420px;
+	height: 135px;
+	z-index: 12;
+	}
+.table_r12 .mp_equ_info {
+	height:90px;
+}
+ /* 중량선별기 */
+.table_r13 {
+	top:510px;
+	left: 10px;
+	width: 420px;
+	height: 225px;
+	z-index: 12;
+	}
+.table_r13 .mp_equ_info {
+	height:180px;
+}
+.table_r13 .mp_equ_info table tbody tr td:first-child {
+	color:#fff;
+}
+.table_r13 .mp_equ_info table tbody td:nth-last-child(2), .table_r13 .mp_equ_info table thead th:nth-last-child(2) {
+	color:#fbff00
+}
+ .table_r13 .mp_equ_info table tbody td:nth-last-child(1), .table_r13 .mp_equ_info table thead th:nth-last-child(1) {
+	color:#ff8f2f
+}
+  /* 이물 검출 */
+.table_r14 {
+	top:745px;
+	left: 10px;
+	width: 420px;
+	height: 180px;
+	z-index: 12;
+	}
+.table_r14 .mp_equ_info {
+	height:135px;
+}
+.table_r14 .mp_equ_info table tbody tr td:first-child {
+	color:#fff;
+}
+.table_r14 .mp_equ_info table tbody td:nth-last-child(1), .table_r14 .mp_equ_info table thead th:nth-last-child(1) {
+	color:#fbff00
+}
+.table_r14 .mp_equ_info table tbody td:nth-last-child(3), .table_r14 .mp_equ_info table thead th:nth-last-child(3) {
+	color:#fff
+}
+  /* 날인검사기1 */
+.table_r15 {
+	top:935px;
+	left: 10px;
+	width: 170px;
+	height: 135px;
+	z-index: 12;
+	}
+.table_r15 .mp_equ_info {
+	height:90px;
+}
+.table_r15 .mp_equ_info table tbody td:nth-last-child(1), .table_r15 .mp_equ_info table thead th:nth-last-child(1) {
+	color:#fbff00
+}
+.table_r15 .mp_equ_info table tbody td:nth-last-child(2), .table_r15 .mp_equ_info table thead th:nth-last-child(2) {
+	color:#ff8f2f
+}
+  /* 날인검사기2 */
+.table_r16 {
+	top:935px;
+	left: 190px;
+	width: 170px;
+	height: 135px;
+	z-index: 12;
+	}
+.table_r16 .mp_equ_info {
+	height:90px;
+}
+.table_r16 .mp_equ_info table tbody td:nth-last-child(1), .table_r16 .mp_equ_info table thead th:nth-last-child(1) {
+	color: #fbff00
+}
+
+.table_r16 .mp_equ_info table tbody td:nth-last-child(2), .table_r16 .mp_equ_info table thead th:nth-last-child(2) {
+	color: #ff8f2f
+}
+
+/* 팔레트 로봇 */
+.table_r17 {
+	top: 935px;
+	left: 370px;
+	width: 170px;
+	height: 135px;
+	z-index: 12;
+}
+
+.table_r17 .mp_equ_info {
+	height: 90px;
+}
+
+/* 완료 생산 수량 */
+.mp_slider_box {
+    top: 10px;
+    left: 575px;
+    width: 600px;
+    height: 135px;
+    z-index: 12;
+}
+.mp_slider {
+	width: 100%;
+    height: 90px;
+}
+.mp_slider .slider {
+  width:600px !important;
+  height:90px !important;
+  border-radius: 0 !important;
+  background-color:transparent !important;
+  box-shadow: none !important;
+}
+.mp_slider .slider:before {
+  content: '';
+  display:none !important
+}
+.mp_slider .mp_active {
+  height:100%;
+  overflow: hidden;
+}
+.mp_slider .mp_equ_header {
+font-size: 20px;
+    font-weight: 500;
+    width: 600px;
+    height: 45px;
+    border-bottom: 1px solid rgba(255,255,255,.25);
+    box-sizing: border-box;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    background-color: #000;
+}
+.mp_slider .mp_equ_info {
+display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 45px;
+    color: #707070;
+    font-weight: 400;
+    font-size: 30px;
+}
+.mp_active.blink-2 > .mp_equ_header{
+	background-color:#ff3636 !important
+}
+.status_list {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+	padding:0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,.75);
+}
+.status_list li{
+display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: center;
+    list-style: none;
+    padding-right: 15px;
+    height: 100%;
+}
+.status_list li em {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-right: 10px;
+    white-space: nowrap;
+}
+.status_list li span {
+color: #9dff5f;
+    font-size: 26px;
+    font-weight: 500;
+}
+.status_list li:nth-child(1), .status_list li:nth-child(2) {
+  width: 35%;
+}
+.status_list li:nth-child(2) span {
+  color:#1ab9ff
+}
+.status_list li:nth-child(3) {
+  width: 30%;
+}
+.status_list li:nth-child(3) span{
+  color:#ffe35c
+}
+.status_list li:last-child {
+  border-right:0;
+}
+.mp_trend {
+  bottom:0;
+  right:370px;
+  width:420px;
+  height:190px;
+  z-index:12
+}
+.mp_trend .mp_equ_header {
+  font-size:22px;
+  height:auto;
+  padding:10px 15px;
+  font-weight: normal;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  box-sizing: border-box;
+}
+.mp_trend .mp_equ_info {
+  height:140px;
+}
+
+
+/*설비정보 미니박스 숫자 마크업*/
+.mp_equ_markup_area {
+  top:0;
+  left:0;
+  right:0;
+  bottom: 0;
+  width: 100%;
+  height:100%;
+  position: absolute;
+  background-color: transparent;
+  overflow: hidden;
+  /* z-index: 3; */
+}
+.markup {
+  display: inline-flex;
+  justify-content: center;
+  width: auto;
+  position: absolute;
+  cursor: pointer;
+  z-index: 3;
+  cursor: pointer;
+}
+.markup:hover {
+	
+}
+.markup span{
+	display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 0;
+    min-width: 90px;
+    font-family: 'Malgun Gothic';
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 12px;
+    border: 0;
+    border-style: solid;
+    border-color: #fff;
+    color: #fff;
+    position: absolute;
+    z-index: 10;
+    box-sizing: border-box;
+}
+.markup.num_c1, .markup.num_c2, .markup.num_c3, .markup.num_c4 {
+  margin-top:0;
+}
+.markup::before {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 100%;
+    border-radius: 3px;
+    background-color: rgba(47,53,100,.5);
+    position: absolute;
+    left: 0;
+    top: 21px;
+}
+/*설비정보 미니박스 숫자 마크업 좌표 */
+.markup.num_1 {
+  top:667px;
+  left:1269px;
+}
+.markup.num_2 {
+  top:657px;
+  left:1249px
+}
+
+.markup.num_3 {
+    top: 630px;
+    left: 1283px;
+}
+
+.markup.num_4 {
+  top:594px;
+  left:1400px
+}
+
+.markup.num_5 {
+  top:570px;
+  left:1370px
+}
+
+.markup.num_6 {
+  top:540px;
+  left:1300px
+}
+
+.markup.num_7 {
+    top: 410px;
+    left: 1200px;
+}
+
+.markup.num_10 {
+	top: 300px;
+    left: 870px;
+}
+
+.markup.num_11 {
+	top: 265px;
+    left: 970px;
+}
+
+.markup.num_12 {
+  top:215px;
+  left:890px
+}
+
+.markup.num_13 {
+  top:250px;
+  left:910px
+}
+
+.markup.num_14 {
+  top:490px;
+  left:900px
+}
+
+.markup.num_15 {
+  top:560px;
+  left:810px
+}
+
+.markup.num_16 {
+    top: 700px;
+    left: 1010px;
+}
+
+.markup.num_17 {
+    top: 730px;
+    left: 780px;
+}
+
+.markup.num_18 {
+    top: 620px;
+    left: 910px;
+}
+
+.markup.num_19 {
+top: 620px;
+    left: 835px;
+}
+.markup.num_19 span {
+	min-width:50px;
+}
+.markup.num_20 {
+  top:527px;
+  left:680px
+}
+.markup.num_21 {
+  top:570px;
+  left:717px
+}
+
+.markup.num_22 {
+  top:550px;
+  left:640px
+}
+.markup.num_23 {
+    top: 603px;
+    left: 580px;
+}
+.markup.num_24 {
+  top:570px;
+  left:610px
+}
+.markup.num_25 {
+    top: 455px;
+    left: 618px;
+}
+
+
+/*룸온도 박스*/
+.temperature {
+  background-color:rgba(0,0,0,.65);
+  display: inline-flex;
+  font-family: 'roboto';
+  font-size:13px;
+  font-weight: 400;
+  padding:3px 10px;
+  border-radius:12px;
+  z-index: 3;
+  cursor: pointer;
+}
+.temperature em {
+  color:rgba(255,255,255,.60);
+  font-size: 11px;
+  font-weight: 400;
+  font-style: normal;
+  font-family: malgun gothic;
+  margin-right: -2px;
+  margin-left: 5px;
+}
+.temperature button {
+  position:absolute;
+  height:21px;
+  width:70px;
+  text-indent: -10000px;
+  overflow: hidden;
+  border:0;
+  top:0;
+  left:0;
+  background-color: transparent;
+  cursor: pointer;
+}
+.temperature button::before {
+  content: '---';
+  display: flex;
+  width:50px;
+  height:21px;
+  position: absolute;
+  top:0;
+  right:0;
+}
+
+/* 설비 ON/OFF 정보 박스*/
+.equ_work {
+  display: inline-flex;
+  justify-content: center;
+  position: absolute;
+  cursor: pointer;
+  z-index: 3;
+  cursor: pointer;
+}
+.equ_work.on span{
+  background-color:#1584ce;
+}
+.equ_work.off span{
+  background-color:#ff3636;
+}
+.equ_work span{
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding:3px 6px;
+  font-family: 'roboto';
+  font-weight: 400;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 2px;
+  border-style: solid;
+  border-color: #fff;
+  color: #fff;
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+}
+.equ_work::before {
+  content: '';
+  display: block;
+  width:2px;
+  height:100%;
+  border-radius:3px;
+  background-color: #fff;
+  position:absolute;
+}
+/* 설비 ON/OFF 정보 박스 좌표*/
+.equ_work.num_1 {
+  top:588px;
+  left:1400px;
+}
+.equ_work.num_2 {
+  top:608px;
+  left:1425px;
+  height: 60px !important;
+}
+.equ_work.num_3 {
+  top:628px;
+  left:1440px;
+  height: 50px !important;
+}
+.equ_work.num_4 {
+  top:650px;
+  left:1290px;
+}
+.equ_work.num_5 {
+  top:690px;
+  left:1310px;
+  height: 50px !important;
+}
+
+/* 동적효과 제어*/
+.slide-in-bottom {
+	-webkit-animation: slide-in-bottom .6s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+	        animation: slide-in-bottom .6s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
+.slide-in-left {
+	-webkit-animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+	        animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+}
+.slide-in-left.mp_num_15  {
+	-webkit-animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+	        animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+}
+.slide-in-left.mp_num_8{
+	-webkit-animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.4s both;
+	        animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.4s both;
+}
+.slide-in-left.mp_num_14, .slide-in-left.mp_num_15, .slide-in-left.mp_num_16, .slide-in-left.mp_num_17, .slide-in-left.mp_num_18, .slide-in-left.mp_num_19, .slide-in-left.mp_num_20{
+	-webkit-animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .6s both;
+	        animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .6s both;
+}
+.slide-in-left.mp_num_21, .slide-in-left.mp_num_22, .slide-in-left.mp_num_23, .slide-in-left.mp_num_24, .slide-in-left.mp_num_25 {
+	-webkit-animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+	        animation: slide-in-left 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+}
+
+.slide-in-right {
+	-webkit-animation: slide-in-right 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+	        animation: slide-in-right 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .8s both;
+}
+.slide-in-right.mp_num_10,.slide-in-right.mp_num_11,.slide-in-right.mp_num_12,.slide-in-right.mp_num_13 {
+	-webkit-animation: slide-in-right 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .6s both;
+	        animation: slide-in-right 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) .6s both;
+}
+.blink-2 {               
+	-webkit-animation: blink-2 1s infinite alternate both;
+	        animation: blink-2 1s infinite alternate both;
+}
+.fade-in-top {
+	-webkit-animation: fade-in-top 0.3s cubic-bezier(0.390, 0.575, 0.565, 1.000) 1.2s both;
+	        animation: fade-in-top 0.3s cubic-bezier(0.390, 0.575, 0.565, 1.000) 1.2s both;
+}
+.wobble-hor-bottom {
+	-webkit-animation: wobble-hor-bottom 0.8s infinite both;
+	        animation: wobble-hor-bottom 0.8s infinite both;
+}
+.fade-in-right {
+	-webkit-animation: fade-in-right 0.6s cubic-bezier(0.390, 0.575, 0.565, 1.000)1.4s both;
+	        animation: fade-in-right 0.6s cubic-bezier(0.390, 0.575, 0.565, 1.000)1.4s both;
+}
+.slide-in-fwd-center {
+	-webkit-animation: slide-in-fwd-center 0.3s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+	        animation: slide-in-fwd-center 0.3s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
+
+
+/* 온도설정 팝업 디자인 */
+.mp_popup_temperature {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background-color: rgb(36 148 255 / 90%);
+	box-shadow: 0 2px 18px rgb(0 0 0 / 75%);
+	width: 500px;
+	height: 500px;
+	transform: translate(-50%, -40%);
+	border-radius: 25px;
+}
+
+	.mp_popup_temperature .mp_popup_close, .mp_popup_danger .mp_popup_close {
+		display: inline-flex;
+		margin: 0;
+		padding: 0;
+		position: fixed;
+		right: -60px;
+		top: 0;
+		background-color: transparent;
+		border: 0;
+		cursor: pointer;
+	}
+
+		.mp_popup_temperature .mp_popup_close img, .mp_popup_danger .mp_popup_close img {
+			width: 50px;
+		}
+
+.mp_temperature {
+	position: absolute;
+	width: 500px;
+	height: 500px;
+}
+
+	.mp_temperature .mp_popup_header, .alarm_popup .mp_popup_header{
+		padding: 20px;
+		font-size: 28px;
+		box-sizing: border-box;
+		background-color: transparent;
+	}
+
+.mp_popup_body {
+	width: 100%;
+	padding: 35px 50px;
+	box-sizing: border-box;
+}
+
+.mp_temperature_bottom, .mp_alarm_bottom {
+	display: flex;
+	margin-top: 20px;
+	justify-content: center;
+}
+
+	.mp_temperature_bottom button, .mp_alarm_bottom button {
+		padding: 12px 18px;
+		border: 0;
+		background-color: #1ab9ff;
+		color: #fff;
+		font-size: 22px;
+		border-radius: 28px;
+		transition: all .1s ease-out;
+		cursor: pointer;
+	}
+
+		.mp_temperature_bottom button:hover {
+			background-color: #3e3e42;
+		}
+
+.mp_temperature_now, .mp_temperature_d {
+	display: flex;
+	margin: 0 0 50px 0;
+	padding: 0;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	align-content: center;
+}
+
+	.mp_temperature_now li, .mp_temperature_d li {
+		list-style: none;
+		font-size: 19px;
+		color: #fff;
+	}
+
+		.mp_temperature_now li span, .mp_temperature_d li span {
+			font-size: 60px;
+			font-family: 'roboto';
+		}
+
+		.mp_temperature_now li em, .mp_temperature_d li em {
+			font-size: 24px;
+			font-family: 'roboto';
+			font-style: normal;
+		}
+
+.mp_temperature_d {
+	margin-left: 20px;
+	margin-bottom: 19px;
+}
+
+	.mp_temperature_d li {
+		list-style: none;
+		font-size: 14px;
+		color: rgb(36, 34, 39);
+	}
+
+		.mp_temperature_d li span {
+			font-size: 32px;
+			font-family: 'roboto';
+		}
+
+.mp_temperature_text {
+	font-size: 13px;
+	color: rgba(255,255,255,.9);
+	margin-top: 20px;
+	padding: 20px
+}
+/* 설비이상 알람 팝업 */
+.alarm_popup .mp_popup_danger {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background-color: rgba(246, 34, 60, 0.9);
+	box-shadow: 0 2px 18px rgb(0 0 0 / 45%);
+	width: 600px;
+	height: 400px;
+	transform: translate(-50%, -40%);
+	border-radius: 25px;
+	color:#fff;
+}
+.mp_alarm_bottom button {
+	background-color:#fff;
+	color:#333
+}
+
+/*//////////*/
+.range-slider.flat {
+	--thumb-size: 25px;
+	--track-height: calc(var(--thumb-size) / 3);
+	--progress-shadow: none;
+	--progress-flll-shadow: none;
+	--thumb-shadow: 0 0 0 7px var(--primary-color) inset, 0 0 0 99px white inset;
+	--thumb-shadow-hover: 0 0 0 9px var(--primary-color) inset, 0 0 0 99px white inset;
+	--thumb-shadow-active: 0 0 0 13px var(--primary-color) inset;
+}
+
+.range-slider.overlay {
+	--primary-color: #ffffff;
+	--track-height: 50px;
+	--thumb-size: var(--track-height);
+	--thumb-color: var(--primary-color);
+	--thumb-shadow: none;
+	--progress-flll-shadow: none;
+	--progress-shadow: none;
+	--progress-background: none;
+	--progress-radius: 0px;
+	--ticks-color: var(--primary-color);
+	--ticks-height: 0;
+	--ticks-thickness: 0;
+	--ticks-gap: 0px;
+	--min-max-font: 700 18px roboto;
+	--min-max-opacity: 1;
+	--show-min-max: none;
+	color: #005ac2;
+}
+
+	.range-slider.overlay input:hover {
+		--thumb-shadow: calc(25px - (50px * var(--is-left-most))) 0 0 -15px #005ac2 inset;
+	}
+
+	.range-slider.overlay input:active {
+		--thumb-color: inherit;
+	}
+
+	.range-slider.overlay .range-slider__values {
+		width: calc(100% - 50% / (var(--max) - var(--min)));
+	}
+
+.range-slider {
+	--primary-color: #005ac2;
+	--value-offset-y: var(--ticks-gap);
+	--value-active-color: white;
+	--value-background: transparent;
+	--value-background-hover: var(--primary-color);
+	--value-font: 500 18px/1 roboto;
+	--fill-color: var(--primary-color);
+	--progress-background: #eee;
+	--progress-radius: 20px;
+	--track-height: calc(var(--thumb-size) / 2);
+	--min-max-font: 12px Arial;
+	--min-max-opacity: 0.5;
+	--min-max-x-offset: 10%;
+	--thumb-size: 24px;
+	--thumb-color: white;
+	--thumb-shadow: 0 0 3px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5) inset, 0 0 0 99px var(--thumb-color) inset;
+	--thumb-shadow-active: 0 0 0 calc(var(--thumb-size) / 4) inset var(--thumb-color), 0 0 0 99px var(--primary-color) inset, 0 0 3px rgba(0, 0, 0, 0.4);
+	--thumb-shadow-hover: var(--thumb-shadow);
+	--ticks-thickness: 1px;
+	--ticks-height: 5px;
+	--ticks-gap: var( --ticks-height, 0 );
+	--ticks-color: rgba(255, 255, 255, 80%);
+	--step: 1;
+	--ticks-count: Calc(var(--max) - var(--min)) / var(--step);
+	--maxTicksAllowed: 30;
+	--too-many-ticks: Min(1, Max(var(--ticks-count) - var(--maxTicksAllowed), 0));
+	--x-step: Max( var(--step), var(--too-many-ticks) * (var(--max) - var(--min)) );
+	--tickInterval: 100/ ((var(--max) - var(--min)) / var(--step)) * var(--tickEvery, 1);
+	--tickIntervalPerc: calc( (100% - var(--thumb-size)) / ((var(--max) - var(--min)) / var(--x-step)) * var(--tickEvery, 1) );
+	--value-a: Clamp( var(--min), var(--value, 0), var(--max) );
+	--value-b: var(--value, 0);
+	--text-value-a: var(--text-value, "");
+	--completed-a: calc( (var(--value-a) - var(--min)) / (var(--max) - var(--min)) * 100 );
+	--completed-b: calc( (var(--value-b) - var(--min)) / (var(--max) - var(--min)) * 100 );
+	--ca: Min(var(--completed-a), var(--completed-b));
+	--cb: Max(var(--completed-a), var(--completed-b));
+	--thumbs-too-close: Clamp( -1, 1000 * (Min(1, Max(var(--cb) - var(--ca) - 5, -1)) + 0.001), 1 );
+	--thumb-close-to-min: Min(1, Max(var(--ca) - 2, 0));
+	--thumb-close-to-max: Min(1, Max(98 - var(--cb), 0));
+	display: inline-block;
+	height: max(var(--track-height), var(--thumb-size));
+	background: linear-gradient(to right, var(--ticks-color) var(--ticks-thickness), transparent 1px) repeat-x;
+	background-size: var(--tickIntervalPerc) var(--ticks-height);
+	background-position-x: calc( var(--thumb-size) / 2 - var(--ticks-thickness) / 2 );
+	background-position-y: var(--flip-y, bottom);
+	padding-bottom: var(--flip-y, var(--ticks-gap));
+	padding-top: calc(var(--flip-y) * var(--ticks-gap));
+	position: relative;
+	z-index: 1;
+}
+
+	.range-slider[data-ticks-position=top] {
+		--flip-y: 1;
+	}
+
+	.range-slider::before, .range-slider::after {
+		--offset: calc(var(--thumb-size) / 2);
+		content: counter(x);
+		display: var(--show-min-max, block);
+		font: var(--min-max-font);
+		position: absolute;
+		bottom: var(--flip-y, -2.5ch);
+		top: calc(-2.5ch * var(--flip-y));
+		opacity: clamp(0, var(--at-edge), var(--min-max-opacity));
+		transform: translateX(calc(var(--min-max-x-offset) * var(--before, -1) * -1)) scale(var(--at-edge));
+		pointer-events: none;
+	}
+
+	.range-slider::before {
+		--before: 1;
+		--at-edge: var(--thumb-close-to-min);
+		counter-reset: x var(--min);
+		left: var(--offset);
+	}
+
+	.range-slider::after {
+		--at-edge: var(--thumb-close-to-max);
+		counter-reset: x var(--max);
+		right: var(--offset);
+	}
+
+.range-slider__values {
+	position: relative;
+	top: 50%;
+	line-height: 0;
+	text-align: justify;
+	width: 100%;
+	pointer-events: none;
+	margin: 0 auto;
+	z-index: 5;
+}
+
+	.range-slider__values::after {
+		content: "";
+		width: 100%;
+		display: inline-block;
+		height: 0;
+		background: red;
+	}
+
+.range-slider__progress {
+	--start-end: calc(var(--thumb-size) / 2);
+	--clip-end: calc(100% - (var(--cb)) * 1%);
+	--clip-start: calc(var(--ca) * 1%);
+	--clip: inset(-20px var(--clip-end) -20px var(--clip-start));
+	position: absolute;
+	left: var(--start-end);
+	right: var(--start-end);
+	top: calc( var(--ticks-gap) * var(--flip-y, 0) + var(--thumb-size) / 2 - var(--track-height) / 2 );
+	height: calc(var(--track-height));
+	background: var(--progress-background, #eee);
+	pointer-events: none;
+	z-index: -1;
+	border-radius: var(--progress-radius);
+}
+
+	.range-slider__progress::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		clip-path: var(--clip);
+		top: 0;
+		bottom: 0;
+		background: var(--fill-color, black);
+		box-shadow: var(--progress-flll-shadow);
+		z-index: 1;
+		border-radius: inherit;
+	}
+
+	.range-slider__progress::after {
+		content: "";
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		box-shadow: var(--progress-shadow);
+		pointer-events: none;
+		border-radius: inherit;
+	}
+
+.range-slider > input {
+	-webkit-appearance: none;
+	width: 100%;
+	height: var(--thumb-size);
+	margin: 0;
+	position: absolute;
+	left: 0;
+	top: calc( 50% - Max(var(--track-height), var(--thumb-size)) / 2 + calc(var(--ticks-gap) / 2 * var(--flip-y, -1)) );
+	cursor: -webkit-grab;
+	cursor: grab;
+	outline: none;
+	background: none;
+}
+
+	.range-slider > input:not(:only-of-type) {
+		pointer-events: none;
+	}
+
+	.range-slider > input::-webkit-slider-thumb {
+		appearance: none;
+		height: var(--thumb-size);
+		width: var(--thumb-size);
+		transform: var(--thumb-transform);
+		border-radius: var(--thumb-radius, 50%);
+		background: var(--thumb-color);
+		box-shadow: var(--thumb-shadow);
+		border: none;
+		pointer-events: auto;
+		transition: 0.1s;
+	}
+
+	.range-slider > input::-moz-range-thumb {
+		appearance: none;
+		height: var(--thumb-size);
+		width: var(--thumb-size);
+		transform: var(--thumb-transform);
+		border-radius: var(--thumb-radius, 50%);
+		background: var(--thumb-color);
+		box-shadow: var(--thumb-shadow);
+		border: none;
+		pointer-events: auto;
+		transition: 0.1s;
+	}
+
+	.range-slider > input::-ms-thumb {
+		appearance: none;
+		height: var(--thumb-size);
+		width: var(--thumb-size);
+		transform: var(--thumb-transform);
+		border-radius: var(--thumb-radius, 50%);
+		background: var(--thumb-color);
+		box-shadow: var(--thumb-shadow);
+		border: none;
+		pointer-events: auto;
+		transition: 0.1s;
+	}
+
+	.range-slider > input:hover {
+		--thumb-shadow: var(--thumb-shadow-hover);
+	}
+
+		.range-slider > input:hover + output {
+			--value-background: var(--value-background-hover);
+			--y-offset: -5px;
+			color: var(--value-active-color);
+			box-shadow: 0 0 0 3px var(--value-background);
+		}
+
+	.range-slider > input:active {
+		--thumb-shadow: var(--thumb-shadow-active);
+		cursor: grabbing;
+		z-index: 2;
+	}
+
+		.range-slider > input:active + output {
+			transition: 0s;
+		}
+
+	.range-slider > input:nth-of-type(1) {
+		--is-left-most: Clamp(0, (var(--value-a) - var(--value-b)) * 99999, 1);
+	}
+
+		.range-slider > input:nth-of-type(1) + output {
+			--value: var(--value-a);
+			--x-offset: calc(var(--completed-a) * -1%);
+		}
+
+			.range-slider > input:nth-of-type(1) + output:not(:only-of-type) {
+				--flip: calc(var(--thumbs-too-close) * -1);
+			}
+
+			.range-slider > input:nth-of-type(1) + output::after {
+				content: var(--prefix, "") var(--text-value-a) var(--suffix, "");
+			}
+
+	.range-slider > input:nth-of-type(2) {
+		--is-left-most: Clamp(0, (var(--value-b) - var(--value-a)) * 99999, 1);
+	}
+
+		.range-slider > input:nth-of-type(2) + output {
+			--value: var(--value-b);
+		}
+
+	.range-slider > input:only-of-type ~ .range-slider__progress {
+		--clip-start: 0;
+	}
+
+	.range-slider > input + output {
+		--flip: -1;
+		--x-offset: calc(var(--completed-b) * -1%);
+		--pos: calc( ((var(--value) - var(--min)) / (var(--max) - var(--min))) * 100% );
+		pointer-events: none;
+		position: absolute;
+		z-index: 5;
+		background: var(--value-background);
+		border-radius: 10px;
+		padding: 2px 4px;
+		left: var(--pos);
+		transform: translate(var(--x-offset), calc( 150% * var(--flip) - (var(--y-offset, 0px) + var(--value-offset-y)) * var(--flip) ));
+		transition: all 0.12s ease-out, left 0s;
+	}
+
+.range-slider > input + output::after {
+	content: var(--prefix, "") var(--text-value-b) var(--suffix, "");
+	font: var(--value-font);
+}
+
+.mp_num_19 .mp_equ_info em {
+	font-size: 12px;
+	width: 12px;
+	line-height: 1.2;
+	}
+.mp_num_19 .mp_equ_info  .mp_text_red {
+	position: relative;
+	margin-right: 15px;
+}
+.mp_num_19 .mp_equ_info  .mp_text_red::before {
+    content: '/';
+    position: absolute;
+    right: -15px;
+	color:#323232;
+}
+
+/* 움직이는 텍스트 */
+.marquee {
+	width: 200px;
+	overflow: hidden;
+	position: relative;
+	display: inline-flex;
+}
+
+	.marquee p:hover {
+		-moz-animation-play-state: paused;
+		-webkit-animation-play-state: paused;
+		animation-play-state: paused;
+	}
+
+	.marquee p {
+		margin: 0;
+		padding: 0;
+	}
+
+		.marquee p:after {
+			content: "";
+			white-space: nowrap;
+		}
+
+	.marquee p {
+		margin: 0;
+		padding-left: 100%;
+		display: inline-block;
+		white-space: nowrap;
+		-webkit-animation-name: marquee;
+		-webkit-animation-timing-function: linear;
+		-webkit-animation-duration: 10s;
+		-webkit-animation-iteration-count: infinite;
+		-moz-animation-name: marquee;
+		-moz-animation-timing-function: linear;
+		-moz-animation-duration: 10s;
+		-moz-animation-iteration-count: infinite;
+		-ms-animation-name: marquee;
+		-ms-animation-timing-function: linear;
+		-ms-animation-duration: 10s;
+		-ms-animation-iteration-count: infinite;
+		-o-animation-name: marquee;
+		-o-animation-timing-function: linear;
+		-o-animation-duration: 10s;
+		-o-animation-iteration-count: infinite;
+		animation-name: marquee;
+		animation-timing-function: linear;
+		animation-duration: 10s;
+		animation-iteration-count: infinite;
+	}
+
+@-webkit-keyframes marquee {
+	from {
+		-webkit-transform: translate(0%);
+	}
+
+	99%,to {
+		-webkit-transform: translate(-100%);
+	}
+}
+
+@-moz-keyframes marquee {
+	from {
+		-moz-transform: translate(0%);
+	}
+
+	99%,to {
+		-moz-transform: translate(-100%);
+	}
+}
+
+@-ms-keyframes marquee {
+	from {
+		-ms-transform: translate(0%);
+	}
+
+	99%,to {
+		-ms-transform: translate(-100%);
+	}
+}
+
+@-o-keyframes marquee {
+	from {
+		-o-transform: translate(0%);
+	}
+
+	99%,to {
+		-o-transform: translate(-100%);
+	}
+}
+
+@keyframes marquee {
+	from {
+		transform: translate(0%);
+	}
+
+	99%,to {
+		transform: translate(-100%);
+	}
+}

@@ -1,0 +1,41 @@
+# 지능형 작업표준 안내 AI(RAG) — WAS 운영 compose. 설치: docs/design/운영배포_가이드_서버별_v1.1.md §4
+# /opt/yest/chatbot/docker-compose.prod.yml 로 둔다(sychoi:chatbot 640).
+# 변수(이미지 태그·UID/GID)는 compose.env, 앱 설정은 .env 에서 읽는다. 명령은 늘 --env-file compose.env 를 붙인다(chatbot.service·deploy.sh).
+name: chatbot
+
+services:
+  backend:
+    image: ${RUNTIME_IMAGE:?compose.env 에 RUNTIME_IMAGE 가 없습니다}
+    pull_policy: never            # 폐쇄망: 인터넷에서 받으려 하지 않고, 없으면 바로 실패
+    container_name: chatbot_backend
+    user: "${CHATBOT_UID:?compose.env 에 CHATBOT_UID 가 없습니다}:${CHATBOT_GID:?compose.env 에 CHATBOT_GID 가 없습니다}"
+    working_dir: /app
+    env_file:
+      - /opt/yest/chatbot/.env
+    environment:
+      TZ: Asia/Seoul
+      HOME: /cache                # 서비스 계정은 컨테이너 안에 홈이 없다
+      HF_HOME: /cache/hf
+      HF_HUB_OFFLINE: "1"         # 폐쇄망: 모델을 내려받으려 하면 기다리지 않고 바로 실패(N-3)
+      PYTHONDONTWRITEBYTECODE: "1"   # 소스가 읽기 전용이라 __pycache__ 를 쓰지 않는다
+    ports:
+      - "127.0.0.1:8081:8081"     # nginx 만 붙는다. 8081 은 방화벽·ACG 에서 열지 않는다
+    volumes:
+      - /opt/yest/chatbot/backend:/app:ro                                  # 소스(deploy.sh 가 교체)
+      - /mnt/a/chatbot/data:/data                                          # 원본·추출 이미지·청크·파싱 결과
+      - /mnt/a/chatbot/logs:/logs                                          # LOG_PATH
+      - /mnt/a/chatbot/cache:/cache                                        # HF 캐시
+      - /mnt/a/chatbot/data/manual_display:/app/instance/manual_display   # 코드에 고정된 경로(manual_display_service.py)
+    restart: unless-stopped
+    mem_limit: 8g                 # WAS 16GB 를 MAIP 와 나눠 쓴다 — 사용량 보고 조정(R-10)
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

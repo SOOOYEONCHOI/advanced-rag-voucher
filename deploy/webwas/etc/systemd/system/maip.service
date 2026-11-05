@@ -1,0 +1,27 @@
+# 제조AI플랫폼 웹(gunicorn). 설치: docs/DEPLOYMENT.md §5
+# 경로(소스 /opt/yest/maip · venv /opt/envs/maip)·계정(maip)이 다르면 고친 뒤 /etc/systemd/system/ 에 복사한다.
+# 워커(maip-worker.service)를 함께 띄우고, 멈추기·다시 시작도 함께 한다 — 운영자는 `systemctl ... maip` 하나만 쓴다.
+[Unit]
+Description=ManufacturingAIPlatform Web
+After=network.target
+Wants=maip-worker.service
+
+[Service]
+User=maip
+Group=maip
+WorkingDirectory=/opt/yest/maip
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONUTF8=1
+# 새 파일·폴더를 데이터·로그 폴더 권한(750)에 맞춘다
+UMask=0027
+# --timeout 120 은 이미지 업로드 때문이다(DEPLOYMENT §6). 127.0.0.1 에만 붙인다(nginx 뒤).
+ExecStart=/opt/envs/maip/bin/gunicorn configurations.wsgi:application \
+  --bind 127.0.0.1:8080 --workers 4 --timeout 120 --access-logfile - --error-logfile -
+# DB 가 내려가 있을 때 재시작을 빠르게 반복하다 한도에 걸려 멈추지 않게 간격을 둔다.
+Restart=always
+RestartSec=3
+# SIGTERM 은 gunicorn 마스터에만 보내 워커를 차례로 정리하게 하고, 남은 것만 마지막에 강제 종료한다.
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
