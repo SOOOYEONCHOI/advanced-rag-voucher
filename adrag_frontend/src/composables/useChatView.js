@@ -467,6 +467,18 @@ export const useChatView = ({ router, route }) => {
     }
   };
 
+  // 2026.11.05(woojin.jung) 추가 - 현재 평가에 사유·의견 저장
+  const submitMessageFeedbackDetail = async (message, { reasons, comment }) => {
+    if (!message?.logId || !message.feedback || message.feedbackPending) return;
+
+    message.feedbackPending = true;
+    try {
+      await chatApi.submitFeedback(message.logId, message.feedback, { reasons, comment });
+    } finally {
+      message.feedbackPending = false;
+    }
+  };
+
   const newChat = async () => {
     if (!selectedCollection.value) return;
     try {
@@ -588,6 +600,7 @@ export const useChatView = ({ router, route }) => {
     sendMessageStream,
     sendStreamingMessage,
     submitMessageFeedback,
+    submitMessageFeedbackDetail,
     newChat,
     logoutUser,
     openSourcesPanel,

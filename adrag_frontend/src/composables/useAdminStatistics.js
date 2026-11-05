@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { statisticsApi } from '../api/statisticsApi';
 import { useAuthStore } from '../stores/authStore';
+import { feedbackReasonLabel } from '../constants/feedbackReasons';
 
 export const useAdminStatistics = () => {
   const router = useRouter();
@@ -114,6 +115,9 @@ export const useAdminStatistics = () => {
       department: item.department,
       query: item.query_text,
       type: item.issue_label || issueTypeLabel(item.issue_types?.[0] || item.outcome_code),
+      // 2026.11.05(woojin.jung) 추가 - 부정 피드백 사유·의견
+      feedbackReasons: (item.feedback_reasons || []).map((reason) => feedbackReasonLabel(item.feedback, reason)),
+      feedbackComment: item.feedback_comment || '',
       time: formatDateTime(item.created_at),
       created_at: item.created_at,
     })),

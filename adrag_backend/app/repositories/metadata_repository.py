@@ -167,13 +167,19 @@ class MetadataRepository:
         )
 
     def set_query_feedback(
-        self, log_id: int, user_id: str, feedback: Optional[int]
+        self,
+        log_id: int,
+        user_id: str,
+        feedback: Optional[int],
+        reasons: Optional[List[str]] = None,
+        comment: Optional[str] = None,
     ) -> bool:
         """피드백 저장 (1=좋아요, 0=별로에요, None=취소).
         user_id 조건으로 본인 로그만 수정 가능하다.
         """
         # 2026.06.16(sooyeon.choi) 추가 - SCR-006 피드백 API facade
-        return self._log.set_feedback(log_id, user_id, feedback)
+        # 2026.11.05(woojin.jung) 수정 - 피드백 사유·의견 전달
+        return self._log.set_feedback(log_id, user_id, feedback, reasons, comment)
 
     def store_query_citations(
         self, log_id: int, citations: List[Dict[str, Any]]

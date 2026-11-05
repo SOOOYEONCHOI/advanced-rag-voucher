@@ -52,11 +52,13 @@ def _extract_principal(request: Request) -> dict:
     if auth_header.startswith("Bearer "):
         payload = decode_optional_token(auth_header[7:])
         if payload and payload.get("sub"):
+            token_type = payload.get("type", "unknown")
             return {
                 "user_id": payload["sub"],
-                "token_type": payload.get("type", "unknown"),
+                "token_type": token_type,
+                "is_admin": token_type == "admin_access",
             }
-    return {"user_id": "anonymous", "token_type": "anonymous"}
+    return {"user_id": "anonymous", "token_type": "anonymous", "is_admin": False}
 
 
 def _get_accessible_collections(user_id: str) -> List[str]:
@@ -86,7 +88,13 @@ def _get_accessible_collections(user_id: str) -> List[str]:
 async def get_query_collections(request: Request):
     """채팅 사용자가 조회 가능한 컬렉션 목록을 반환한다."""
     principal = _extract_principal(request)
-    qdrant_names = _get_accessible_collections(principal["user_id"])
+    if principal.get("is_admin"):
+        qdrant_names = sorted(
+            collection.qdrant_name
+            for collection in CollectionRepository(get_settings().sqlite_db_path).get_all()
+        )
+    else:
+        qdrant_names = _get_accessible_collections(principal["user_id"])
 
     # qdrant_name → display_name 매핑 (2026.06.16 수정: collection_name → display_name)
     settings = get_settings()
@@ -114,7 +122,7 @@ async def rag_query(request: Request, body: QueryRequestBody):
     # 2026.05.07(sooyeon.choi) 추가 - session_id 제거, 서버가 (user_id, collection_name)으로 세션 직접 관리
     logger.info("쿼리 요청 user_id=%s, collection=%s", user_id, body.collection_name)
 
-    if body.collection_name:
+    if body.collection_name and not principal.get("is_admin"):
         accessible = _get_accessible_collections(user_id)
         if body.collection_name not in accessible:
             raise HTTPException(
@@ -165,7 +173,7 @@ async def rag_query_stream(request: Request, body: QueryRequestBody):
     user_id = principal["user_id"]
     logger.info("스트리밍 쿼리 요청 user_id=%s, collection=%s", user_id, body.collection_name)
 
-    if body.collection_name:
+    if body.collection_name and not principal.get("is_admin"):
         accessible = _get_accessible_collections(user_id)
         if body.collection_name not in accessible:
             raise HTTPException(
@@ -288,20 +296,37 @@ async def reset_chat_history(request: Request, body: ResetRequest):
 # 2026.06.16(sooyeon.choi) 추가 - SCR-006 피드백 API
 class FeedbackRequest(BaseModel):
     feedback: Optional[Literal["like", "dislike"]] = None  # None = 취소(토글 해제)
+    # 2026.11.05(woojin.jung) 추가 - 피드백 의견 패널의 사유 코드·자유 의견 (평가만 바꿀 때는 생략)
+    reasons: List[str] = Field(default_factory=list, max_length=10)
+    comment: Optional[str] = Field(default=None, max_length=1000)
+
+
+# 2026.11.05(woojin.jung) 추가 - 평가별 허용 사유 코드 (화면 라벨: adrag_frontend/src/constants/feedbackReasons.js)
+FEEDBACK_REASONS = {
+    "like": {"accurate", "source_clear", "image_helpful", "actionable", "other"},
+    "dislike": {"incorrect", "wrong_source", "wrong_image", "irrelevant", "insufficient", "other"},
+}
 
 
 @router.patch("/{log_id}/feedback")
 async def submit_query_feedback(log_id: int, body: FeedbackRequest, request: Request):
-    """채팅 응답에 좋아요(like)/별로에요(dislike) 피드백을 저장한다.
+    """채팅 응답에 좋아요(like)/별로에요(dislike) 피드백과 사유·의견을 저장한다.
 
-    None을 전달하면 기존 피드백을 취소한다.
+    None을 전달하면 기존 피드백(사유·의견 포함)을 취소한다.
     본인이 발생시킨 쿼리 로그에만 적용 가능하다.
     """
     principal = _extract_principal(request)
     user_id = principal["user_id"]
+    reasons = list(dict.fromkeys(body.reasons))
+    comment = (body.comment or "").strip() or None
+    if body.feedback is None and (reasons or comment):
+        raise HTTPException(status_code=422, detail="평가를 선택한 뒤 의견을 남길 수 있습니다.")
+    invalid = [r for r in reasons if r not in FEEDBACK_REASONS.get(body.feedback, set())]
+    if invalid:
+        raise HTTPException(status_code=422, detail=f"허용되지 않는 피드백 사유입니다: {', '.join(invalid)}")
     value = {"like": 1, "dislike": 0, None: None}[body.feedback]
     meta_repo = MetadataRepository(get_settings().sqlite_db_path)
-    ok = meta_repo.set_query_feedback(log_id, user_id, value)
+    ok = meta_repo.set_query_feedback(log_id, user_id, value, reasons, comment)
     if not ok:
         raise HTTPException(status_code=404, detail="대상 로그를 찾을 수 없거나 접근 권한이 없습니다.")
-    return {"log_id": log_id, "feedback": body.feedback}
+    return {"log_id": log_id, "feedback": body.feedback, "reasons": reasons, "comment": comment}

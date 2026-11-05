@@ -188,7 +188,14 @@
                 </thead>
                 <tbody>
                   <tr v-for="issue in queryIssues" :key="`${issue.query}-${issue.time}`">
-                    <td>{{ issue.query }}</td>
+                    <td>
+                      {{ issue.query }}
+                      <!-- 2026.11.05(woojin.jung) 추가 - 부정 피드백 사유·의견 -->
+                      <div v-if="issue.feedbackReasons.length || issue.feedbackComment" class="issue-feedback">
+                        <span v-for="reason in issue.feedbackReasons" :key="reason" class="issue-feedback-reason">{{ reason }}</span>
+                        <p v-if="issue.feedbackComment" class="issue-feedback-comment">“{{ issue.feedbackComment }}”</p>
+                      </div>
+                    </td>
                     <td>
                       <span class="badge badge-error">{{ issue.type }}</span>
                     </td>
@@ -920,6 +927,30 @@ td {
 .badge-stale {
   background: #fee2e2;
   color: #dc2626;
+}
+
+/* 2026.11.05(woojin.jung) 추가 - 부정 피드백 사유·의견 */
+.issue-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.issue-feedback-reason {
+  padding: 1px 8px;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.72rem;
+}
+.issue-feedback-comment {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .badge-warn {

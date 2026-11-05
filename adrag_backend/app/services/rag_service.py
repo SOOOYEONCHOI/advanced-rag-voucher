@@ -212,6 +212,7 @@ class RAGService:
             processing_time_ms=elapsed_ms,
             # 2026.10.19 추가 - Phase 4-A 답변 사진
             images=list(result.get("answer_images") or []),
+            timing=dict(result.get("timing") or {}),
         )
 
         try:

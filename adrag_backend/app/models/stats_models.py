@@ -152,6 +152,9 @@ class AdminFlaggedQueryItem(FlaggedQueryItem):
     user_id: str
     user_name: Optional[str] = None
     department: str
+    # 2026.11.05(woojin.jung) 추가 - 부정 피드백 사유 코드·의견
+    feedback_reasons: List[str] = []
+    feedback_comment: Optional[str] = None
 
 
 class AdminFlaggedQueryListResponse(BaseModel):

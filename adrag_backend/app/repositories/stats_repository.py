@@ -379,6 +379,8 @@ class StatsRepository:
               l.query_text,
               l.outcome_code,
               l.feedback,
+              l.feedback_reasons,
+              l.feedback_comment,
               l.model_id,
               l.created_at
             FROM tb_query_logs l
@@ -408,6 +410,9 @@ class StatsRepository:
                     else "dislike" if r["feedback"] == 0
                     else None
                 ),
+                # 2026.11.05(woojin.jung) 추가 - 부정 피드백 사유·의견
+                "feedback_reasons": json.loads(r["feedback_reasons"]) if r["feedback_reasons"] else [],
+                "feedback_comment": r["feedback_comment"],
                 "model_id": r["model_id"],
                 "created_at": r["created_at"],
             }

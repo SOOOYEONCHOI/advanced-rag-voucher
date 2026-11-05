@@ -151,14 +151,29 @@ class QueryLogRepository:
         log_id: int,
         user_id: str,
         feedback: Optional[int],
+        reasons: Optional[List[str]] = None,
+        comment: Optional[str] = None,
     ) -> bool:
         """피드백 저장 (1=좋아요, 0=별로에요, None=취소).
         user_id 조건으로 본인 로그만 수정 가능하다.
+        사유·의견은 매 호출마다 덮어쓴다(평가만 바꾸면 이전 사유·의견은 비워진다).
         """
+        # 2026.11.05(woojin.jung) 수정 - 피드백 사유(feedback_reasons)·의견(feedback_comment) 저장 추가
         feedback_at = now_kst_iso() if feedback is not None else None
         affected = self.db.execute_update(
-            "UPDATE tb_query_logs SET feedback=?, feedback_at=? WHERE log_id=? AND user_id=?",
-            (feedback, feedback_at, log_id, user_id),
+            """
+            UPDATE tb_query_logs
+            SET feedback=?, feedback_at=?, feedback_reasons=?, feedback_comment=?
+            WHERE log_id=? AND user_id=?
+            """,
+            (
+                feedback,
+                feedback_at,
+                json.dumps(reasons, ensure_ascii=False) if reasons else None,
+                comment or None,
+                log_id,
+                user_id,
+            ),
         )
         return affected > 0
 

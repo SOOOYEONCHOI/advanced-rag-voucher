@@ -10,7 +10,18 @@ source /opt/yest/chatbot/vllm/app/env.sh
 : "${VLM_API_KEY:?env.sh에 VLM_API_KEY가 비어 있음}"
 
 URL=http://127.0.0.1:8110/v1
-MODEL=gemma-4-12B-it
+MODEL=A.X-4.0-VL-Light   # run-vlm.sh 의 --served-model-name 과 같게
+
+# 2026.11.05 수정 - 서버가 아직 안 떴으면 원인 안내 후 멈춘다(000 만 찍히고 넘어가던 문제)
+echo "== 0. 서버 준비 여부 (/health 200 이어야 함)"
+code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8110/health || true)
+echo "$code"
+if [ "$code" != "200" ]; then
+  echo "== 8110 응답 없음 — 아직 기동 중이거나 실패. 아래를 확인:"
+  echo "   systemctl status vllm@vlm --no-pager"
+  echo "   sudo tail -n 50 /mnt/a/chatbot/vllm/logs/vlm.log /mnt/a/chatbot/vllm/logs/vlm-error.log"
+  exit 1
+fi
 
 echo "== 1. 모델 목록"
 curl -sf -H "Authorization: Bearer ${VLM_API_KEY}" "$URL/models" | head -c 300; echo

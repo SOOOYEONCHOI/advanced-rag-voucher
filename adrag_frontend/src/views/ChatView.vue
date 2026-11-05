@@ -41,7 +41,10 @@
       :chatCollections="chatCollections"
       :selectedCollection="selectedCollection"
       :authUser="authUser"
-      @close="sidebarOpen = false; sidebarCollapsed = true"
+      @close="
+        sidebarOpen = false;
+        sidebarCollapsed = true;
+      "
       @selectCollection="selectCollection"
       @logout="logoutUser"
     />
@@ -49,7 +52,13 @@
     <!-- 메인 영역 -->
     <div ref="mainContainerRef" class="main-container" :class="{ resizing: citationResizing }">
       <div class="chat-column">
-        <PageHeader :showMenu="sidebarCollapsed" @openSidebar="sidebarOpen = true; sidebarCollapsed = false">
+        <PageHeader
+          :showMenu="sidebarCollapsed"
+          @openSidebar="
+            sidebarOpen = true;
+            sidebarCollapsed = false;
+          "
+        >
           <template #title>
             {{ currentCollectionName || 'RAG Assistant' }}
             <span class="status-dot" :class="{ offline: !isOnline }"></span>
@@ -81,13 +90,7 @@
               <p>문서 기반 질의응답과 안전 규정 검색을 지원합니다.</p>
             </div>
 
-            <div
-              v-for="(msg, idx) in messages"
-              :key="idx"
-              class="message"
-              :class="[msg.role, { 'source-answer-active': isSourceAnswer(idx) }]"
-              :data-message-index="idx"
-            >
+            <div v-for="(msg, idx) in messages" :key="idx" class="message" :class="[msg.role, { 'source-answer-active': isSourceAnswer(idx) }]" :data-message-index="idx">
               <div class="avatar" :class="msg.role">
                 <i :class="msg.role === 'user' ? 'fa-solid fa-user' : 'fa-solid fa-robot'"></i>
               </div>
@@ -156,6 +159,17 @@
                       <i class="fa-regular fa-thumbs-down"></i>
                     </button>
                   </div>
+                  <!-- 2026.11.05(woojin.jung) 추가 - 좋아요/별로에요 선택 후 사유·의견 입력 패널 -->
+                  <ChatFeedbackPanel
+                    v-if="msg.role === 'assistant' && msg.feedback && msg.feedbackPanel"
+                    :key="`${msg.logId}-${msg.feedback}`"
+                    :feedback="msg.feedback"
+                    :done="msg.feedbackPanel === 'done'"
+                    :pending="msg.feedbackPending"
+                    :source-label="feedbackSourceLabel(msg.citations)"
+                    @submit="submitFeedbackDetail(msg, $event)"
+                    @close="msg.feedbackPanel = null"
+                  />
                 </div>
                 <span v-if="msg.role === 'user' && msg.inputMode === 'voice'" class="voice-origin">
                   <i class="fa-solid fa-microphone"></i>
@@ -412,12 +426,13 @@ import AppToast from '../components/AppToast.vue';
 import PageHeader from '../components/PageHeader.vue';
 import ChatImageGallery from '../components/ChatImageGallery.vue';
 import ImageViewer from '../components/ImageViewer.vue';
+import ChatFeedbackPanel from '../components/ChatFeedbackPanel.vue';
 import { useChatView } from '../composables/useChatView';
 import { useVoiceRecorder } from '../composables/useVoiceRecorder';
 import { citationDisplayPage, groupCitationsByDocument } from '../utils/textFormat';
 
 export default {
-  components: { CitationPanel, ChatSidebar, AppToast, PageHeader, ChatImageGallery, ImageViewer },
+  components: { CitationPanel, ChatSidebar, AppToast, PageHeader, ChatImageGallery, ImageViewer, ChatFeedbackPanel },
   setup() {
     const router = useRouter();
     const route = useRoute();
@@ -825,11 +840,32 @@ export default {
 
       try {
         const feedback = await chatView.submitMessageFeedback(message, value);
-        showToast(feedback ? '피드백이 저장되었습니다.' : '피드백이 취소되었습니다.');
+        // 2026.11.05(woojin.jung) 수정 - 평가 저장 시 토스트 대신 사유·의견 패널을 연다
+        message.feedbackPanel = feedback ? 'open' : null;
+        if (!feedback) showToast('피드백이 취소되었습니다.');
       } catch (error) {
         const detail = error.response?.data?.detail || '피드백 저장에 실패했습니다.';
         showToast(detail, 'error');
       }
+    };
+
+    // 2026.11.05(woojin.jung) 추가 - 피드백 사유·의견 저장 후 완료 안내를 잠시 보여 주고 닫는다
+    const submitFeedbackDetail = async (message, detail) => {
+      try {
+        await chatView.submitMessageFeedbackDetail(message, detail);
+        message.feedbackPanel = 'done';
+        setTimeout(() => {
+          if (message.feedbackPanel === 'done') message.feedbackPanel = null;
+        }, 2500);
+      } catch (error) {
+        showToast(error.response?.data?.detail || '의견 저장에 실패했습니다.', 'error');
+      }
+    };
+
+    const feedbackSourceLabel = (citations) => {
+      const groups = groupCitationsByDocument(citations || []);
+      if (!groups.length) return '';
+      return groups.length > 1 ? `${groups[0].filename} 외 ${groups.length - 1}건` : groups[0].filename;
     };
 
     const handleModelSelectorOutsideClick = (event) => {
@@ -944,6 +980,8 @@ export default {
       copyMessage,
       retryMessage,
       setMessageFeedback,
+      submitFeedbackDetail,
+      feedbackSourceLabel,
       citationPanelWidth,
       citationResizing,
       startCitationResize,
@@ -1121,7 +1159,9 @@ export default {
 }
 .message.assistant .message-body {
   border-radius: 12px;
-  transition: outline-color 0.2s, box-shadow 0.2s;
+  transition:
+    outline-color 0.2s,
+    box-shadow 0.2s;
 }
 /* 2026.10.26(woojin.jung) 수정 - 참고 문서 패널과 연결된 답변 영역을 채팅 화면에서 식별 가능하게 강조 */
 .message.assistant.source-answer-active .message-body {
