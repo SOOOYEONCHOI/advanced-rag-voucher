@@ -251,6 +251,8 @@ class QueryResponse:
     log_id: Optional[int] = None  # PATCH /query/{log_id}/feedback 에서 사용
     # 2026.10.19 추가 - 사진 답변: 검증된 [IMG:ref] 사진 목록(app/graphs/images.public_images)
     images: List[Dict[str, Any]] = field(default_factory=list)
+    # 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수(같은 그림 1장). images보다 많으면 화면에 "전체 N장 보기"
+    images_total: Optional[int] = None
     # 검색/리랭킹 시간을 전체 생성시간과 분리해 비교할 수 있는 노드별 시간(s).
     timing: Dict[str, float] = field(default_factory=dict)
 

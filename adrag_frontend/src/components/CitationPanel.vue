@@ -282,12 +282,22 @@ const getCitationDocumentId = (citation) => {
 };
 
 // 2026.10.22(woojin.jung) 수정 - 인용 resource_ids와 표시 가능 여부를 기준으로 출처별 연결 이미지만 선별
+// 2026.11.06(sooyeon.choi) 수정 - resource_ids 순서로 정렬하고 같은 그림(content_hash)은 1장만(답변 하단 관련 이미지와 같은 규칙)
+const imageKey = (resource) => String(resource.content_hash || '').split(':').pop() || resource.resource_id;
 const linkedImages = (citation) => {
   const documentId = getCitationDocumentId(citation);
-  const allowedIds = new Set(citation?.resource_ids || []);
-  if (!documentId || allowedIds.size === 0) return [];
+  const order = new Map((citation?.resource_ids || []).map((id, index) => [id, index]));
+  if (!documentId || order.size === 0) return [];
+  const seen = new Set();
   return (documentResources.value[documentId] || [])
-    .filter((resource) => allowedIds.has(resource.resource_id) && resource.displayable === true && (resource.resource_type === 'image' || String(resource.mime_type || '').startsWith('image/')))
+    .filter((resource) => order.has(resource.resource_id) && resource.displayable === true && (resource.resource_type === 'image' || String(resource.mime_type || '').startsWith('image/')))
+    .sort((a, b) => order.get(a.resource_id) - order.get(b.resource_id))
+    .filter((resource) => {
+      const key = imageKey(resource);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .map((resource) => ({
       ...resource,
       document_id: documentId,

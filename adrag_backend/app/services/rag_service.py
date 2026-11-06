@@ -212,6 +212,8 @@ class RAGService:
             processing_time_ms=elapsed_ms,
             # 2026.10.19 추가 - Phase 4-A 답변 사진
             images=list(result.get("answer_images") or []),
+            # 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수(같은 그림 1장)
+            images_total=result.get("answer_images_total") or len(result.get("answer_images") or []),
             timing=dict(result.get("timing") or {}),
         )
 
@@ -261,6 +263,7 @@ class RAGService:
                     "citations": [asdict(c) for c in (response.citations or [])],
                     # 2026.10.19 추가 - Phase 4-A: 대화 이력 복원 시 사진도 다시 표시
                     "images": response.images,
+                    "images_total": response.images_total,  # 2026.11.06(sooyeon.choi) 추가
                 })
 
                 now = now_kst()
@@ -294,6 +297,7 @@ class RAGService:
             answer: str,
             citation: list,
             images: Optional[list] = None,
+            images_total: Optional[int] = None,  # 2026.11.06(sooyeon.choi) 추가
     ) -> None:
         """(session_id, collection_id)이 유효한 경우에만 대화 이력을 저장한다."""
         if not (session_id and collection_id is not None):
@@ -314,6 +318,8 @@ class RAGService:
                 "citations": citation,
                 # 2026.10.19 추가 - Phase 4-A: 대화 이력 복원 시 사진도 다시 표시
                 "images": images or [],
+                # 2026.11.06(sooyeon.choi) 추가 - 이력 복원 시 "전체 N장 보기" 표시용
+                "images_total": images_total if images_total is not None else len(images or []),
             })
 
             now = now_kst()
@@ -429,14 +435,16 @@ class RAGService:
             yield _sse({"type": "citations", "data": citations})
             # 2026.10.19 추가 - Phase 4-A 답변 사진: 검증된 사진 목록. 화면은 이 목록에 없는 [IMG:ref]를 지운다
             images = list(final_state.get("answer_images") or [])
+            # 2026.11.06(sooyeon.choi) 수정 - total(출처 사진 전체 장수) 추가. data 모양은 그대로(기존 화면 호환)
+            images_total = final_state.get("answer_images_total") or len(images)
             if images:
-                yield _sse({"type": "images", "data": images})
+                yield _sse({"type": "images", "data": images, "total": images_total})
             log_id = await recorder.record(record, final_state, answer=answer, citations=citations)
             if log_id:
                 yield _sse({"type": "meta", "log_id": log_id})
             if session_id and collection_name:
                 await self._save_stream_history(
-                    repository, session_id, collection_id, user_id, query, answer, citations, images
+                    repository, session_id, collection_id, user_id, query, answer, citations, images, images_total
                 )
             yield _sse({"type": "done"})
         except asyncio.CancelledError:

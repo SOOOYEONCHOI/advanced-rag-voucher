@@ -1,7 +1,9 @@
 <template>
   <section v-if="images.length" class="image-section" aria-label="관련 이미지">
+    <!-- 2026.11.06(sooyeon.choi) 수정 - 출처 사진이 더 있으면 "표시 / 전체" 장수와 "전체 N장 보기"(출처 패널) 표시 -->
     <div class="image-section-title">
-      <i class="fa-regular fa-images"></i> 관련 이미지 <span>{{ images.length }}</span>
+      <i class="fa-regular fa-images"></i> 관련 이미지 <span>{{ hasMore ? `${images.length} / 전체 ${total}` : images.length }}</span>
+      <button v-if="hasMore" type="button" class="image-more" @click="$emit('openSources', images[0])">전체 {{ total }}장 보기 <i class="fa-solid fa-chevron-right"></i></button>
     </div>
     <div class="image-grid">
       <button v-for="(image, index) in images" :key="image.resource_id || index" type="button" class="image-card" @click="$emit('open', index)">
@@ -19,12 +21,19 @@
 <script setup>
 import AuthenticatedImage from './AuthenticatedImage.vue';
 
-defineProps({ images: { type: Array, default: () => [] } });
-defineEmits(['open']);
+import { computed } from 'vue';
 
+// 2026.11.06(sooyeon.choi) 수정 - total(출처 사진 전체 장수)·openSources 추가
+const props = defineProps({ images: { type: Array, default: () => [] }, total: { type: Number, default: 0 } });
+defineEmits(['open', 'openSources']);
+
+const hasMore = computed(() => props.total > props.images.length);
+
+// 2026.11.06(sooyeon.choi) 수정 - 출처 기준 사진은 출처 번호 [n]을 앞에 붙여 참고 문서 카드와 연결
 const locationLabel = (image) => {
   const range = [image.from_cell, image.to_cell].filter(Boolean).join('–');
-  return [image.sheet_name, range].filter(Boolean).join(' · ') || image.original_filename || '첨부 이미지';
+  const location = [image.sheet_name, range].filter(Boolean).join(' · ') || image.original_filename || '첨부 이미지';
+  return image.citation_id ? `[${image.citation_id}] ${location}` : location;
 };
 </script>
 
@@ -49,6 +58,21 @@ const locationLabel = (image) => {
   background: #dbeafe;
   color: #2563eb;
   font-size: 0.68rem;
+}
+/* 2026.11.06(sooyeon.choi) 추가 - "전체 N장 보기" 버튼 */
+.image-more {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.image-more:hover {
+  text-decoration: underline;
 }
 .image-grid {
   display: grid;

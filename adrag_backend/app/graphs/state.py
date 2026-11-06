@@ -68,6 +68,7 @@ class PipelineState(TypedDict):
     # 2026.10.19 추가 - 사진 답변: LLM에 보여준 후보, 검증 후 표시할 사진(응답 images)
     image_candidates: List[Dict[str, Any]]
     answer_images: List[Dict[str, Any]]
+    answer_images_total: int                              # 2026.11.06(sooyeon.choi) 추가 - 같은 그림을 합친 출처 사진 전체 장수
 
     # ── 폴백/재시도 ──
     retry_count: int                                      # 폴백 재시도 횟수
@@ -162,6 +163,7 @@ def make_initial_state(
         "citations": [],
         "image_candidates": [],
         "answer_images": [],
+        "answer_images_total": 0,  # 2026.11.06(sooyeon.choi) 추가
         "relevance_threshold": relevance_threshold,
         # 2026.07.16(sooyeon.choi) 추가 - B4/B5 override 필드 초기화
         "retrieval_override": None,

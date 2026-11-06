@@ -328,6 +328,114 @@ def test_stream_sends_images_and_saves_them_in_history(monkeypatch):
     events = asyncio.run(collect())
     assert [e["type"] for e in events] == ["token", "citations", "images", "meta", "done"]
     assert events[2]["data"] == images
+    # 2026.11.06(sooyeon.choi) 수정 - images 이벤트 total·이력 images_total(출처 사진 전체 장수) 추가
+    assert events[2]["total"] == 1
     history = stored[0].conversation_history
-    assert history[-1] == {"role": "assistant", "content": "조립[IMG:aaa111]", "citations": [], "images": images}
+    assert history[-1] == {"role": "assistant", "content": "조립[IMG:aaa111]", "citations": [], "images": images,
+                           "images_total": 1}
+
+
+# ── 2026.11.06(sooyeon.choi) 추가 - 출처 기준 답변 사진(ANSWER_IMAGE_SOURCE=citation) ──────────────
+
+def _citation_rows(db, document_id: str) -> dict:
+    """출처 [1]: step·같은그림·detail1·detail2·emf, 출처 [2]: part·detail1과 같은 그림."""
+    _document(db, document_id)
+    rows = {
+        "step": _resource(db, document_id, 1),
+        "same": _resource(db, document_id, 2, role_cd="detail_view", content_hash=f"sha256:01{'ab' * 31}"),
+        "d1": _resource(db, document_id, 3, role_cd="detail_view"),
+        "d2": _resource(db, document_id, 4, role_cd="detail_view"),
+        "emf": _resource(db, document_id, 5, mime_type="image/emf"),
+        "part": _resource(db, document_id, 6, role_cd="part_photo", step_no=None),
+        "dup2": _resource(db, document_id, 7, role_cd="part_photo", content_hash=f"sha256:03{'ab' * 31}"),
+    }
+    return rows
+
+
+def test_citation_images_follow_resource_ids_and_merge_same_image():
+    from app.graphs.images import collect_citation_images
+
+    db = get_database_manager()
+    r = _citation_rows(db, "doc-c")
+    first = _chunk("doc-c", [r["step"], r["same"], r["d1"], r["d2"], r["emf"]], step_no=6)
+    second = _chunk("doc-c", [r["part"], r["dup2"], r["d1"]])
+    images, total = collect_citation_images([(1, first), (2, second)], max_images=4)
+    # 출처 순 → resource_ids 순, 같은 그림(same·dup2·두 번째 d1)은 1장, emf 제외
+    assert [i["resource_id"] for i in images] == [r["step"], r["d1"], r["d2"], r["part"]]
+    assert total == 4 and [i["citation_id"] for i in images] == [1, 1, 1, 2]
+    assert all(not i["cited"] for i in images) and len({i["ref"] for i in images}) == 4
+
+    # 상한: 앞에서 2장, 전체 장수는 그대로
+    capped, capped_total = collect_citation_images([(1, first), (2, second)], max_images=2)
+    assert [i["resource_id"] for i in capped] == [r["step"], r["d1"]] and capped_total == 4
+
+    # LLM이 인용한 사진은 맨 앞(후보 ref 재사용 → 본문 배지와 같은 ref)
+    candidates = collect_image_candidates([first, second])
+    part_ref = next(c["ref"] for c in candidates if c["resource_id"] == r["part"])
+    promoted, _ = collect_citation_images([(1, first), (2, second)], cited_refs=[part_ref],
+                                          candidates=candidates, max_images=2)
+    assert [(i["resource_id"], i["cited"]) for i in promoted] == [(r["part"], True), (r["step"], False)]
+    assert promoted[0]["ref"] == part_ref
+
+    # 같은 그림의 다른 배치가 후보 대표여도 ref는 같은 그림 기준으로 맞춘다
+    same_first = [{**c, "resource_id": r["same"]} if c["resource_id"] == r["step"] else c for c in candidates]
+    step_ref = next(c["ref"] for c in candidates if c["resource_id"] == r["step"])
+    matched, _ = collect_citation_images([(1, first)], candidates=same_first, max_images=1)
+    assert matched[0]["resource_id"] == r["step"] and matched[0]["ref"] == step_ref
+
+    assert collect_citation_images([(1, first)], max_images=0) == ([], 0)
+
+
+def test_citation_images_skip_row_range_fallback_and_survive_db_error():
+    from app.graphs.images import collect_citation_images
+
+    db = get_database_manager()
+    _document(db, "doc-r")
+    _resource(db, "doc-r", 1, role_cd="part_photo", step_no=None, from_cell="C12")
+    table = _chunk("doc-r", source_range="10:20", content_type="table_section")
+    assert collect_image_candidates([table])                      # llm 모드 후보는 행 범위 사진을 쓴다
+    assert collect_citation_images([(1, table)]) == ([], 0)       # 출처 기준은 resource_ids만(출처 카드와 같음)
+
+    class Broken:
+        def execute_query(self, *args):
+            raise RuntimeError("db down")
+
+    assert collect_citation_images([(1, _chunk("doc-r", ["x"]))], db=Broken()) == ([], 0)
+
+
+@pytest.mark.asyncio
+async def test_format_citations_citation_mode_uses_cited_sources_only():
+    db = get_database_manager()
+    r = _citation_rows(db, "doc-f")
+    first = {**_chunk("doc-f", [r["step"], r["d1"], r["d2"]], step_no=6), "text": "Step 6"}
+    unused = {**_chunk("doc-f", [r["part"]]), "text": "부품"}         # 컨텍스트 [2] — 답변에서 인용 안 됨
+    candidates = collect_image_candidates([first, unused])
+    ref = {c["resource_id"]: c["ref"] for c in candidates}
+    state = {
+        "generated_answer": f"조립합니다[1][IMG:{ref[r['d2']]}]. 부품[IMG:{ref[r['part']]}][IMG:nope00].",
+        "context_chunks": [first, unused], "image_candidates": candidates, "original_query": "FAN 조립",
+        "preprocess_result": {}, "citation_limit": 5, "outcome_code": "success", "timing": {},
+    }
+    settings = _node_settings(answer_image_source="citation", rag_max_images=2)
+    result = await format_citations(state, deps=SimpleNamespace(settings=settings))
+    # 인용 출처 [1]의 사진만, LLM 인용(d2)이 맨 앞, 최대 2장 / 전체 3장
+    assert [(i["resource_id"], i["cited"], i["citation_id"]) for i in result["answer_images"]] == [
+        (r["d2"], True, 1), (r["step"], False, 1)]
+    assert result["answer_images_total"] == 3
+    # 출처 카드에 없는 사진(part)·후보 밖 태그는 본문에서 지운다
+    assert result["generated_answer"] == f"조립합니다[1][IMG:{ref[r['d2']]}]. 부품."
+    assert set(result["answer_images"][0]) >= {"ref", "resource_id", "citation_id", "cited"}
+    assert "image_key" not in result["answer_images"][0]
+
+    # LLM 인용이 없어도 출처 사진이 나온다(자동 첨부 대신)
+    plain = await format_citations({**state, "generated_answer": "조립합니다[1]."},
+                                   deps=SimpleNamespace(settings=settings))
+    assert [i["resource_id"] for i in plain["answer_images"]] == [r["step"], r["d1"]]
+    # 근거 없음·[n] 인용 없음이면 사진 없음
+    for case in ({"outcome_code": "no_context"}, {"generated_answer": f"조립[IMG:{ref[r['step']]}]."}):
+        empty = await format_citations({**state, **case}, deps=SimpleNamespace(settings=settings))
+        assert empty["answer_images"] == [] and empty["answer_images_total"] == 0
+    # llm 모드(기본)는 기존 동작 그대로 + total = 표시 장수
+    legacy = await format_citations(state, deps=SimpleNamespace(settings=_node_settings()))
+    assert legacy["answer_images_total"] == len(legacy["answer_images"])
 

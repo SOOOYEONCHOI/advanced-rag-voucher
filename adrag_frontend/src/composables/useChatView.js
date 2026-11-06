@@ -89,6 +89,12 @@ export const useChatView = ({ router, route }) => {
         title: image.title || image.step_title || '관련 이미지',
       }));
 
+  // 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수(같은 그림 1장). 값이 없는 이전 이력은 표시 장수로 대체
+  const normalizeImagesTotal = (total, images = []) => {
+    const value = Number(total);
+    return Number.isFinite(value) && value > images.length ? value : images.length;
+  };
+
   // 2026.06.24(woojin.jung) 추가 - DB 피드백 값을 화면 표시 값으로 정규화
   const normalizeFeedback = (feedback) => {
     if (feedback === 'like' || feedback === 1 || feedback === true) return 'like';
@@ -135,6 +141,8 @@ export const useChatView = ({ router, route }) => {
         createdAt: h.created_at ?? h.createdAt ?? h.timestamp ?? null,
         citations: normalizeCitations(h.citations || []),
         images: normalizeImages(h.images || []),
+        // 2026.11.06(sooyeon.choi) 추가 - 이력 복원 시 "전체 N장 보기" 표시용
+        imagesTotal: normalizeImagesTotal(h.images_total, normalizeImages(h.images || [])),
         logId: h.log_id ?? h.logId ?? null,
         feedback: normalizeFeedback(h.feedback),
         inputMode: h.input_mode ?? h.inputMode ?? 'text',
@@ -268,6 +276,8 @@ export const useChatView = ({ router, route }) => {
         createdAt: new Date().toISOString(),
         citations,
         images,
+        // 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수
+        imagesTotal: normalizeImagesTotal(res.data.images_total, images),
         logId: res.data.log_id ?? res.data.logId ?? null,
         feedback: normalizeFeedback(res.data.feedback),
       });
@@ -327,6 +337,7 @@ export const useChatView = ({ router, route }) => {
     let rawReply = '';
     let citations = [];
     let images = [];
+    let imagesTotal = 0; // 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수
     let renderFrame = null;
 
     const renderStreamingReply = async () => {
@@ -391,6 +402,9 @@ export const useChatView = ({ router, route }) => {
           if (event.type === 'images') {
             images = normalizeImages(event.data || []);
             messages.value[idx].images = images;
+            // 2026.11.06(sooyeon.choi) 추가 - images 이벤트 total(출처 사진 전체 장수)
+            imagesTotal = normalizeImagesTotal(event.total, images);
+            messages.value[idx].imagesTotal = imagesTotal;
             return;
           }
 
@@ -419,6 +433,7 @@ export const useChatView = ({ router, route }) => {
       messages.value[idx].isStreaming = false;
       messages.value[idx].citations = citations;
       messages.value[idx].images = images;
+      messages.value[idx].imagesTotal = imagesTotal; // 2026.11.06(sooyeon.choi) 추가
 
       if (citations.length > 0) {
         activeCitations.value = citations;

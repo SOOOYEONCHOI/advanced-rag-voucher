@@ -110,7 +110,14 @@
                         : msg.content
                     "
                   ></div>
-                  <ChatImageGallery v-if="msg.role === 'assistant' && msg.images?.length" :images="msg.images" @open="openImageViewer(msg.images, $event, msg.citations || [])" />
+                  <!-- 2026.11.06(sooyeon.choi) 수정 - 출처 사진 전체 장수(total)·"전체 N장 보기" → 출처 패널 -->
+                  <ChatImageGallery
+                    v-if="msg.role === 'assistant' && msg.images?.length"
+                    :images="msg.images"
+                    :total="msg.imagesTotal || msg.images.length"
+                    @open="openImageViewer(msg.images, $event, msg.citations || [])"
+                    @open-sources="openImageSources(msg, $event)"
+                  />
                   <div v-if="msg.role === 'assistant' && msg.citations && msg.citations.length > 0" class="reference-section">
                     <div class="ref-title">[참고 문서]</div>
                     <div v-for="group in groupCitationsByDocument(msg.citations)" :key="group.key" class="ref-item">
@@ -536,6 +543,16 @@ export default {
 
     const openCitationImages = ({ images, index, citation, citations }) => {
       openImageViewer(images, index, citations || [citation], citation);
+    };
+
+    // 2026.11.06(sooyeon.choi) 추가 - 답변 사진 "전체 N장 보기": 첫 사진의 출처 카드(없으면 사진이 연결된 첫 출처)를 선택해 출처 패널 열기
+    const openImageSources = (message, image) => {
+      const citations = message?.citations || [];
+      const citation =
+        citations.find((c) => String(c.citation_id) === String(image?.citation_id)) ||
+        citations.find((c) => c.resource_ids?.length) ||
+        citations[0];
+      if (citation) chatView.openSourcesPanel(citation, citations);
     };
 
     const locateCurrentImage = () => {
@@ -995,6 +1012,7 @@ export default {
       openImageViewer,
       closeImageViewer,
       openCitationImages,
+      openImageSources, // 2026.11.06(sooyeon.choi) 추가
       locateCurrentImage,
       citationDisplayPage,
       groupCitationsByDocument,

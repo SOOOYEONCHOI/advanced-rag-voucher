@@ -257,6 +257,10 @@ class Settings(BaseSettings):
     rag_max_images: int = Field(default=4, ge=0)          # 답변 1건에 표시할 최대 사진 수(RAG_MAX_IMAGES)
     rag_image_candidates: int = Field(default=8, ge=0)    # LLM에 보여줄 사진 후보 수
     answer_image_auto_attach: bool = True                 # 인용이 없을 때 Step 사진 1장 자동 첨부
+    # 2026.11.06(sooyeon.choi) 추가 - 답변 사진 선택 기준(ANSWER_IMAGE_SOURCE)
+    #   llm(기본·기존): LLM이 [IMG:ref]로 인용한 사진 + 자동 첨부
+    #   citation: 답변이 [n]으로 인용한 출처 청크의 resource_ids 사진(같은 그림 1장, 최대 rag_max_images장). 자동 첨부 안 함
+    answer_image_source: Literal["llm", "citation"] = "llm"
     # 2026.08.27(sooyeon.choi) 추가 - excel resource 영구 저장/내부 업로드 설정
     resource_storage_root: str = "instance/xl_res"
     resource_internal_api_key: str = ""

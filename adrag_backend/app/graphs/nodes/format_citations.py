@@ -6,12 +6,14 @@ LLM에 실제 전달된 context_chunks에서 Citation 객체 리스트를 생성
 답변에서 유효하게 참조된 Citation을 번호 순서대로 반환한다.
 """
 
+import asyncio
 import re
 from typing import List
 
 from app.core.config import get_settings
 from app.graphs.dependencies import GraphDependencies
-from app.graphs.images import public_images, validate_answer_images
+# 2026.11.06(sooyeon.choi) 수정 - 출처 기준 답변 사진(collect_citation_images·keep_image_tags) 추가
+from app.graphs.images import collect_citation_images, keep_image_tags, public_images, validate_answer_images
 from app.graphs.state import PipelineState
 from app.graphs.utils import timed_node
 from app.services.manual_display_service import ManualDisplayService
@@ -186,18 +188,42 @@ async def format_citations(state: PipelineState, deps: GraphDependencies | None 
     # 2026.10.19 추가 - 사진 답변: [IMG:ref] 인용을 후보 기준으로 검증(후보 밖 태그 제거, 최대 rag_max_images)
     #   후보가 없거나 기능이 꺼져 있어도 검증은 돌려 LLM이 지어낸 태그를 지운다. 근거 없음 답변에는 자동 첨부하지 않는다.
     images_enabled = getattr(settings, "answer_images_enabled", False)
+    max_images = getattr(settings, "rag_max_images", 4)
+    # 2026.11.06(sooyeon.choi) 추가 - 출처 기준(answer_image_source=citation): 답변 사진 = 인용 출처 카드의 연결 사진
+    #   [IMG:ref] 인용은 순서 앞당기기·본문 배지에만 쓰고, 자동 첨부는 하지 않는다. 하단에 없는 사진의 태그는 지운다.
+    if images_enabled and getattr(settings, "answer_image_source", "llm") == "citation":
+        candidates = state.get("image_candidates") or []
+        cleaned_answer, cited = validate_answer_images(
+            answer, candidates, max_images=len(candidates), auto_step_image=False
+        )
+        images, images_total = [], 0
+        if state.get("outcome_code") == "success" and citations:
+            images, images_total = await asyncio.to_thread(
+                collect_citation_images,
+                [(c["citation_id"], context_chunks[c["citation_id"] - 1]) for c in citations],
+                cited_refs=[item["ref"] for item in cited],
+                candidates=candidates,
+                max_images=max_images,
+            )
+        cleaned_answer = keep_image_tags(cleaned_answer, [item["ref"] for item in images])
+        result = {"citations": citations, "answer_images": public_images(images), "answer_images_total": images_total}
+        if cleaned_answer != answer:
+            result["generated_answer"] = cleaned_answer
+        return result
+
     cleaned_answer, images = validate_answer_images(
         answer,
         (state.get("image_candidates") or []) if images_enabled else [],
         context_chunks=context_chunks,
-        max_images=getattr(settings, "rag_max_images", 4),
+        max_images=max_images,
         auto_step_image=(
             images_enabled
             and getattr(settings, "answer_image_auto_attach", True)
             and state.get("outcome_code") == "success"
         ),
     )
-    result = {"citations": citations, "answer_images": public_images(images)}
+    # 2026.11.06(sooyeon.choi) 수정 - answer_images_total 추가(llm 모드는 표시 장수와 같음 → 화면 "전체 보기" 안 나옴)
+    result = {"citations": citations, "answer_images": public_images(images), "answer_images_total": len(images)}
     if cleaned_answer != answer:
         result["generated_answer"] = cleaned_answer
     return result
