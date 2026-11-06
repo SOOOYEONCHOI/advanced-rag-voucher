@@ -55,6 +55,8 @@ class DocumentEventType(str, Enum):
     FAIL    = "fail"
     # 2026.10.19 추가 - 문서 정보 수정(모델명 등, 재처리 없음).
     UPDATE  = "update"
+    # 2026.11.06(sooyeon.choi) 추가 - 이전 버전 복원(UI-12, R1-5). CHECK 제약은 0006에서 추가
+    RESTORE = "restore"
 
 
 # =============================================================================

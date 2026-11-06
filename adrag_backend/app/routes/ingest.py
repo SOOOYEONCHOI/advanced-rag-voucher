@@ -17,9 +17,10 @@ from pathlib import Path
 from typing import List, Optional, Set, Tuple
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+import json
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.repositories.database import get_database_manager
@@ -48,6 +49,18 @@ from app.parsers.document_types import (
     normalize_requested_doc_type,
     validate_document_type_compatibility,
 )
+# 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, R1-5, D-22)
+from app.services.document_version_restore import (
+    BLOCK_MESSAGES as RESTORE_BLOCK_MESSAGES,
+    RestoreError,
+    document_block_code,
+    evaluate_versions,
+    job_payload,
+    restore_enabled,
+    submit_restore,
+)
+from app.services.embedding_profile import current_profile_id
+from app.services.ingest_jobs import RestoreRetryNotAllowed
 
 
 def _get_user_accessible(principal: dict) -> Optional[Tuple[Set[str], Set[str]]]:
@@ -94,6 +107,11 @@ class IngestJobResponse(BaseModel):
     result: Optional[dict] = None
     error: Optional[str] = None
     error_code: Optional[str] = None
+    # 2026.11.06(sooyeon.choi) 수정 - 작업 유형(upload·replace·restore)과 대상 문서·버전(복원 진행·결과 화면)
+    operation_type: Optional[str] = None
+    document_id: Optional[str] = None
+    from_version_no: Optional[int] = None
+    target_version_no: Optional[int] = None
 
 
 class CollectionsResponse(BaseModel):
@@ -122,6 +140,10 @@ class DocumentItem(BaseModel):
     # 2026.10.19 추가(sooyeon.choi) - 최신본 변경 처리 중인 버전(없으면 None) — 화면 상태 표시·폴링 복원용
     pending_version_no: Optional[int] = None
     pending_job_id: Optional[str] = None
+    # 2026.11.06(sooyeon.choi) 수정 - 적용 순번·진행 중 변경 작업(최신본 변경·복원 공통, queued/running일 때만).
+    #   기존 pending_job_id·pending_version_no는 최신본 변경 전용으로 유지(기존 화면 호환)
+    activation_revision: Optional[int] = None
+    pending_operation: Optional[dict] = None
 
 
 class VersionJobResponse(BaseModel):
@@ -151,6 +173,11 @@ class DocumentVersionItem(BaseModel):
     job_id: Optional[str] = None
     job_status: Optional[str] = None
     error: Optional[str] = None
+    # 2026.11.06(sooyeon.choi) 수정 - 등록자 이름·행별 복원 가능 여부(서버 판정)
+    uploaded_by_name: Optional[str] = None
+    can_restore: bool = False
+    restore_block_code: Optional[str] = None
+    restore_block_reason: Optional[str] = None
 
 
 class DocumentVersionsResponse(BaseModel):
@@ -159,6 +186,51 @@ class DocumentVersionsResponse(BaseModel):
     current_version_no: int
     versions: List[DocumentVersionItem]
     restore_supported: bool = False
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 화면(명세 v1.1 4절)
+    collection_name: Optional[str] = None
+    collection_display_name: Optional[str] = None
+    current_original_filename: Optional[str] = None
+    activation_revision: int = 1
+    total_versions: int = 0
+    next_version_no: int = 1
+    can_restore: bool = False
+    restore_block_code: Optional[str] = None
+    restore_block_reason: Optional[str] = None
+    pending_operation: Optional[dict] = None
+
+
+# 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 접수 본문·응답, 적용 이력(명세 v1.1 5·7절)
+class RestoreVersionRequest(BaseModel):
+    expected_current_version_no: int = Field(ge=1)
+    expected_activation_revision: int = Field(ge=1)
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class RestoreJobResponse(BaseModel):
+    job_id: str
+    operation_type: str = "restore"
+    status: str
+    current_step: str
+    document_id: str
+    from_version_no: Optional[int] = None
+    target_version_no: int
+
+
+class ActivationItem(BaseModel):
+    activation_id: int
+    operation_type: str
+    from_version_no: Optional[int] = None
+    to_version_no: int
+    activation_revision: int
+    activated_by: Optional[str] = None
+    activated_by_name: Optional[str] = None
+    activated_at: Optional[str] = None
+
+
+class ActivationsResponse(BaseModel):
+    document_id: str
+    activations: List[ActivationItem]
+    next_before_activation_id: Optional[int] = None
 
 
 class ModelNameUpdateRequest(BaseModel):
@@ -369,6 +441,7 @@ async def get_ingest_job(job_id: str, principal: dict = Depends(get_current_prin
         result=job.get("result"),
         error=job.get("error_message"),
         error_code=job.get("error_code"),
+        **job_payload(job),  # 2026.11.06(sooyeon.choi) 수정 - 작업 유형·대상 문서·버전
     )
 
 
@@ -381,6 +454,10 @@ async def retry_ingest_job(job_id: str, principal: dict = Depends(get_current_pr
         raise HTTPException(status_code=403, detail="작업 재시도 권한이 없습니다.")
     try:
         await get_ingest_job_manager().retry(job_id)
+    except RestoreRetryNotAllowed as exc:
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 작업은 최신 이력 확인 후 새 요청으로만 다시 실행
+        code = "RESTORE_RETRY_REQUIRES_NEW_REQUEST"
+        raise HTTPException(status_code=409, detail={"code": code, "message": RESTORE_BLOCK_MESSAGES[code]}) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return IngestJobResponse(job_id=job_id, status="queued", current_step=job["current_step"])
@@ -423,6 +500,8 @@ async def list_documents(
             ]
         # 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중인 버전(문서별 최대 1개)
         pending = await asyncio.to_thread(_pending_versions, [d.get("document_id") for d in raw_docs])
+        # 2026.11.06(sooyeon.choi) 수정 - 적용 순번·진행 중 변경 작업(복원 포함)
+        states = await asyncio.to_thread(_document_states, [d.get("document_id") for d in raw_docs])
         docs = []
         for d in raw_docs:
             docs.append(DocumentItem(
@@ -460,6 +539,8 @@ async def list_documents(
                 ),
                 pending_version_no=pending.get(d.get("document_id"), (None, None))[0],
                 pending_job_id=pending.get(d.get("document_id"), (None, None))[1],
+                activation_revision=states.get(d.get("document_id"), {}).get("activation_revision"),
+                pending_operation=states.get(d.get("document_id"), {}).get("pending_operation"),
             ))
         return DocumentsResponse(documents=docs, total=len(docs))
     except Exception as e:
@@ -541,6 +622,41 @@ def _pending_versions(document_ids: List[str]) -> dict:
     return {r["document_id"]: (r["version_no"], r["job_id"]) for r in rows}
 
 
+# 2026.11.06(sooyeon.choi) 추가 - 문서별 적용 순번과 진행 중 변경 작업(pending_job_id가 가리키는 queued/running 작업)
+def _pending_operation(row) -> Optional[dict]:
+    if not row["job_id"]:
+        return None
+    request = row["request_json"]
+    request = json.loads(request) if isinstance(request, str) else (request or {})
+    restore = row["operation_type"] == "restore"
+    return {
+        "job_id": row["job_id"],
+        "operation_type": "restore" if restore else "replace",
+        "status": row["status"],
+        "current_step": row["current_step"],
+        "target_version_no": request.get("target_version_no") if restore else request.get("version_no"),
+    }
+
+
+def _document_states(document_ids: List[str]) -> dict:
+    ids = [doc_id for doc_id in document_ids if doc_id]
+    if not ids:
+        return {}
+    placeholders = ", ".join("?" for _ in ids)
+    rows = get_database_manager().execute_query(
+        f"""SELECT d.document_id, d.activation_revision, j.job_id, j.status, j.current_step, j.operation_type,
+                   j.request_json
+            FROM tb_documents d
+            LEFT JOIN tb_ingest_jobs j ON j.job_id = d.pending_job_id AND j.status IN ('queued', 'running')
+            WHERE d.document_id IN ({placeholders})""",
+        tuple(ids),
+    )
+    return {
+        r["document_id"]: {"activation_revision": r["activation_revision"], "pending_operation": _pending_operation(r)}
+        for r in rows
+    }
+
+
 def _load_visible_document(document_id: str, principal: dict) -> dict:
     """삭제되지 않았고 사용자가 볼 수 있는 문서 정보. 아니면 404."""
     rows = get_database_manager().execute_query(
@@ -588,6 +704,9 @@ def _register_version_job(document_id: str, job_id: str, request: dict, created_
             raise _VersionConflict(
                 f"JOB_IN_PROGRESS: 이 문서는 v{current['version_no']} 최신본 변경을 처리 중입니다. 완료 후 다시 시도하세요."
             )
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 문서를 점유 중이면 거부(공통 점유 표식, B-01)
+        if repo.pending_job_id(document_id):
+            raise _VersionConflict("JOB_IN_PROGRESS: 이 문서는 다른 변경 작업을 처리 중입니다. 완료 후 다시 시도하세요.")
         if file_sha256 and file_sha256 == repo.active_version_sha(document_id):
             raise _VersionConflict("DUPLICATE_FILE: 현재 최신본과 같은 파일입니다.")
         version_no = repo.next_version_no(document_id)
@@ -598,6 +717,7 @@ def _register_version_job(document_id: str, job_id: str, request: dict, created_
             original_filename=request["filename"], file_sha256=file_sha256,
             file_size=file_size, job_id=job_id, uploaded_by=created_by,
         )
+        repo.acquire_pending(document_id, job_id)  # 2026.11.06(sooyeon.choi) 수정 - 전환·실패 시 해제
     return version_no
 
 
@@ -681,8 +801,19 @@ async def list_document_versions(document_id: str, principal: dict = Depends(get
 
     doc = await asyncio.to_thread(_load_visible_document, document_id, principal)
     rows = await asyncio.to_thread(IngestRecordRepository().list_versions, document_id)
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원: 문서 단위·행 단위 가능 여부(서버 판정, 설계 v1.1 8절)
+    settings_obj = get_settings()
+    extra = await asyncio.to_thread(_version_history_context, document_id, settings_obj)
+    pending_operation = extra["state"].get("pending_operation")
+    doc_code = document_block_code(
+        settings=settings_obj, principal=principal,
+        pending_job=pending_operation or (extra["in_progress"] or None),
+    )
+    verdicts = evaluate_versions(
+        rows, doc_code=doc_code, profile_id=extra["profile_id"], pending_busy=bool(pending_operation),
+    )
     items = []
-    for row in rows:
+    for row, (can_restore, block_code, block_reason) in zip(rows, verdicts):
         failed = row["status"] == "failed" or row.get("job_status") == "failed"
         items.append(DocumentVersionItem(
             version_no=row["version_no"],
@@ -702,12 +833,125 @@ async def list_document_versions(document_id: str, principal: dict = Depends(get
             job_id=row.get("job_id"),
             job_status=row.get("job_status"),
             error=row.get("error_message") if failed else None,
+            uploaded_by_name=row.get("uploaded_by_name"),
+            can_restore=can_restore,
+            restore_block_code=block_code,
+            restore_block_reason=block_reason,
         ))
     return DocumentVersionsResponse(
         document_id=document_id,
         product_model=doc.get("product_model"),
         current_version_no=doc.get("version_no") or 1,
         versions=items,
+        # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 화면 값
+        restore_supported=restore_enabled(settings_obj),
+        collection_name=doc.get("source_collection"),
+        collection_display_name=extra["collection_display_name"],
+        current_original_filename=doc.get("original_filename"),
+        activation_revision=extra["state"].get("activation_revision") or 1,
+        total_versions=len(rows),
+        next_version_no=max((r["version_no"] for r in rows), default=0) + 1,
+        can_restore=doc_code is None,
+        restore_block_code=doc_code,
+        restore_block_reason=RESTORE_BLOCK_MESSAGES.get(doc_code) if doc_code else None,
+        pending_operation=pending_operation,
+    )
+
+
+# 2026.11.06(sooyeon.choi) 추가 - 이력 화면 보조 정보(대화 주제 표시명·적용 순번·진행 작업·현재 임베딩 프로필)
+def _version_history_context(document_id: str, settings_obj) -> dict:
+    from app.repositories.ingest_record_repository import IngestRecordRepository
+
+    db = get_database_manager()
+    rows = db.execute_query(
+        "SELECT c.display_name FROM tb_documents d LEFT JOIN tb_collections c ON c.collection_id = d.collection_id "
+        "WHERE d.document_id = ?",
+        (document_id,),
+    )
+    return {
+        "collection_display_name": rows[0][0] if rows else None,
+        "state": _document_states([document_id]).get(document_id, {}),
+        "in_progress": IngestRecordRepository(db).in_progress_version(document_id),
+        "profile_id": current_profile_id(db, settings_obj),
+    }
+
+
+def _restore_http_error(exc: RestoreError) -> HTTPException:
+    if exc.code == "NOT_FOUND":
+        return HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
+    return HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message})
+
+
+# 2026.11.06(sooyeon.choi) 추가 - [이전 버전 복원] 접수(문서를 볼 수 있는 모든 사용자, 명세 v1.1 5절). 새 접수 202, 같은 키 재전송은
+#   진행 중 202·끝난 작업 200(같은 job_id). 실제 전환은 작업 관리자가 검증 후 수행한다.
+@router.post(
+    "/documents/{document_id}/versions/{version_no}/restore", response_model=RestoreJobResponse, status_code=202,
+)
+async def restore_document_version(
+    document_id: str,
+    version_no: int,
+    body: RestoreVersionRequest,
+    response: Response,
+    principal: dict = Depends(get_current_principal),
+):
+    # 볼 수 없거나 삭제된 문서는 404. 2026.11.06(sooyeon.choi) 수정 - 볼 수 있으면 복원 가능(관리자 전용 아님)
+    await asyncio.to_thread(_load_visible_document, document_id, principal)
+    try:
+        result = await asyncio.to_thread(
+            submit_restore, document_id, version_no,
+            expected_version_no=body.expected_current_version_no,
+            expected_revision=body.expected_activation_revision,
+            idempotency_key=body.idempotency_key,
+            principal=principal,
+        )
+    except RestoreError as exc:
+        raise _restore_http_error(exc) from exc
+    job = result.job
+    if result.created:
+        try:
+            await get_ingest_job_manager().enqueue(job["job_id"])
+        except Exception:
+            # 접수(DB 저장)는 끝났다 — 실패로 위장하지 않고 재기동 시 queued 작업으로 이어서 처리한다
+            logger.exception("event=version_restore status=enqueue_failed job_id=%s", job["job_id"])
+    elif job["status"] in ("completed", "failed"):
+        response.status_code = 200
+    payload = job_payload(job)
+    return RestoreJobResponse(
+        job_id=job["job_id"], status=job["status"], current_step=job["current_step"],
+        document_id=payload["document_id"], from_version_no=payload.get("from_version_no"),
+        target_version_no=payload["target_version_no"],
+    )
+
+
+# 2026.11.06(sooyeon.choi) 추가 - [적용 이력 보기](명세 v1.1 7절). 문서를 볼 수 있으면 조회, 최신순·커서 페이지
+@router.get("/documents/{document_id}/activations", response_model=ActivationsResponse)
+async def list_document_activations(
+    document_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    before_activation_id: Optional[int] = Query(default=None, ge=1),
+    principal: dict = Depends(get_current_principal),
+):
+    from app.repositories.ingest_record_repository import IngestRecordRepository
+
+    await asyncio.to_thread(_load_visible_document, document_id, principal)
+    rows = await asyncio.to_thread(
+        IngestRecordRepository().list_activations, document_id, limit=limit + 1,
+        before_activation_id=before_activation_id,
+    )
+    page = rows[:limit]
+    return ActivationsResponse(
+        document_id=document_id,
+        activations=[
+            ActivationItem(
+                activation_id=r["activation_id"], operation_type=r["operation_type"],
+                from_version_no=r["from_version_no"], to_version_no=r["to_version_no"],
+                activation_revision=r["activation_revision"], activated_by=r["actor_id"],
+                activated_by_name=r["actor_name"],
+                activated_at=format_kst_datetime(r["activated_at"]) or None,
+            )
+            for r in page
+        ],
+        next_before_activation_id=page[-1]["activation_id"] if len(rows) > limit else None,
     )
 
 
@@ -849,7 +1093,11 @@ async def delete_document(
             detail="본인이 업로드한 문서만 개별 삭제할 수 있습니다.",
         )
     # 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중에는 삭제하지 않는다(처리 완료·실패 후 삭제)
-    if not doc_info.get("deleted_at") and (await asyncio.to_thread(_pending_versions, [document_id])):
+    # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 점유 중이어도 삭제하지 않는다(B-02)
+    if not doc_info.get("deleted_at") and (
+        await asyncio.to_thread(_pending_versions, [document_id])
+        or (await asyncio.to_thread(_document_states, [document_id])).get(document_id, {}).get("pending_operation")
+    ):
         raise HTTPException(status_code=409, detail="최신본 변경을 처리 중인 문서는 삭제할 수 없습니다. 처리가 끝난 뒤 다시 시도하세요.")
     try:
         service = IngestService()

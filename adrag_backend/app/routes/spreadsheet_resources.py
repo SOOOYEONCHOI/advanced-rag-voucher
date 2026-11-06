@@ -168,6 +168,7 @@ def _authorize_document(document_id: str, principal: dict) -> None:
 @router.get("/api/documents/{document_id}/spreadsheet-resources")
 async def list_document_resources(
     document_id: str,
+    version_no: Optional[int] = None,
     principal: dict = Depends(get_current_principal),
 ):
     _authorize_document(document_id, principal)
@@ -175,6 +176,14 @@ async def list_document_resources(
         resources = _service().list_document_resources(document_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid document_id")
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 사진이 보존되므로 기본은 현재 적용 버전만(version_no로 특정 버전 조회, B-10).
+    #   버전 정보가 없는 과거 리소스(version_no NULL)는 그대로 둔다
+    if version_no is None:
+        rows = get_database_manager().execute_query(
+            "SELECT version_no FROM tb_documents WHERE document_id = ?", (document_id,)
+        )
+        version_no = (dict(rows[0]).get("version_no") if rows else None) or 1
+    resources = [r for r in resources if r.get("version_no") in (None, version_no)]
     return {"document_id": document_id, "total": len(resources), "resources": resources}
 
 

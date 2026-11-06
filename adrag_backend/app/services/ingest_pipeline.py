@@ -30,6 +30,8 @@ from app.ingest.records import (
 from app.repositories.database import get_database_manager
 from app.repositories.ingest_record_repository import IngestRecordRepository
 from app.ingest.file_router import ROUTE_EXCEL_INGEST, resolve_parse_route
+# 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원: 버전 봉인(임베딩 프로필)
+from app.services.embedding_profile import ensure_current_profile_id
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,29 @@ def _version_of(request: Dict[str, Any]) -> int:
 
 def _is_new_version(request: Dict[str, Any]) -> bool:
     return bool(request.get("target_document_id"))
+
+
+# 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, 설계 v1.1 7.1): 보존이 켜져 있으면 정상 버전 포인트를 지우지 않는다
+def _retention_enabled() -> bool:
+    return bool(getattr(get_settings(), "document_version_vector_retention_enabled", False))
+
+
+# 2026.11.06(sooyeon.choi) 수정 - 버전 봉인 값: 벡터 명세(포인트 수·ID 해시)와 문서 행 재구성 값(snapshot)
+def _vector_manifest(chunks) -> Dict[str, Any]:
+    point_ids = sorted(str(chunk.metadata.get("point_id")) for chunk in chunks)
+    return {
+        "point_count": len(point_ids),
+        "point_ids_sha256": hashlib.sha256("\n".join(point_ids).encode("utf-8")).hexdigest(),
+    }
+
+
+def _profile_id_or_none(db) -> Optional[int]:
+    try:
+        return ensure_current_profile_id(db)
+    except Exception:
+        # 프로필을 기록하지 못해도 적재는 계속한다(그 버전은 복원 시 PROFILE_UNKNOWN으로 차단)
+        logger.exception("event=embedding_profile status=failed")
+        return None
 
 
 def _record_repo(service) -> IngestRecordRepository:
@@ -301,10 +326,12 @@ class IndexStep:
         # 2026.10.16 수정 - Phase 2: 문서 행·리소스 확정·버전·청크·사진·흐름도를 한 트랜잭션으로 기록(P2-6~P2-13).
         #   실패하면 DB는 함께 롤백되고, 파이프라인 보상 단계가 Qdrant 포인트·리소스 파일을 지운다.
         with db.get_connection():
+            previous_version_no = None
             if new_version:
                 # 2026.10.19 추가 - 최신본 전환: 이전 active → retired, 새 버전 → active, 문서 행 표시 정보·version_no 갱신
                 #   (모델명·doc_key·업로더·대화 주제는 유지). 이 트랜잭션이 실패하면 기존 최신본이 그대로 남는다.
-                record_repo.activate_version(
+                # 2026.11.06(sooyeon.choi) 수정 - 이전 적용 버전(적용 이력 from_version_no)을 돌려받는다
+                previous_version_no = record_repo.activate_version(
                     context.document_id, version_no, **version_fields,
                     doc_type=parse_result.get("doc_type"),
                     requested_doc_type=parse_result.get("requested_doc_type", "auto"),
@@ -325,15 +352,37 @@ class IndexStep:
             record_repo.insert_chunks(chunk_rows(chunks, context.document_id, version_no, config.collection_id))
             record_repo.insert_chunk_resources(chunk_resource_links(chunks))
             record_repo.insert_flow_graphs(context.document_id, version_no, data.get("excel_flow_graphs") or [])
+            # 2026.11.06(sooyeon.choi) 수정 - 버전 봉인(프로필·벡터 명세·문서 snapshot)과 적용 이력(upload·replace)을
+            #   같은 전환 트랜잭션에 기록한다(설계 v1.1 5.2·5.3·6.5, B-03·B-04)
+            record_repo.seal_version(
+                context.document_id, version_no,
+                embedding_profile_id=_profile_id_or_none(db),
+                manifest=_vector_manifest(chunks),
+                snapshot={
+                    "doc_type": parse_result.get("doc_type"),
+                    "requested_doc_type": parse_result.get("requested_doc_type", "auto"),
+                    "doc_type_source": parse_result.get("doc_type_source"),
+                    "title": title,
+                },
+            )
+            record_repo.record_activation(
+                context.document_id, to_version_no=version_no,
+                operation_type="replace" if new_version else "upload",
+                from_version_no=previous_version_no, actor_id=request.get("uploaded_by"),
+                job_id=request.get("job_id"), initial=not new_version,
+            )
         data["activated"] = True
-        if new_version:
+        # 2026.11.06(sooyeon.choi) 수정 - 보존이 켜져 있으면 이전 정상 버전 포인트를 지우지 않는다(B-08)
+        if new_version and not _retention_enabled():
             # 2026.10.19 추가 - 전환 후 이전 버전 포인트 정리(실패해도 검색 제외 조건이 가리고, 주기 작업이 다시 시도)
-            purged = await asyncio.to_thread(
+            # 2026.11.06(sooyeon.choi) 수정 - 방금 교체된 이전 버전만 지운다. 보존 기간에 남긴 다른 정상 버전은
+            #   설정을 꺼도 지우지 않는다(설계 v1.1 10절). 그 밖의 미정리 포인트는 기동 시 주기 정리가 맡는다
+            purged = previous_version_no is not None and await asyncio.to_thread(
                 service.vector_repo.delete_document_version_points,
-                context.document_id, config.qdrant_name, keep_version_no=version_no,
+                context.document_id, config.qdrant_name, version_no=previous_version_no,
             )
             if purged:
-                await asyncio.to_thread(record_repo.mark_inactive_versions_purged, context.document_id)
+                await asyncio.to_thread(record_repo.mark_version_purged, context.document_id, previous_version_no)
         data["result"] = service._build_response(
             context.document_id, request["filename"], parse_result, request["collection_name"]
         )

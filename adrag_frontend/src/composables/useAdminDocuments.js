@@ -7,6 +7,8 @@ import { docTypeLabel, docTypeSourceLabel, formatFileSize, formatTime } from '..
 import { useNavigationLock } from './useNavigationLock';
 import { modelNameError, useDocumentUpload } from './useDocumentUpload';
 import { useDocumentVersions } from './useDocumentVersions';
+// 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, R1-5)
+import { useVersionRestore } from './useVersionRestore';
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'auto', label: '자동', description: '파일 형식과 문서 구조를 분석하여 적절한 청킹 방식을 자동 적용합니다.' },
@@ -142,6 +144,8 @@ export const useAdminDocuments = ({ router }) => {
       }
       // 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중인 본인 작업은 상태 확인을 이어간다(새로고침 복원)
       versions.syncPendingJobs(documents.value);
+      // 2026.11.06(sooyeon.choi) 수정 - 복원 처리 중(pending_operation=restore)인 문서는 작업 확인을 이어간다
+      restore.syncPendingRestores(documents.value);
     } catch {
       if (disposed) return;
       documents.value = [];
@@ -150,6 +154,8 @@ export const useAdminDocuments = ({ router }) => {
 
   // 2026.10.19(sooyeon.choi) 추가 - [최신본 변경]·[버전 이력]
   const versions = useDocumentVersions({ api: adminApi, loadDocuments, showAlert });
+  // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원: 선택·확인·접수·진행 확인·적용 이력
+  const restore = useVersionRestore({ api: adminApi, documents, loadDocuments, showAlert, versions });
 
   const loadCollections = async () => {
     if (disposed) return;
@@ -349,6 +355,8 @@ export const useAdminDocuments = ({ router }) => {
     saveModelEdit,
     // 2026.10.19(sooyeon.choi) 추가 - 최신본 변경·버전 이력
     ...versions,
+    // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원
+    ...restore,
     isAdmin,
     displayName,
     logout,

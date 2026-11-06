@@ -21,6 +21,11 @@ class IngestJobManager:
     async def start(self) -> None:
         if self._worker and not self._worker.done():
             return
+        # 2026.11.06(sooyeon.choi) 수정 - 끝났거나 없는 작업을 가리키는 문서 점유 표식 해제(설계 v1.1 6.4)
+        try:
+            await asyncio.to_thread(_record_repo().reconcile_pending)
+        except Exception:
+            logger.exception("pending_job_id 정합성 복구 실패")
         for job_id in await asyncio.to_thread(self._repository.requeue_interrupted):
             await self._queue.put(job_id)
         self._worker = asyncio.create_task(self._run(), name="ingest-worker")
@@ -39,13 +44,17 @@ class IngestJobManager:
 
     async def retry(self, job_id: str) -> None:
         job = await asyncio.to_thread(self._repository.get, job_id)
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 작업은 같은 작업으로 재시도하지 않는다(최신 이력 확인 후 새 요청)
+        if job and job.get("operation_type") == "restore":
+            raise RestoreRetryNotAllowed("RESTORE_RETRY_REQUIRES_NEW_REQUEST")
         if not job or job["status"] != "failed":
             raise ValueError("재시도 가능한 실패 작업이 아닙니다.")
         # 2026.10.19 추가 - 최신본 변경 작업 재시도: 같은 버전을 다시 처리 중(building)으로 되돌린다.
         #   그 사이 같은 문서에 다른 최신본 변경이 접수됐으면 재시도하지 않는다(문서별 처리 중 1개, D-01).
         request = job.get("request") or {}
         if request.get("target_document_id"):
-            await asyncio.to_thread(_reopen_version, request["target_document_id"], int(request["version_no"]))
+            # 2026.11.06(sooyeon.choi) 수정 - 재시도 시 문서 점유 표식도 다시 잡는다
+            await asyncio.to_thread(_reopen_version, request["target_document_id"], int(request["version_no"]), job_id)
         await asyncio.to_thread(
             self._repository.update, job_id, status="queued", step=job["current_step"]
         )
@@ -62,6 +71,12 @@ class IngestJobManager:
     async def _execute(self, job_id: str) -> None:
         job = await asyncio.to_thread(self._repository.get, job_id)
         if not job:
+            return
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 작업은 파일 경로·체크포인트를 쓰지 않으므로 맨 앞에서 분기(B-14)
+        if job.get("operation_type") == "restore":
+            from app.services.document_version_restore import run_restore_job
+
+            await run_restore_job(job_id)
             return
         request = job["request"]
         # Jobs persisted before document-type selection was introduced may not
@@ -102,6 +117,11 @@ class IngestJobManager:
                     )
                 except Exception:
                     logger.exception("version failed 표시 실패 job_id=%s", job_id)
+                # 2026.11.06(sooyeon.choi) 수정 - 최신본 변경 실패: 이 작업의 문서 점유 표식 해제(B-01)
+                try:
+                    await asyncio.to_thread(_record_repo().release_pending, request["target_document_id"], job_id)
+                except Exception:
+                    logger.exception("pending_job_id 해제 실패 job_id=%s", job_id)
             await asyncio.to_thread(
                 self._repository.update,
                 job_id,
@@ -119,17 +139,25 @@ def _record_repo():
 
 
 # 2026.10.19 추가 - 실패한 최신본 변경 버전을 재시도용으로 다시 연다(문서별 처리 중 1개 보장)
-def _reopen_version(document_id: str, version_no: int) -> None:
+def _reopen_version(document_id: str, version_no: int, job_id: str | None = None) -> None:
     repo = _record_repo()
     with repo.db.get_connection():
         repo.lock_document(document_id)
         current = repo.in_progress_version(document_id)
         if current and current["version_no"] != version_no:
             raise ValueError(f"이 문서는 v{current['version_no']} 최신본 변경을 처리 중입니다.")
+        # 2026.11.06(sooyeon.choi) 수정 - 다른 작업(복원 등)이 문서를 점유 중이면 재시도하지 않는다
+        if job_id and not repo.acquire_pending(document_id, job_id):
+            raise ValueError("이 문서는 다른 작업을 처리 중입니다. 완료 후 다시 시도하세요.")
         if not current and not repo.set_version_status(
             document_id, version_no, "building", vectors_purged=False, from_statuses=("failed",)
         ):
             raise ValueError("재시도할 수 있는 최신본 변경 버전이 아닙니다.")
+
+
+# 2026.11.06(sooyeon.choi) 수정 - 복원 작업 재시도 거부(라우트가 409 RESTORE_RETRY_REQUIRES_NEW_REQUEST로 응답)
+class RestoreRetryNotAllowed(ValueError):
+    pass
 
 
 _manager: Optional[IngestJobManager] = None

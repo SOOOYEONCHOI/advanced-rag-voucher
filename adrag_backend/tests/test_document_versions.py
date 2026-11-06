@@ -314,5 +314,9 @@ def test_visibility_filter_hides_non_active_versions_in_qdrant(env):
     db.execute_update("UPDATE tb_document_versions SET status = 'active' WHERE document_id = 'doc-a' AND version_no = 2")
     db.execute_update("UPDATE tb_documents SET version_no = 2 WHERE document_id = 'doc-a'")
     db.execute_update("UPDATE tb_document_versions SET vectors_purged_at = now() WHERE document_id = 'doc-b' AND version_no = 1")
+    # 2026.11.06(sooyeon.choi) 수정 - 삭제 시각만으로는 필터를 풀지 않는다(보존·백업 복구 포인트 대비, 설계 v1.1 B-07)
+    assert visible() == [("doc-a", 2), ("doc-b", 2), ("doc-c", 0), ("doc-c", 1)]
+    db.execute_update("UPDATE tb_document_versions SET vector_storage_state = 'missing' "
+                      "WHERE document_id = 'doc-b' AND version_no = 1")
     assert visible() == [("doc-a", 2), ("doc-b", 1), ("doc-b", 2), ("doc-c", 0), ("doc-c", 1)]
     assert version_visibility.documents_with_hidden_versions() == [("doc-a", 2)]

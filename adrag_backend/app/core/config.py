@@ -9,7 +9,7 @@
 import os
 from functools import lru_cache
 from typing import Literal, Optional
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -191,6 +191,15 @@ class Settings(BaseSettings):
     answer_correctness_judge_temperature: float = 0.0
     openai_api_key: Optional[str] = None
 
+    # 2026.11.06(sooyeon.choi) 수정 - 복원은 보존을 전제로 한다(보존 OFF + 복원 ON이면 기동 실패, 설계 v1.1 10절 B-15)
+    @model_validator(mode="after")
+    def validate_document_version_restore(self):
+        if self.document_version_restore_enabled and not self.document_version_vector_retention_enabled:
+            raise ValueError(
+                "DOCUMENT_VERSION_RESTORE_ENABLED=true에는 DOCUMENT_VERSION_VECTOR_RETENTION_ENABLED=true가 필요합니다."
+            )
+        return self
+
     @field_validator("answer_correctness_primary")
     @classmethod
     def validate_answer_correctness_primary(cls, value: str) -> str:
@@ -232,6 +241,15 @@ class Settings(BaseSettings):
     excel_image_link_all: bool = True
     # 2026.10.19 추가 - 문서 목록 [최신본 변경]
     document_version_replace_enabled: bool = True
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, R1-5, D-22). 기본값은 기존 동작 그대로(둘 다 false)
+    #   보존: 최신본 변경 후 이전 정상 버전의 Qdrant 포인트를 지우지 않는다(정리 경로 중단). 한번 보존한 데이터는 꺼도 자동 삭제하지 않음
+    #   복원: 버전 이력에서 이전 버전 복원 신규 접수 허용(관리자 전용). 보존이 꺼져 있으면 기동 오류
+    document_version_vector_retention_enabled: bool = False
+    document_version_restore_enabled: bool = False
+    # 2026.11.06(sooyeon.choi) 추가 - 검색의 비활성 버전 제외 조건 방식(설계 v1.1 7.3 C안)
+    #   nested(기본·기존): 문서마다 중첩 조건 / doc_version: payload doc_version에 대한 match any 조건 1개.
+    #   doc_version은 scripts/backfill_doc_version_payload.py로 기존 포인트를 채우고 미기록 0건을 확인한 뒤에 켠다
+    document_version_filter_mode: Literal["nested", "doc_version"] = "nested"
     # 2026.10.19 추가 - 사진 답변·출처 패널·이미지 뷰어
     #   false면 사진 후보를 프롬프트에 넣지 않고 응답 images도 비운다(기존 답변 흐름 그대로).
     #   사진이 연결된 엑셀 문서가 근거일 때만 프롬프트가 바뀐다(그 외 문서는 후보 0건 → 기존과 같음).

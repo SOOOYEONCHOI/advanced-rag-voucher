@@ -17,8 +17,9 @@ from app.repositories.database import Row, get_database_manager, to_driver_sql
 #   현재 소스 기준 0001_baseline = SQLite schema.sql 24테이블
 # 2026.10.16 수정 - 0002_schema_hardening(테이블 추가 없음), 0003(Phase 2): 버전·청크·청크↔사진·흐름도·staging +5
 # 2026.10.19 수정 - 0004(UI-12 모델명)·0005(최신본 변경): 테이블 추가 없음
-TABLE_COUNT = 29
-HEAD = "0005_document_version_replace"
+# 2026.11.06(sooyeon.choi) 수정 - 0006(이전 버전 복원): tb_embedding_profiles·tb_document_version_activations +2
+TABLE_COUNT = 31
+HEAD = "0006_document_version_restore"
 
 
 def _tables(db):

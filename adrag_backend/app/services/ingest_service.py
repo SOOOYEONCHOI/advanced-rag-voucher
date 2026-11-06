@@ -464,6 +464,9 @@ class IngestService:
             )
             # 2026.10.16 추가 - Phase 2(P2-2): 버전·포인트 종류·버전 무관 키(검색 필터·개정 전환·재매핑용)
             payload["version_no"] = meta.get("version_no", 1)
+            # 2026.11.06(sooyeon.choi) 수정 - 버전 제외 필터용 고정 키 "document_id:version_no"(설계 v1.1 7.3 C안).
+            #   버전마다 값이 고정이라 최신본 전환·복원 때 Qdrant를 다시 쓰지 않는다
+            payload["doc_version"] = f"{document_id}:{int(payload['version_no'])}"
             payload["point_type"] = "text"
             if meta.get("source_key"):
                 payload["source_key"] = meta["source_key"]

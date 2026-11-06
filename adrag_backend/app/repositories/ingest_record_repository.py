@@ -29,6 +29,13 @@ _RESOURCE_COLUMNS = (
 )
 
 
+# 2026.11.06(sooyeon.choi) 수정 - 복원 전환 조건 불일치(코드는 API·작업 오류 코드와 같음)
+class RestoreStateError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class IngestRecordRepository:
     def __init__(self, db: Optional[DatabaseManager] = None) -> None:
         self.db = db or get_database_manager()
@@ -70,7 +77,8 @@ class IngestRecordRepository:
         # 2026.10.19 수정 - 문서 삭제는 모든 포인트를 지우므로 정리 완료 시각도 함께 기록
         return self.db.execute_update(
             "UPDATE tb_document_versions SET status = 'retired', retired_at = coalesce(retired_at, now()), "
-            "vectors_purged_at = coalesce(vectors_purged_at, now()) "
+            "vectors_purged_at = coalesce(vectors_purged_at, now()), "
+            "vector_storage_state = 'missing' "  # 2026.11.06(sooyeon.choi) 수정 - 보관 상태도 함께 기록
             "WHERE document_id = ? AND (status <> 'retired' OR vectors_purged_at IS NULL)",
             (document_id,),
         )
@@ -126,7 +134,8 @@ class IngestRecordRepository:
         """처리 중 버전의 상태를 바꾼다(active·retired 행은 건드리지 않음)."""
         purged_sql = ""
         if vectors_purged is True:
-            purged_sql = ", vectors_purged_at = coalesce(vectors_purged_at, now())"
+            # 2026.11.06(sooyeon.choi) 수정 - 포인트를 지웠으면 보관 상태도 missing
+            purged_sql = ", vectors_purged_at = coalesce(vectors_purged_at, now()), vector_storage_state = 'missing'"
         elif vectors_purged is False:
             purged_sql = ", vectors_purged_at = NULL"
         placeholders = ", ".join("?" for _ in from_statuses)
@@ -144,7 +153,7 @@ class IngestRecordRepository:
             (source_path, stored_filename, document_id, version_no),
         )
 
-    def activate_version(self, document_id: str, version_no: int, **fields: Any) -> None:
+    def activate_version(self, document_id: str, version_no: int, **fields: Any) -> Optional[int]:
         """새 버전을 active로 전환하고 이전 active를 retired로 둔다. 호출자 트랜잭션 안에서 실행.
 
         문서가 삭제됐거나 새 버전이 처리 중 상태가 아니면 RuntimeError(트랜잭션 롤백 → 기존 최신본 유지).
@@ -156,6 +165,7 @@ class IngestRecordRepository:
         )
         if not doc:
             raise RuntimeError("최신본을 바꿀 문서가 없거나 삭제되었습니다.")
+        previous_version_no = doc[0][0]  # 2026.11.06(sooyeon.choi) 수정 - 적용 이력(from_version_no)용
         state = self.db.execute_query(
             "SELECT status FROM tb_document_versions WHERE document_id = ? AND version_no = ? FOR UPDATE",
             (document_id, version_no),
@@ -197,15 +207,33 @@ class IngestRecordRepository:
                 fields.get("parser_type"), fields.get("total_pages"), fields.get("chunk_count"), document_id,
             ),
         )
+        # 2026.11.06(sooyeon.choi) 수정 - 이 버전 작업의 점유 표식 해제(자기 소유만, B-01)
+        self.db.execute_update(
+            "UPDATE tb_documents SET pending_job_id = NULL WHERE document_id = ? AND pending_job_id = "
+            "(SELECT job_id FROM tb_document_versions WHERE document_id = ? AND version_no = ?)",
+            (document_id, document_id, version_no),
+        )
+        return previous_version_no
 
     def mark_inactive_versions_purged(self, document_id: str) -> int:
         """활성 버전을 뺀 나머지 포인트를 지운 뒤 호출 — 검색 제외 조건에서 빠진다."""
         return self.db.execute_update(
-            """UPDATE tb_document_versions v SET vectors_purged_at = now()
+            """UPDATE tb_document_versions v SET vectors_purged_at = now(), vector_storage_state = 'missing'
                FROM tb_documents d
                WHERE d.document_id = v.document_id AND v.document_id = ? AND v.version_no <> d.version_no
                  AND v.status IN ('retired', 'failed') AND v.vectors_purged_at IS NULL""",
             (document_id,),
+        )
+
+    # 2026.11.06(sooyeon.choi) 수정 - 특정 비활성 버전 하나의 포인트를 지운 뒤 호출(보존 OFF의 즉시 정리)
+    def mark_version_purged(self, document_id: str, version_no: int) -> int:
+        return self.db.execute_update(
+            """UPDATE tb_document_versions v SET vectors_purged_at = coalesce(v.vectors_purged_at, now()),
+                   vector_storage_state = 'missing'
+               FROM tb_documents d
+               WHERE d.document_id = v.document_id AND v.document_id = ? AND v.version_no = ?
+                 AND v.version_no <> d.version_no""",
+            (document_id, version_no),
         )
 
     def documents_needing_purge(self) -> list[tuple[str, int, str]]:
@@ -216,20 +244,209 @@ class IngestRecordRepository:
                JOIN tb_documents d ON d.document_id = v.document_id AND d.deleted_at IS NULL
                JOIN tb_collections c ON c.collection_id = d.collection_id
                WHERE v.version_no <> d.version_no AND v.status IN ('retired', 'failed')
-                 AND v.vectors_purged_at IS NULL"""
+                 AND v.vectors_purged_at IS NULL
+                 AND (v.status = 'failed' OR v.vector_storage_state <> 'available')"""
+            # 2026.11.06(sooyeon.choi) 수정 - 봉인된(available) 정상 버전은 주기 정리에서 제외(보존 데이터 보호)
         )
         return [(r[0], int(r[1]), r[2]) for r in rows]
 
     def list_versions(self, document_id: str) -> list[dict[str, Any]]:
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 가능 여부 판정용 컬럼·등록자 이름 추가
         rows = self.db.execute_query(
             """SELECT v.version_no, v.status, v.original_filename, v.file_size, v.file_format, v.parser_type,
                       v.processing_engine, v.total_pages, v.chunk_count, v.uploaded_by, v.job_id,
-                      v.created_at, v.activated_at, v.retired_at, j.status AS job_status, j.error_message
+                      v.created_at, v.activated_at, v.retired_at, j.status AS job_status, j.error_message,
+                      v.source_path, v.vectors_purged_at, v.vector_storage_state, v.embedding_profile_id,
+                      v.document_snapshot_json IS NOT NULL AS has_snapshot, v.restore_verified_at,
+                      nullif(u.user_name, '') AS uploaded_by_name
                FROM tb_document_versions v
                LEFT JOIN tb_ingest_jobs j ON j.job_id = v.job_id
+               LEFT JOIN tb_users u ON u.user_id = v.uploaded_by
                WHERE v.document_id = ?
                ORDER BY v.version_no DESC""",
             (document_id,),
+        )
+        return [dict(r) for r in rows]
+
+    # ── 이전 버전 복원·적용 이력·점유 표식 (2026.11.06(sooyeon.choi) 수정 - UI-12 R1-5, 설계 v1.1 5·6절) ──
+
+    def pending_job_id(self, document_id: str) -> Optional[str]:
+        rows = self.db.execute_query("SELECT pending_job_id FROM tb_documents WHERE document_id = ?", (document_id,))
+        return rows[0][0] if rows else None
+
+    def acquire_pending(self, document_id: str, job_id: str) -> bool:
+        """문서 변경 작업 점유(최신본 변경·복원 공통). 비어 있거나 이미 자기 것일 때만 성공. 호출자가 lock_document 아래에서 호출."""
+        return bool(self.db.execute_update(
+            "UPDATE tb_documents SET pending_job_id = ? WHERE document_id = ? AND deleted_at IS NULL "
+            "AND (pending_job_id IS NULL OR pending_job_id = ?)",
+            (job_id, document_id, job_id),
+        ))
+
+    def release_pending(self, document_id: str, job_id: str) -> int:
+        """자기 소유 점유만 해제한다."""
+        return self.db.execute_update(
+            "UPDATE tb_documents SET pending_job_id = NULL WHERE document_id = ? AND pending_job_id = ?",
+            (document_id, job_id),
+        )
+
+    def reconcile_pending(self) -> int:
+        """기동 시 정합성 복구: 끝났거나 없는 작업을 가리키는 점유를 해제한다(6.4)."""
+        return self.db.execute_update(
+            """UPDATE tb_documents d SET pending_job_id = NULL
+               WHERE d.pending_job_id IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM tb_ingest_jobs j
+                                 WHERE j.job_id = d.pending_job_id AND j.status IN ('queued', 'running'))"""
+        )
+
+    def record_activation(
+        self, document_id: str, *, to_version_no: int, operation_type: str, from_version_no: Optional[int] = None,
+        actor_id: Optional[str] = None, job_id: Optional[str] = None, initial: bool = False,
+    ) -> dict[str, Any]:
+        """적용 이력 1행. initial이면 순번 1(신규 문서), 아니면 tb_documents.activation_revision을 1 올린다.
+        호출자의 전환 트랜잭션 안에서 실행한다(B-04)."""
+        if initial:
+            revision = 1
+        else:
+            revision = int(self.db.execute_query(
+                "UPDATE tb_documents SET activation_revision = activation_revision + 1 WHERE document_id = ? "
+                "RETURNING activation_revision",
+                (document_id,),
+            )[0][0])
+        row = self.db.execute_query(
+            """INSERT INTO tb_document_version_activations
+                   (document_id, from_version_no, to_version_no, activation_revision, operation_type, actor_id, job_id)
+               VALUES (?, ?, ?, ?, ?,
+                       (SELECT user_id FROM tb_users WHERE user_id = ?),
+                       (SELECT job_id FROM tb_ingest_jobs WHERE job_id = ?))
+               RETURNING activation_id, activated_at""",
+            (document_id, from_version_no, to_version_no, revision, operation_type, actor_id, job_id),
+        )[0]
+        return {"activation_id": int(row[0]), "activated_at": row[1], "activation_revision": revision}
+
+    def seal_version(
+        self, document_id: str, version_no: int, *, embedding_profile_id: Optional[int],
+        manifest: dict[str, Any], snapshot: dict[str, Any],
+    ) -> None:
+        """적재 성공 버전의 프로필·벡터 명세·문서 snapshot 기록(봉인). 이후 복원 판정·검증의 기준."""
+        self.db.execute_update(
+            """UPDATE tb_document_versions SET embedding_profile_id = ?, vector_manifest_json = ?,
+                   document_snapshot_json = ?, vector_storage_state = 'available', restore_verified_at = now()
+               WHERE document_id = ? AND version_no = ?""",
+            (embedding_profile_id, _dump(manifest), _dump(snapshot), document_id, version_no),
+        )
+
+    def get_version(self, document_id: str, version_no: int) -> Optional[dict[str, Any]]:
+        rows = self.db.execute_query(
+            "SELECT * FROM tb_document_versions WHERE document_id = ? AND version_no = ?", (document_id, version_no)
+        )
+        return dict(rows[0]) if rows else None
+
+    def version_point_ids(self, document_id: str, version_no: int) -> list[str]:
+        return [str(r[0]) for r in self.db.execute_query(
+            "SELECT point_id FROM tb_chunks WHERE document_id = ? AND version_no = ? ORDER BY point_id",
+            (document_id, version_no),
+        )]
+
+    def version_resources(self, document_id: str, version_no: int) -> list[str]:
+        return [r[0] for r in self.db.execute_query(
+            "SELECT resource_id FROM tb_spreadsheet_resources WHERE document_id = ? AND version_no = ? "
+            "AND status <> 'deleted'",
+            (document_id, version_no),
+        )]
+
+    def restore_version(
+        self, document_id: str, version_no: int, *, job_id: str, actor_id: Optional[str],
+        expected_version_no: int, expected_revision: int,
+    ) -> dict[str, Any]:
+        """이전 버전 복원 전환(6.2). 호출자 트랜잭션 안에서 실행. 조건이 어긋나면 RestoreStateError(롤백 → 기존 유지).
+
+        이전 active → retired, 대상 → active, 문서 행 표시·내용 정보 전환(모델명·doc_key·업로더·대화 주제·보안 등급 유지),
+        적용 순번 +1·적용 이력·점유 해제. 새 임베딩·포인트는 만들지 않는다.
+        """
+        self.lock_document(document_id)
+        doc = self.db.execute_query(
+            "SELECT version_no, activation_revision, pending_job_id, deleted_at FROM tb_documents "
+            "WHERE document_id = ? FOR UPDATE",
+            (document_id,),
+        )
+        if not doc or doc[0]["deleted_at"] is not None:
+            raise RestoreStateError("NOT_FOUND", "문서가 없거나 삭제되었습니다.")
+        doc = dict(doc[0])
+        if doc["pending_job_id"] != job_id:
+            raise RestoreStateError("JOB_IN_PROGRESS", "다른 작업이 이 문서를 처리 중입니다.")
+        if int(doc["version_no"] or 1) != expected_version_no or int(doc["activation_revision"]) != expected_revision:
+            raise RestoreStateError("STATE_CHANGED", "현재 적용 버전이 변경되었습니다.")
+        target = self.db.execute_query(
+            "SELECT * FROM tb_document_versions WHERE document_id = ? AND version_no = ? FOR UPDATE",
+            (document_id, version_no),
+        )
+        if not target:
+            raise RestoreStateError("VERSION_NOT_FOUND", "선택한 버전을 찾을 수 없습니다.")
+        target = dict(target[0])
+        if target["status"] != "retired" or target["activated_at"] is None:
+            raise RestoreStateError("VERSION_NOT_RESTORABLE", "정상 적용 이력이 없는 버전입니다.")
+        snapshot = target.get("document_snapshot_json")
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+        if not snapshot:
+            raise RestoreStateError("METADATA_MISSING", "이전 버전 정보가 부족해 복원할 수 없습니다.")
+        from_version_no = int(doc["version_no"] or 1)
+        self.db.execute_update(
+            "UPDATE tb_document_versions SET status = 'retired', retired_at = now() "
+            "WHERE document_id = ? AND status = 'active'",
+            (document_id,),
+        )
+        self.db.execute_update(
+            "UPDATE tb_document_versions SET status = 'active', activated_at = now(), retired_at = NULL "
+            "WHERE document_id = ? AND version_no = ?",
+            (document_id, version_no),
+        )
+        self.db.execute_update(
+            """UPDATE tb_documents SET
+                   version_no = ?, original_filename = ?, stored_filename = ?, source_path = ?, file_size = ?,
+                   file_format = ?, parser_type = ?, total_pages = ?, chunk_count = ?,
+                   doc_type = ?, requested_doc_type = ?, doc_type_source = ?, title = ?,
+                   status = 'ready', error_message = NULL, pending_job_id = NULL,
+                   active_activated_at = now(), content_updated_at = now(), updated_at = now()
+               WHERE document_id = ?""",
+            (
+                version_no, target["original_filename"], target["stored_filename"], target["source_path"],
+                target["file_size"], target["file_format"], target["parser_type"], target["total_pages"],
+                target["chunk_count"], snapshot.get("doc_type"), snapshot.get("requested_doc_type") or "auto",
+                snapshot.get("doc_type_source"), snapshot.get("title"), document_id,
+            ),
+        )
+        activation = self.record_activation(
+            document_id, from_version_no=from_version_no, to_version_no=version_no, operation_type="restore",
+            actor_id=actor_id, job_id=job_id,
+        )
+        return {
+            "document_id": document_id,
+            "from_version_no": from_version_no,
+            "current_version_no": version_no,
+            "original_filename": target["original_filename"],
+            "total_pages": target["total_pages"],
+            "chunk_count": target["chunk_count"],
+            **activation,
+        }
+
+    def list_activations(
+        self, document_id: str, *, limit: int, before_activation_id: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        params: list[Any] = [document_id]
+        cursor_sql = ""
+        if before_activation_id is not None:
+            cursor_sql = " AND a.activation_id < ?"
+            params.append(before_activation_id)
+        params.append(limit)
+        rows = self.db.execute_query(
+            f"""SELECT a.activation_id, a.operation_type, a.from_version_no, a.to_version_no, a.activation_revision,
+                       a.actor_id, nullif(u.user_name, '') AS actor_name, a.activated_at
+                FROM tb_document_version_activations a
+                LEFT JOIN tb_users u ON u.user_id = a.actor_id
+                WHERE a.document_id = ?{cursor_sql}
+                ORDER BY a.activation_id DESC LIMIT ?""",
+            tuple(params),
         )
         return [dict(r) for r in rows]
 

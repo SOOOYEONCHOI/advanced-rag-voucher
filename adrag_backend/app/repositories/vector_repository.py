@@ -226,6 +226,8 @@ class VectorRepository:
             "version_no": PayloadSchemaType.INTEGER,
             "point_type": PayloadSchemaType.KEYWORD,
             "source_key": PayloadSchemaType.KEYWORD,
+            # 2026.11.06(sooyeon.choi) 추가 - 비활성 버전 제외 조건(match any) 대상 키
+            "doc_version": PayloadSchemaType.KEYWORD,
         }
         try:
             for field_name, field_schema in indexed_fields.items():

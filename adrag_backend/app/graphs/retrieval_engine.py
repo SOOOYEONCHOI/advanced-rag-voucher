@@ -374,18 +374,23 @@ class RetrievalOrchestrator:
         # 2026.06.29(sooyeon.choi) 수정 - 기본 프로필에서는 BM42 객체도 생성하지 않는 지연 채널 선택
         channel_names = list(profile["channels"])
         channels = [self._get_channel(name) for name in channel_names]
-        results = await asyncio.gather(
-            *[
-                channel.search(
-                    query_bundle=query_bundle,
-                    top_k=top_k,
-                    collection_name=collection_name,
-                    filters=filters,
-                    context=context,
-                )
-                for channel in channels
-            ]
-        )
+        # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(설계 v1.1 7.2): 모든 채널이 같은 활성 버전 목록을 쓰도록 요청 단위 snapshot.
+        #   gather가 만드는 작업·to_thread는 현재 context를 복사하므로 채널마다 따로 DB를 읽지 않는다
+        from app.services.version_visibility import version_snapshot
+
+        with version_snapshot():
+            results = await asyncio.gather(
+                *[
+                    channel.search(
+                        query_bundle=query_bundle,
+                        top_k=top_k,
+                        collection_name=collection_name,
+                        filters=filters,
+                        context=context,
+                    )
+                    for channel in channels
+                ]
+            )
         return dict(zip(channel_names, results))
 
     def merge(

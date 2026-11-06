@@ -50,6 +50,20 @@ export const adminApi = {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/versions`, authConfig({ timeout: 15000 }));
   },
 
+  // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 접수(관리자 전용, 202 + job_id). 본문: 예상 현재 버전·적용 순번·멱등 키
+  restoreDocumentVersion(documentId, versionNo, body) {
+    return http.post(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/restore`,
+      body,
+      authConfig({ timeout: 15000 }),
+    );
+  },
+
+  // 2026.11.06(sooyeon.choi) 수정 - 적용 이력 조회(최신순, before_activation_id 커서)
+  documentActivations(documentId, params = {}) {
+    return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/activations`, authConfig({ params, timeout: 15000 }));
+  },
+
   documentFile(documentId) {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/file`, authConfig({ responseType: 'blob' }));
   },

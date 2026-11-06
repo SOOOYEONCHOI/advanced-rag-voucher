@@ -92,6 +92,10 @@ def _purge_inactive_version_points() -> None:
     from app.repositories.ingest_record_repository import IngestRecordRepository
     from app.repositories.vector_repository import VectorRepository
 
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원: 보존이 켜져 있으면 정리하지 않는다(설계 v1.1 7.1, B-08).
+    #   꺼져 있어도 봉인된(available) 정상 버전은 대상에서 빠진다(documents_needing_purge) — 설정 OFF로 보존 데이터를 지우지 않음
+    if getattr(settings, "document_version_vector_retention_enabled", False):
+        return
     repo = IngestRecordRepository()
     targets = repo.documents_needing_purge()
     if not targets:

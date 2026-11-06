@@ -240,6 +240,12 @@
 
         <!-- Documents Table -->
         <div class="card table-card">
+          <!-- 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 진행·완료·실패 상태 줄(목업 #pageStatus) -->
+          <div v-if="pageStatus" class="page-status" :class="pageStatus.type" role="status">
+            <i v-if="pageStatus.type === 'info'" class="fa-solid fa-spinner fa-spin"></i>
+            <span>{{ pageStatus.text }}</span>
+            <button class="page-status-close" aria-label="상태 안내 닫기" @click="pageStatus = null"><i class="fa-solid fa-xmark"></i></button>
+          </div>
           <div class="card-title-row">
             <div class="card-title"><i class="fa-solid fa-list"></i> 업로드된 문서</div>
             <div class="table-filters">
@@ -356,18 +362,23 @@
                     <span v-if="isVersionPending(doc)" class="version-pending" :title="`v${pendingVersionNo(doc)} 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`">
                       <i class="fa-solid fa-spinner fa-spin"></i> v{{ pendingVersionNo(doc) }}
                     </span>
+                    <!-- 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 처리 중 표시(완료 전까지 현재 버전으로 검색·답변) -->
+                    <span v-else-if="restorePendingOf(doc)" class="version-pending" :title="`v${restorePendingOf(doc)} 복원 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`">
+                      <i class="fa-solid fa-spinner fa-spin"></i> v{{ restorePendingOf(doc) }} 복원
+                    </span>
                   </td>
                   <td class="td-time">{{ formatTime(doc.updated_at || doc.upload_timestamp) }}</td>
                   <!-- 2026.04.02(sooyeon.choi) - 문서 삭제 기능 추가 -->
                   <!-- 2026.10.19(sooyeon.choi) 수정 - [최신본 변경]·[버전 이력] 추가, 기존 삭제 버튼·권한 유지(처리 중에는 삭제 불가) -->
                   <td>
                     <div class="document-actions">
+                      <!-- 2026.11.06(sooyeon.choi) 수정 - 복원 처리 중에도 최신본 변경·삭제 잠금(isDocumentBusy) -->
                       <button
                         v-if="versionReplaceEnabled"
                         class="btn-doc-action btn-latest-version"
-                        :disabled="!doc.can_edit || isVersionPending(doc)"
+                        :disabled="!doc.can_edit || isDocumentBusy(doc)"
                         :title="
-                          !doc.can_edit ? '본인이 업로드한 문서만 최신본을 변경할 수 있습니다.' : isVersionPending(doc) ? '최신본 변경을 처리 중입니다.' : '새 파일을 이 문서의 다음 버전으로 등록'
+                          !doc.can_edit ? '본인이 업로드한 문서만 최신본을 변경할 수 있습니다.' : isDocumentBusy(doc) ? '이 문서의 변경 작업을 처리 중입니다.' : '새 파일을 이 문서의 다음 버전으로 등록'
                         "
                         @click="openReplaceDialog(doc)"
                       >
@@ -376,9 +387,9 @@
                       <button class="btn-doc-action btn-version-history" title="버전 이력" @click="openVersionHistory(doc)"><i class="fa-solid fa-clock-rotate-left"></i><span>버전 이력</span></button>
                       <button
                         class="btn-delete-doc"
-                        :disabled="!doc.can_delete || deletingId === doc.document_id || isVersionPending(doc)"
+                        :disabled="!doc.can_delete || deletingId === doc.document_id || isDocumentBusy(doc)"
                         @click="confirmDeleteDoc(doc)"
-                        :title="!doc.can_delete ? '본인이 업로드한 문서만 개별 삭제할 수 있습니다.' : isVersionPending(doc) ? '최신본 변경을 처리 중인 문서는 삭제할 수 없습니다.' : '문서 삭제'"
+                        :title="!doc.can_delete ? '본인이 업로드한 문서만 개별 삭제할 수 있습니다.' : isDocumentBusy(doc) ? '변경 작업을 처리 중인 문서는 삭제할 수 없습니다.' : '문서 삭제'"
                       >
                         <i v-if="deletingId === doc.document_id" class="fa-solid fa-spinner fa-spin"></i>
                         <i v-else class="fa-solid fa-trash"></i>
@@ -436,41 +447,179 @@
       </div>
     </div>
 
-    <!-- 2026.10.19(sooyeon.choi) 추가 - 버전 이력 대화상자. 이전 버전 적용은 아직 -->
-    <div v-if="historyTarget" class="dialog-overlay" @click.self="closeVersionHistory">
-      <div class="dialog-box version-dialog version-history-dialog" role="dialog" aria-modal="true" aria-labelledby="historyDialogTitle">
-        <div id="historyDialogTitle" class="dialog-title"><i class="fa-solid fa-clock-rotate-left" style="color: #2563eb"></i>버전 이력</div>
+    <!-- 2026.10.19(sooyeon.choi) 추가 - 버전 이력 대화상자 -->
+    <!-- 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(목업 v0.2): 버전 단일 선택 → 하단 [선택 버전 복원] → 확인창. 행 선택은 서버 요청 없음, 적용 이력 펼치기 -->
+    <div v-if="historyTarget" class="dialog-overlay" @click.self="!restoreDialog.stage && closeVersionHistory()">
+      <div
+        v-focus
+        class="dialog-box version-dialog version-history-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="historyDialogTitle"
+        tabindex="-1"
+        :inert="Boolean(restoreDialog.stage)"
+        @keydown.esc="!restoreDialog.stage && closeVersionHistory()"
+      >
+        <div class="history-head">
+          <div id="historyDialogTitle" class="dialog-title"><i class="fa-solid fa-clock-rotate-left" style="color: #2563eb"></i>버전 이력</div>
+          <button class="history-close" aria-label="버전 이력 닫기" @click="closeVersionHistory">×</button>
+        </div>
         <p class="version-dialog-name">
-          <strong>{{ historyTarget.product_model || '-' }}</strong>
-          <span>{{ historyTarget.filename }}</span>
+          <strong
+            >{{ historyData?.product_model || historyTarget.product_model || '-' }}<span v-if="historyData?.collection_display_name" class="history-topic">
+              · {{ historyData.collection_display_name }}</span
+            ></strong
+          >
+          <span>{{ historyData?.current_original_filename || historyTarget.filename }}</span>
         </p>
-        <p class="dialog-hint">현재 적용 중인 버전만 검색과 질의응답에 사용됩니다.</p>
+        <p class="history-notice">{{ historyNotice }}</p>
+        <div class="history-section-title">
+          <span>{{ restoreSupported ? '버전 선택' : '버전 목록' }}</span>
+          <span v-if="historyData" class="history-count">최신순 · 총 {{ historyData.total_versions ?? historyItems.length }}개 버전</span>
+        </div>
         <div class="version-history-list" aria-live="polite">
-          <p v-if="historyLoading" class="version-history-empty"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</p>
-          <p v-else-if="historyError" class="model-error" role="alert">{{ historyError }}</p>
+          <p v-if="historyLoading" class="version-history-empty"><i class="fa-solid fa-spinner fa-spin"></i> 버전 이력을 불러오는 중입니다.</p>
+          <div v-else-if="historyError" class="history-load-error" role="alert">
+            <span>버전 이력을 불러오지 못했습니다. {{ historyError }}</span>
+            <button class="btn-cancel" @click="reloadVersionHistory">다시 불러오기</button>
+          </div>
           <p v-else-if="!historyItems.length" class="version-history-empty">버전 이력이 없습니다.</p>
           <template v-else>
-            <div v-for="item in historyItems" :key="item.version_no" class="version-history-item" :class="item.status">
-              <div class="version-history-head">
-                <strong>v{{ item.version_no }}</strong>
-                <span class="version-status" :class="item.status">{{ versionStatusLabel(item.status) }}</span>
-                <span class="version-history-file" :title="item.original_filename">{{ item.original_filename || '-' }}</span>
-              </div>
-              <p>
-                등록 {{ item.created_at || '-' }}<template v-if="item.activated_at"> · 적용 {{ item.activated_at }}</template
-                ><template v-if="item.retired_at"> · 교체 {{ item.retired_at }}</template>
-              </p>
-              <small>
-                {{ item.uploaded_by || '-' }} · {{ item.processing_engine || item.parser_type || '-' }}<template v-if="item.total_pages != null"> · {{ item.total_pages }}페이지</template
-                ><template v-if="item.chunk_count != null"> · {{ item.chunk_count }}개 청크</template><template v-if="item.file_size"> · {{ formatFileSize(item.file_size) }}</template>
-              </small>
-              <p v-if="item.error" class="model-error">{{ item.error }}</p>
-            </div>
+            <article
+              v-for="item in historyItems"
+              :key="item.version_no"
+              class="version-history-item"
+              :class="[item.status, { selected: selectedVersionNo === item.version_no }]"
+              :aria-label="`v${item.version_no} 버전`"
+            >
+              <button type="button" class="version-option" :disabled="!canSelectVersion(item)" :aria-pressed="selectedVersionNo === item.version_no" @click="selectVersion(item)">
+                <span v-if="restoreSupported" class="version-radio" aria-hidden="true"><i v-if="item.is_active" class="fa-solid fa-check"></i></span>
+                <span class="version-info">
+                  <span class="version-history-head">
+                    <strong>v{{ item.version_no }}</strong>
+                    <span v-if="selectedVersionNo === item.version_no" class="version-status selected">복원 대상 선택됨</span>
+                    <span v-else class="version-status" :class="item.status">{{ item.is_active ? '현재 적용 중' : versionStatusLabel(item.status) }}</span>
+                    <span v-if="item.is_active" class="version-in-use">· 검색·답변 사용 중</span>
+                  </span>
+                  <span class="version-history-file" :title="item.original_filename">{{ item.original_filename || '-' }}</span>
+                  <small>
+                    {{ item.created_at || '-' }} 등록<template v-if="item.uploaded_by_name || item.uploaded_by"> · {{ item.uploaded_by_name || item.uploaded_by }}</template
+                    ><template v-if="item.total_pages != null"> · {{ item.total_pages }}페이지</template
+                    ><template v-if="item.chunk_count != null"> · {{ item.chunk_count }}청크</template
+                    ><template v-if="item.file_size"> · {{ formatFileSize(item.file_size) }}</template>
+                  </small>
+                </span>
+                <i v-if="canSelectVersion(item)" class="fa-solid fa-chevron-right version-chevron" aria-hidden="true"></i>
+              </button>
+              <p v-if="item.error" class="model-error version-reason">{{ item.error }}</p>
+              <p v-else-if="versionBlockReason(item)" class="version-reason"><i class="fa-solid fa-circle-info"></i> {{ versionBlockReason(item) }}</p>
+            </article>
           </template>
         </div>
-        <div class="dialog-actions">
-          <button class="btn-cancel" @click="closeVersionHistory">닫기</button>
+        <p v-if="restoreSupported && historyItems.length" class="history-help"><i class="fa-solid fa-circle-info"></i> 이전 버전을 선택한 후 하단의 복원 버튼을 눌러주세요.</p>
+        <details v-if="restoreSupported" class="activation-log" @toggle="onActivationsToggle">
+          <summary>적용 이력 보기 <i class="fa-solid fa-chevron-down"></i></summary>
+          <p v-if="activations.error" class="model-error" role="alert">{{ activations.error }}</p>
+          <p v-else-if="activations.loaded && !activations.items.length" class="activation-empty">적용 이력이 없습니다.</p>
+          <p v-for="a in activations.items" :key="a.activation_id">{{ activationText(a) }}</p>
+          <p v-if="activations.loading" class="activation-empty"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</p>
+          <button v-else-if="activations.next != null" class="btn-text" @click="loadMoreActivations">더 보기</button>
+        </details>
+        <div class="dialog-actions history-foot">
+          <div v-if="restoreSupported" class="selection-summary" aria-live="polite">
+            <template v-if="selectionValid"
+              ><strong>v{{ historyData.current_version_no }} → v{{ selectedVersionNo }}</strong> 복원 예정 · 확인 단계가 한 번 더 표시됩니다.</template
+            >
+            <template v-else>복원할 이전 버전을 선택하세요.</template>
+          </div>
+          <div class="footer-actions">
+            <button class="btn-cancel" @click="closeVersionHistory">닫기</button>
+            <button v-if="restoreSupported" class="btn-activate-version" :disabled="!selectionValid" @click="openRestoreConfirm">
+              <i class="fa-solid fa-rotate-left"></i> 선택 버전 복원
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 확인·진행·완료·실패 대화상자(목업 v0.2 #restoreOverlay) -->
+    <div v-if="restoreDialog.stage" class="dialog-overlay restore-overlay" @click.self="onRestoreEscape">
+      <div v-focus class="dialog-box version-dialog restore-dialog" role="dialog" aria-modal="true" aria-labelledby="restoreDialogTitle" tabindex="-1" @keydown.esc="onRestoreEscape">
+        <div id="restoreDialogTitle" class="dialog-title">{{ restoreTitle }}</div>
+        <p class="restore-model">{{ restoreDialog.productModel || '-' }}</p>
+
+        <template v-if="restoreDialog.stage === 'confirm'">
+          <p>선택한 버전으로 문서를 복원하시겠습니까?</p>
+          <div class="restore-comparison">
+            <div class="compare-box">
+              <span class="compare-label">현재 적용</span>
+              <strong>v{{ restoreDialog.fromVersionNo }}</strong>
+              <span class="compare-file">{{ restoreDialog.fromFilename || '-' }}</span>
+            </div>
+            <span class="compare-arrow" aria-hidden="true">→</span>
+            <div class="compare-box target">
+              <span class="compare-label">복원할 버전</span>
+              <strong>v{{ restoreDialog.targetVersionNo }}</strong>
+              <span class="compare-file">{{ restoreDialog.targetFilename || '-' }}</span>
+            </div>
+          </div>
+          <p class="restore-note">검색·답변과 사진·출처가 v{{ restoreDialog.targetVersionNo }} 내용으로 변경됩니다.</p>
+          <p class="restore-checklist">
+            ✓ 보관된 검색 데이터를 그대로 사용합니다.<br />✓ 복원 전후 버전 이력이 모두 유지됩니다.<br />✓ 완료 전에는 현재 v{{ restoreDialog.fromVersionNo }}으로 서비스합니다.
+          </p>
+          <p v-if="restoreDialog.nextVersionNo" class="restore-small">복원 후 새 파일을 등록하면 v{{ restoreDialog.nextVersionNo }}로 추가됩니다.</p>
+          <p v-if="restoreDialog.submitError" class="model-error" role="alert">{{ restoreDialog.submitError }}</p>
+          <div class="dialog-actions">
+            <button class="btn-cancel" :disabled="restoreSubmitting" @click="cancelRestoreConfirm">취소</button>
+            <button class="btn-activate-version" :disabled="restoreSubmitting" @click="submitRestore">
+              <i v-if="restoreSubmitting" class="fa-solid fa-spinner fa-spin"></i> 이 버전으로 복원
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="restoreDialog.stage === 'progress'">
+          <p class="restore-note">완료 전까지 현재 v{{ restoreDialog.fromVersionNo }}으로 검색·답변합니다.</p>
+          <div class="restore-progress" role="status">
+            <p v-for="(state, index) in restoreStepStates(restoreDialog.step)" :key="index" class="restore-step" :class="state">
+              <i v-if="state === 'on'" class="fa-solid fa-spinner fa-spin"></i>
+              <span v-else>{{ state === 'done' ? '✓' : '○' }}</span>
+              {{ restoreStepLabel(index, state) }}
+            </p>
+          </div>
+          <p v-if="restoreDialog.checking" class="restore-small">상태 확인 중... 연결이 회복되면 자동으로 이어서 확인합니다.</p>
+          <p class="restore-small">창을 닫아도 처리는 계속됩니다. 버전 이력에서 결과를 확인할 수 있습니다.</p>
+          <div class="dialog-actions">
+            <button class="btn-cancel" @click="backgroundRestore">닫고 계속하기</button>
+          </div>
+        </template>
+
+        <template v-else-if="restoreDialog.stage === 'success'">
+          <p class="restore-note success" role="status">✓ 현재 적용 버전이 v{{ restoreDialog.result?.current_version_no ?? restoreDialog.targetVersionNo }}으로 변경되었습니다.</p>
+          <div class="restore-progress">
+            <strong>{{ restoreDialog.result?.original_filename || restoreDialog.targetFilename }}</strong>
+            <p class="restore-small">
+              <template v-if="restoreDialog.result?.total_pages != null">{{ restoreDialog.result.total_pages }}페이지 · </template
+              ><template v-if="restoreDialog.result?.chunk_count != null">{{ restoreDialog.result.chunk_count }}개 청크<br /></template>
+              선택한 버전의 문서·검색·사진·출처가 적용되었습니다.
+            </p>
+          </div>
+          <p class="restore-small">실행자: {{ restoreDialog.result?.activated_by_name || restoreDialog.result?.activated_by || '-' }} · 복원 내역은 적용 이력에 기록되었습니다.</p>
+          <div class="dialog-actions">
+            <button class="btn-activate-version" @click="closeRestoreResult">버전 이력 확인</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <p class="restore-note error" role="alert">{{ restoreDialog.error }}</p>
+          <p class="restore-keep">
+            현재 적용 버전은 <strong>v{{ restoreDialog.currentVersionNo }}</strong>으로 유지됩니다.
+          </p>
+          <p class="restore-small">잠시 후 다시 시도하세요. 반복되면 관리자에게 문의하세요.</p>
+          <div class="dialog-actions">
+            <button class="btn-cancel" @click="closeRestoreResult">버전 이력으로</button>
+            <button class="btn-activate-version" @click="retryRestore">다시 시도</button>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -1727,6 +1876,317 @@ export default {
 .version-status.failed {
   background: #fee2e2;
   color: #dc2626;
+}
+/* 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(목업 v0.2): 버전 선택 행·하단 선택 요약·적용 이력·복원 확인/진행/결과 대화상자 */
+.page-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+}
+.page-status.success {
+  background: #ecfdf5;
+  color: #047857;
+}
+.page-status.error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.page-status span {
+  flex: 1;
+  min-width: 0;
+}
+.page-status-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dialog-box.version-history-dialog {
+  width: 760px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+.dialog-box.restore-dialog {
+  width: 530px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+.dialog-box:focus {
+  outline: none;
+}
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.history-close {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.history-topic {
+  font-weight: 400;
+  color: #64748b;
+}
+.history-notice {
+  margin: 0.25rem 0 1rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.history-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+.history-count {
+  font-weight: 400;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+.history-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+.version-history-item.selected {
+  background: #eff6ff;
+}
+.version-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.version-option:disabled {
+  cursor: default;
+}
+.version-option:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.version-radio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  color: #64748b;
+  font-size: 0.6rem;
+}
+.version-history-item.selected .version-radio {
+  border: 5px solid #2563eb;
+}
+.version-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.version-in-use {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+.version-chevron {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+.version-status.selected {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.version-reason {
+  margin: 0.4rem 0 0 calc(18px + 0.75rem) !important;
+  color: #b45309;
+  font-size: 0.78rem;
+}
+.history-help {
+  margin: -0.5rem 0 0.75rem;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+.activation-log {
+  margin-bottom: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+.activation-log summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #334155;
+}
+.activation-log summary i {
+  font-size: 0.6rem;
+}
+.activation-log p {
+  margin: 0.35rem 0 0;
+}
+.activation-empty {
+  color: #94a3b8;
+}
+.history-foot {
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.selection-summary {
+  flex: 1;
+  min-width: 0;
+  color: #475569;
+  font-size: 0.82rem;
+}
+.footer-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.restore-model {
+  margin: 0.15rem 0 1rem;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+.restore-comparison {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.1rem 0;
+}
+.compare-box {
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  min-width: 0;
+}
+.compare-box.target {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+.compare-box strong {
+  font-size: 1.5rem;
+  margin: 2px 0;
+}
+.compare-label {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+.compare-box.target .compare-label {
+  color: #2563eb;
+}
+.compare-file {
+  font-size: 0.75rem;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.compare-arrow {
+  color: #64748b;
+}
+.restore-note {
+  padding: 0.75rem 0.95rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+}
+.restore-note.success {
+  background: #ecfdf5;
+  color: #047857;
+}
+.restore-note.error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.restore-checklist {
+  margin: 0.9rem 0;
+  color: #475569;
+  font-size: 0.8rem;
+  line-height: 2;
+}
+.restore-small {
+  margin: 0.5rem 0;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+.restore-keep {
+  margin: 1rem 0;
+  font-size: 0.88rem;
+}
+.restore-progress {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+}
+.restore-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+.restore-step.on {
+  color: #2563eb;
+  font-weight: 600;
+}
+.restore-step.done {
+  color: #047857;
+}
+@media (max-width: 600px) {
+  .restore-comparison {
+    gap: 0.5rem;
+  }
+  .history-foot .footer-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .restore-step .fa-spin,
+  .page-status .fa-spin {
+    animation: none;
+  }
 }
 .td-filename {
   width: var(--filename-column-width, 340px);

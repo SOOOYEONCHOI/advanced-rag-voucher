@@ -4,6 +4,7 @@
 //   - 접수한 작업은 기존 작업 조회 API로 3초마다 확인하고, 끝나면 목록을 다시 읽는다.
 //     새로고침 후에도 목록의 pending_job_id로 확인을 이어간다(본인·관리자 작업만 조회 가능).
 //   - 버전 이력: 실제 버전 목록 조회.
+// 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(useVersionRestore)이 쓰도록 이력 응답 전체(historyData)를 보관하고 재조회 함수를 추가
 import { onScopeDispose, reactive, ref } from 'vue';
 
 const POLL_INTERVAL_MS = 3000;
@@ -37,6 +38,8 @@ export const useDocumentVersions = ({ api, loadDocuments, showAlert, pollInterva
   const historyItems = ref([]);
   const historyLoading = ref(false);
   const historyError = ref('');
+  // 2026.11.06(sooyeon.choi) 수정 - 이력 응답 전체(current_version_no·activation_revision·can_restore 등). 조회 실패·로딩 중에는 null
+  const historyData = ref(null);
 
   const isVersionPending = (doc) => Boolean(doc?.pending_version_no || versionJobs[doc?.document_id]);
   const pendingVersionNo = (doc) => versionJobs[doc?.document_id]?.versionNo || doc?.pending_version_no || null;
@@ -141,12 +144,14 @@ export const useDocumentVersions = ({ api, loadDocuments, showAlert, pollInterva
     const request = ++historyRequest;
     historyTarget.value = doc;
     historyItems.value = [];
+    historyData.value = null; // 2026.11.06(sooyeon.choi) 수정
     historyError.value = '';
     historyLoading.value = true;
     try {
       const res = await api.documentVersions(doc.document_id);
       if (disposed || request !== historyRequest) return;
       historyItems.value = res.data?.versions || [];
+      historyData.value = res.data || null; // 2026.11.06(sooyeon.choi) 수정
     } catch (error) {
       if (disposed || request !== historyRequest) return;
       historyError.value = errorDetail(error, '버전 이력을 불러오지 못했습니다.');
@@ -158,7 +163,12 @@ export const useDocumentVersions = ({ api, loadDocuments, showAlert, pollInterva
     historyRequest += 1;
     historyTarget.value = null;
     historyItems.value = [];
+    historyData.value = null; // 2026.11.06(sooyeon.choi) 수정
     historyError.value = '';
+  };
+  // 2026.11.06(sooyeon.choi) 수정 - 열려 있는 이력을 다시 조회(복원 완료·실패·상태 변경 후). 닫혀 있으면 아무것도 하지 않는다
+  const reloadVersionHistory = async () => {
+    if (historyTarget.value) await openVersionHistory(historyTarget.value);
   };
 
   onScopeDispose(() => {
@@ -171,6 +181,7 @@ export const useDocumentVersions = ({ api, loadDocuments, showAlert, pollInterva
     openReplaceDialog, closeReplaceDialog, onReplaceFileChange, submitReplace,
     versionJobs, isVersionPending, pendingVersionNo, syncPendingJobs,
     historyTarget, historyItems, historyLoading, historyError, openVersionHistory, closeVersionHistory,
+    historyData, reloadVersionHistory, // 2026.11.06(sooyeon.choi) 수정
     versionStatusLabel: (status) => VERSION_STATUS_LABELS[status] || status,
   };
 };
