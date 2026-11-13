@@ -22,7 +22,7 @@ from app.repositories.department_repository import DepartmentRepository
 from app.repositories.vector_repository import VectorRepository
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -236,8 +236,8 @@ class CollectionService:
             )
 
         # 2. SQLite 관련 삭제와 권한 정리를 하나의 트랜잭션으로 수행한다.
-        db = get_database_manager(self.settings.sqlite_db_path)
-        department_repo = DepartmentRepository(self.settings.sqlite_db_path)
+        db = get_database_manager()
+        department_repo = DepartmentRepository()
         with db.get_connection() as conn:
             deleted_docs = conn.execute(
                 "DELETE FROM tb_documents WHERE collection_id = ?",
@@ -294,7 +294,7 @@ class CollectionService:
         qdrant_name: str,
     ) -> None:
         """Validate deletion blockers before changing Qdrant or SQLite."""
-        db = get_database_manager(self.settings.sqlite_db_path)
+        db = get_database_manager()
 
         active_ingest_jobs = 0
         job_rows = db.execute_query(

@@ -25,7 +25,7 @@ from app.prompts.templates import build_rag_messages
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -60,15 +60,6 @@ async def generate_answer(state: PipelineState, deps: GraphDependencies | None =
             await adispatch_custom_event("rag_token", {"token": token})
         answer = "".join(answer_parts).strip()
         # LLMService.chat()에서 이미 strip_thinking() 처리됨
-        # logger.info(f"답변 생성 완료: {len(answer)}자")
-        # 2026.05.22(sooyeon.choi) 추가 - 노드 출력 로깅
-        # logger.info(f"[generate_answer 출력] 답변 앞 200자: {answer[:200]!r}")
-
-        # [DEBUG] 컨텍스트 및 전체 답변 확인 (검색 품질 디버깅용)
-        # context_preview = (state.get("final_context", "") or "")[:500]
-        # logger.debug(f"[DEBUG] 컨텍스트 앞 500자:\n{context_preview}")
-        # logger.debug(f"[DEBUG] 생성된 전체 답변:\n{answer}")
-
         # 2026.06.16(sooyeon.choi) 추가 - SCR-006 토큰 사용량 캡처 (비스트리밍 전용)
         usage = usage or None
         if not answer:

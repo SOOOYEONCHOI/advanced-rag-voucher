@@ -16,7 +16,7 @@ def _dedup_preserve_order(ids: Sequence[str]) -> List[str]:
     운영 검색은 여러 채널 병합으로 같은 청크가 2회 이상 등장할 수 있는데, 순위·nDCG는
     사용자가 실제 보는 '중복 제거된 순위' 기준으로 계산해야 한다. 중복을 남기면
     (a) nDCG의 DCG가 이중 계산되어 값이 1.0을 초과하고, (b) 뒤 정답의 순위가 밀린다.
-    (설계서 C1) — 모든 순위/집합 지표는 dedup 후 top-k를 자른다.
+    모든 순위/집합 지표는 dedup 후 top-k를 자른다.
     """
     seen: Set[str] = set()
     out: List[str] = []
@@ -137,7 +137,7 @@ def compute_channel_metrics(
         metrics[f"fail@{k}"] = None if hit is None else 1.0 - hit
         metrics[f"recall@{k}"] = recall_at_k(retrieved_ids, gold_ids, k)
         metrics[f"ndcg@{k}"] = ndcg_at_k(retrieved_ids, gold_ids, k)
-        # C2 — MRR을 K별로 산출한다. 기존 단일 rr은 max_k 고정(=MRR@10)이라 화면의
+        # MRR을 K별로 산출한다. 기존 단일 rr은 max_k 고정(=MRR@10)이라 화면의
         # "MRR@5" 라벨과 불일치했다. rr@5 등 K별 값을 명시적으로 제공한다.
         metrics[f"rr@{k}"] = reciprocal_rank(retrieved_ids, gold_ids, k)
     max_k = max(k_values) if k_values else None
@@ -155,9 +155,5 @@ def compute_channel_metrics(
     return metrics
 
 
-def aggregate_mean(per_item_values: Sequence[float]) -> float:
-    """항목별 지표 평균 (빈 리스트는 0.0)."""
-    if not per_item_values:
-        return 0.0
-    return sum(per_item_values) / len(per_item_values)
+# 2026.11.09(sooyeon.choi) 삭제 - 사용처 없는 aggregate_mean()
 

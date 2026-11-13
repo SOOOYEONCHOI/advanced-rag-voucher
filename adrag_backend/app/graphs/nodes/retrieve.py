@@ -25,6 +25,9 @@ from app.graphs.retrieval_engine import (
     apply_soft_boost,
     build_query_bundle,
     classify_query_type,
+    # 2026.11.11(sooyeon.choi) 추가 - 가중치 프로필·원문 질의 비중
+    dense_query_weights,
+    get_rrf_weights,
     get_retrieval_config,
     get_retrieval_profile,
 )
@@ -36,7 +39,7 @@ from app.services.collection_service import CollectionService
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -96,7 +99,15 @@ async def _search_qdrant_hybrid(
         (container.kiwi_bm25_encoder if container else get_kiwi_bm25_encoder()).encode_query,
         query_bundle.kiwi_bm25_query,
     )
-    weights = RRF_WEIGHTS.get(query_type, {})
+    # 2026.11.11(sooyeon.choi) 수정 - 가중치는 QUERY_TYPE_PROFILE 표에서, Dense는 원문 질의 비중을 반영해 질의별로 나눈다
+    weights = get_rrf_weights(query_type, settings)
+    dense_weight = weights.get("dense", 1.0)
+    share = getattr(settings, "dense_original_query_share", None)
+    hybrid_kwargs = {}
+    if share is not None:
+        hybrid_kwargs["dense_weights"] = dense_query_weights(
+            list(dense_queries), query_bundle.original_query, dense_weight, share
+        )
     return await asyncio.to_thread(
         (container.vector_store if container else get_vector_repo()).search_hybrid,
         dense_vectors=dense_vectors,
@@ -106,9 +117,10 @@ async def _search_qdrant_hybrid(
         filters=filters,
         dense_prefetch_k=max(top_k, settings.dense_prefetch_k),
         sparse_prefetch_k=max(top_k, settings.sparse_prefetch_k),
-        dense_weight=weights.get("dense", 1.0),
+        dense_weight=dense_weight,
         sparse_weight=weights.get("kiwi_bm25", 1.0),
         rrf_k=settings.hybrid_rrf_k,
+        **hybrid_kwargs,
     )
 
 
@@ -129,6 +141,7 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
             "retrieved_chunks": [],
             "error": "검색할 컬렉션을 선택해주세요",
             "outcome_code": "retrieval_error",
+            "error_message_type": "collection_unavailable",  # 2026.11.11(sooyeon.choi) 추가
         }
 
     # 2026.04.21(sooyeon.choi) 수정 - CollectionService 싱글톤으로 교체
@@ -139,6 +152,7 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
             "retrieved_chunks": [],
             "error": "등록되지 않은 컬렉션입니다",
             "outcome_code": "retrieval_error",
+            "error_message_type": "collection_unavailable",  # 2026.11.11(sooyeon.choi) 추가
         }
 
     # 2026.06.29(sooyeon.choi) 추가 - Task 7: state의 legacy top_k 또는 settings 3단계 top_k에서 RetrievalConfig 생성
@@ -171,7 +185,8 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
 
     # 2026.06.29(sooyeon.choi) 추가 - Task 6: 질의 유형 분류 후 채널별 가중치 결정
     query_type = classify_query_type(preprocess_result, settings)
-    rrf_weights = RRF_WEIGHTS.get(query_type)
+    # 2026.11.11(sooyeon.choi) 수정 - legacy 엔진 경로도 같은 가중치 프로필 사용
+    rrf_weights = get_rrf_weights(query_type, settings) or None
 
     logger.info(
         "[RAG][node=retrieve] collection=%s profile=%s dense_queries=%s candidate_top_k=%s filters=%s query_type=%s",
@@ -267,7 +282,6 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
             metadata=payload,
         ))
 
-    # logger.info(f"검색 완료: {len(chunks)}개 청크 반환 (컬렉션: '{collection_name}')")
     scores = [c["score"] for c in chunks]
     logger.info(
         "[RAG][results][pre_rerank] count=%s chunks=%s",

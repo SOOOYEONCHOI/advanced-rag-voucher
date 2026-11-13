@@ -10,8 +10,8 @@ GPU 서버의 Docling API를 호출하여 PDF/DOCX/PPTX/XLSX/이미지 등을 �
 import os
 import time
 import logging
-from typing import List
 from pathlib import Path
+# 2026.11.09(sooyeon.choi) 삭제 - 미사용 import(typing.List)
 
 import requests
 
@@ -81,7 +81,6 @@ class DoclingApiLoader(BaseDocumentLoader):
         ext = Path(file_path).suffix.lstrip(".").lower()
         load_start = time.perf_counter()
         logger.info("[PARSE][step=docling_api] 시작 file=%s ext=%s", file_path, ext)
-        # logger.info(f"Docling API 호출 시작: {file_path} (타입: {ext})")
 
         headers = {}
         if self.api_key:
@@ -153,7 +152,6 @@ class DoclingApiLoader(BaseDocumentLoader):
                     response.status_code,
                     time.perf_counter() - submit_start,
                 )
-                # logger.info("Docling API: 동기 응답 수신")
                 raise _SyncResponse(res_data["results"])
             raise RuntimeError(f"Job ID를 응답받지 못했습니다: {res_data}")
 
@@ -163,7 +161,6 @@ class DoclingApiLoader(BaseDocumentLoader):
             response.status_code,
             time.perf_counter() - submit_start,
         )
-        # logger.info(f"Job 생성 성공: {job_id}")
         return job_id
 
     def _poll_job(self, job_id: str, headers: dict) -> dict:
@@ -189,7 +186,6 @@ class DoclingApiLoader(BaseDocumentLoader):
                         job_id,
                         time.perf_counter() - poll_start,
                     )
-                    # logger.info("Job 완료. 결과 수신 중...")
                     result_res = requests.get(result_url, headers=headers, timeout=self.read_timeout)
                     if result_res.status_code == 200:
                         return result_res.json()
@@ -272,7 +268,6 @@ class DoclingApiLoader(BaseDocumentLoader):
             len(result),
             preserve_headers,
         )
-        # logger.info(f"Docling 결과 매핑 완료: {len(result)}페이지 (헤더 보존: {preserve_headers})")
         return result
 
     def _map_spreadsheet_result(

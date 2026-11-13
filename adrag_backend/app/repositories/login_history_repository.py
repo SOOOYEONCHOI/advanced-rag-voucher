@@ -14,8 +14,8 @@ class LoginHistoryRepository:
     Audit writes are best-effort: failures are logged but do not block auth.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
-        self.db = get_database_manager(db_path)
+    def __init__(self):
+        self.db = get_database_manager()
 
     def record(
         self,

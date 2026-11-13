@@ -19,14 +19,19 @@ from app.utils.kiwi_tokenizer import (
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 # ── 정규표현식 패턴 ─────────────────────────────────────
 LAW_REFERENCE_PATTERN = re.compile(r"제\d+조(?:의\d+)?(?:\s*제\d+항)?")
 DATE_PATTERN = re.compile(r"\d{4}[년.]\s*\d{1,2}[월.]?\s*\d{0,2}일?")
 _SPACED_LAW_UNIT_PATTERN = re.compile(r"제\s*(\d+)\s*(조|항|호)(\s*의\s*\d+)?")
-_BARE_LAW_UNIT_PATTERN = re.compile(r"(?<!제)(\d+)\s*(조|항|호)(\s*의\s*\d+)?(?!원)")
+# 2026.11.10(sooyeon.choi) 수정 - 뒤가 끝·기호·조사일 때만 "제N조"로 바꾼다.
+#   기존: "3호기"→"제3호기", "2조립"→"제2조립"(법령 질의로 오분류), "제12조"→"제1제2조"(숫자 중간 매칭)
+_BARE_LAW_UNIT_PATTERN = re.compile(
+    r"(?<![제0-9])(\d+)\s*(조|항|호)(\s*의\s*\d+)?"
+    r"(?=$|[^0-9A-Za-z가-힣]|(?:은|는|이|가|을|를|의|에|도|만|와|과|로|으로|에서|부터|까지))"
+)
 
 # 제어 문자 제거용 패턴 (탭·줄바꿈 제외)
 _CONTROL_CHAR_RE = re.compile(
@@ -51,7 +56,13 @@ class QueryPreprocessor:
     패턴 매칭 → 형태소 분석 키워드 추출 순서로 전처리를 수행한다.
     """
 
-    def __init__(self, abbreviation_dict: Dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        abbreviation_dict: Dict[str, str] | None = None,
+        law_notation_normalize: bool = True,
+    ) -> None:
+        # 2026.11.10(sooyeon.choi) 추가 - false면 법령 표기 변환·법령 조문 패턴 추출을 하지 않는다(SOP 전용)
+        self._law_notation_normalize = law_notation_normalize
         # 2026.06.26(sooyeon.choi) 수정 - YAML 통합 사전을 QueryPreprocessor 약어 확장 원천으로 사용
         try:
             dictionary = load_korean_search_dictionary()
@@ -84,21 +95,13 @@ class QueryPreprocessor:
         # 2026.06.29(sooyeon.choi) 수정 - 약어 확장 전에 복합어 띄어쓰기 변형을 표준화
         normalized = _normalize_compound_spacing(normalized, self._compound_terms)
         expanded_text, expanded_terms = self._expand_abbreviations(normalized)
-        expanded_text = self._normalize_law_reference_notation(expanded_text)
+        # 2026.11.10(sooyeon.choi) 수정 - 설정이 꺼지면 법령 표기 변환을 건너뛰고 law_references를 비운다
+        if self._law_notation_normalize:
+            expanded_text = self._normalize_law_reference_notation(expanded_text)
         matched_patterns = self._match_patterns(expanded_text)
+        if not self._law_notation_normalize:
+            matched_patterns["law_references"] = []
         extracted_keywords = self._extract_keywords(expanded_text)
-
-        # logger.info(
-        #     "[Kiwi 형태소 분석 결과] "
-        #     "원본 질의='%s' | "
-        #     "약어 확장=%s | "
-        #     "법령 패턴=%s | "
-        #     "추출 키워드(NNG/NNP/SL)=%s",
-        #     query,
-        #     expanded_terms if expanded_terms else "(없음)",
-        #     matched_patterns.get("law_references") or "(없음)",
-        #     extracted_keywords if extracted_keywords else "(없음)",
-        # )
 
         return PreprocessResult(
             normalized_query=expanded_text,

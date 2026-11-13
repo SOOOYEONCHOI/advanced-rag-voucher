@@ -11,7 +11,7 @@ from app.graphs.utils import timed_node
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -30,7 +30,7 @@ async def build_response(state: PipelineState) -> dict:
             "error": get_user_message(UserMessageType.INVALID_QUESTION),
             "citations": [],
         }
-    # 2026.07.16(sooyeon.choi) 추가 - 검색 시스템 오류의 사용자 안내 메시지 구성 (B2)
+    # 2026.07.16(sooyeon.choi) 추가 - 검색 시스템 오류의 사용자 안내 메시지 구성
     #   check_retrieval이 오류를 재시도 없이 이곳으로 직행시키므로,
     #   raw error 문자열 대신 원인 유형이 드러나는 안내 문구로 교체한다.
     #   generated_answer가 아닌 error 필드를 교체하는 이유:
@@ -44,8 +44,12 @@ async def build_response(state: PipelineState) -> dict:
         logger.warning(
             "[RAG][node=build_response] 검색 오류 종료 error=%r", state.get("error")
         )
+        # 2026.11.11(sooyeon.choi) 수정 - 권한 없음·컬렉션 없음은 원인별 안내(그 밖의 검색 오류는 일시 오류 안내)
+        message_type = state.get("error_message_type")
+        if message_type not in (UserMessageType.PERMISSION_DENIED.value, UserMessageType.COLLECTION_UNAVAILABLE.value):
+            message_type = UserMessageType.TEMPORARY_ERROR
         return {
-            "error": get_user_message(UserMessageType.TEMPORARY_ERROR),
+            "error": get_user_message(message_type),
             "citations": [],
         }
     return {}

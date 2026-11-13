@@ -45,6 +45,16 @@ def file_extension(name: str) -> str:
     return Path(name).suffix.lower().lstrip(".")
 
 
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - DRAWING_PARSE_MODE=backend이면 .dwg·.dxf를 도면 처리기로 보낸다
+#   (문서 유형·파서 선택은 무시). off이면 기존처럼 지원하지 않는 형식으로 거부된다.
+ROUTE_DRAWING_INGEST = "drawing_ingest"
+DRAWING_INGEST_EXTENSIONS = frozenset({"dwg", "dxf"})
+
+
+def is_drawing_ingest_upload(name: str, mode: str) -> bool:
+    return mode == "backend" and file_extension(name or "") in DRAWING_INGEST_EXTENSIONS
+
+
 def is_excel_ingest_extension(name: str) -> bool:
     ext = file_extension(name)
     return ext in EXCEL_INGEST_EXTENSIONS or ext == LEGACY_XLS_EXTENSION

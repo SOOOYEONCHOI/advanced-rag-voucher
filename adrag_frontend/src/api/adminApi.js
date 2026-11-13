@@ -50,18 +50,41 @@ export const adminApi = {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/versions`, authConfig({ timeout: 15000 }));
   },
 
-  // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 접수(관리자 전용, 202 + job_id). 본문: 예상 현재 버전·적용 순번·멱등 키
-  restoreDocumentVersion(documentId, versionNo, body) {
+  // 2026.11.09(woojin.jung) 추가 - 이전 버전 복원 접수(202 job_id). 본문 expected_current_version_no·expected_activation_revision·idempotency_key
+  restoreDocumentVersion(documentId, versionNo, payload) {
     return http.post(
       `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/restore`,
-      body,
+      payload,
       authConfig({ timeout: 15000 }),
     );
   },
 
-  // 2026.11.06(sooyeon.choi) 수정 - 적용 이력 조회(최신순, before_activation_id 커서)
+  // 2026.11.09(woojin.jung) 추가 - 적용 이력 조회(최신순, limit·before_activation_id 커서)
   documentActivations(documentId, params = {}) {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/activations`, authConfig({ params, timeout: 15000 }));
+  },
+
+  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과 조회·검수 완료/취소
+  drawingResult(documentId, versionNo) {
+    return http.get(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-result`,
+      authConfig({ timeout: 30000 }),
+    );
+  },
+
+  reviewDrawing(documentId, versionNo, confirmMissing = false) {
+    return http.post(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-review`,
+      { confirm_missing: confirmMissing },
+      authConfig({ timeout: 15000 }),
+    );
+  },
+
+  cancelDrawingReview(documentId, versionNo) {
+    return http.delete(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-review`,
+      authConfig({ timeout: 15000 }),
+    );
   },
 
   documentFile(documentId) {

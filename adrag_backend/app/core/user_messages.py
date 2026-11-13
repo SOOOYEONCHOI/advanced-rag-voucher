@@ -9,6 +9,9 @@ class UserMessageType(str, Enum):
     SECURITY_BLOCKED = "security_blocked"
     INVALID_QUESTION = "invalid_question"
     TEMPORARY_ERROR = "temporary_error"
+    # 2026.11.11(sooyeon.choi) 추가 - 검색 준비 단계 오류를 원인별로 안내(전에는 모두 TEMPORARY_ERROR)
+    PERMISSION_DENIED = "permission_denied"
+    COLLECTION_UNAVAILABLE = "collection_unavailable"
 
 
 USER_MESSAGES = {
@@ -31,6 +34,14 @@ USER_MESSAGES = {
     UserMessageType.TEMPORARY_ERROR: (
         "답변을 생성하는 중 일시적인 오류가 발생했습니다. \n"
         "잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요."
+    ),
+    UserMessageType.PERMISSION_DENIED: (
+        "선택한 문서 컬렉션을 검색할 권한이 없습니다. \n"
+        "권한이 필요하면 관리자에게 문의해 주세요."
+    ),
+    UserMessageType.COLLECTION_UNAVAILABLE: (
+        "검색할 문서 컬렉션을 찾을 수 없습니다. \n"
+        "문서 컬렉션을 다시 선택해 주세요. 목록에 없으면 관리자에게 문의해 주세요."
     ),
 }
 

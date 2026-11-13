@@ -25,7 +25,7 @@ async def get_query_logs(
     current_admin: dict = Depends(get_current_admin),
 ):
     """접속/질의 로그를 조회한다."""
-    repo = MetadataRepository(get_settings().sqlite_db_path)
+    repo = MetadataRepository()
     logs = []
     for log in repo.get_query_history(user_id=user_id, session_id=session_id, limit=limit):
         logs.append({

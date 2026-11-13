@@ -20,6 +20,8 @@ class RequestedDocumentType(str, Enum):
     MANUAL = "manual"
     GENERAL = "general"
     SPREADSHEET = "spreadsheet"
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - DWG·DXF 전용(도면 처리기)
+    DRAWING = "drawing"
 
 
 class DocumentTypeSource(str, Enum):
@@ -73,3 +75,9 @@ def validate_document_type_compatibility(
         raise ValueError(
             "스프레드시트 유형은 XLSX, XLSM, XLTX, XLTM 파일에만 사용할 수 있습니다."
         )
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 유형은 DWG·DXF만, DWG·DXF는 도면 유형만
+    is_drawing = ext in ("dwg", "dxf")
+    if requested == "drawing" and not is_drawing:
+        raise ValueError("도면 유형은 DWG, DXF 파일에만 사용할 수 있습니다.")
+    if is_drawing and requested not in ("auto", "drawing"):
+        raise ValueError("DWG·DXF 파일은 문서 유형을 '자동' 또는 '도면'으로 선택해야 합니다.")

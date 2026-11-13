@@ -43,7 +43,8 @@ for f in "$BASE/.env" "$BASE/compose.env" "$BASE/docker-compose.prod.yml"; do
 done
 grep -q '^RUNTIME_IMAGE=' "$BASE/compose.env" || { echo "$BASE/compose.env 에 RUNTIME_IMAGE= 줄이 없습니다." >&2; exit 1; }
 # 마운트 원본·데이터 폴더 — 없으면 만든다(있으면 그대로). 없으면 Docker 가 root 소유로 만들어 앱이 쓰지 못한다
-sudo install -d -o chatbot -g chatbot -m 750 "$DATA"/{data,xl_res,parsed_md,chunk,db,manual_display,migrate} /mnt/a/chatbot/logs /mnt/a/chatbot/cache
+# 2026.11.13(sooyeon.choi) 수정 - 시트 미리보기 작업 폴더(sheet_preview, .env SHEET_PREVIEW_WORK_ROOT=/data/sheet_preview) 추가
+sudo install -d -o chatbot -g chatbot -m 750 "$DATA"/{data,xl_res,parsed_md,chunk,db,manual_display,migrate,sheet_preview} /mnt/a/chatbot/logs /mnt/a/chatbot/cache
 
 echo "== 0. 묶음 $TAR (교체 범위: $MODE)"
 sha256sum -c "$TAR.sha256"

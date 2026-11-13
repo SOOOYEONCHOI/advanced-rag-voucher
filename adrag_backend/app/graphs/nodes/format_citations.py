@@ -32,7 +32,7 @@ def _restore_revision_brackets(text: str) -> str:
     return _REVISION_RESTORE_RE.sub(r"<\1>", text)
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -181,10 +181,6 @@ async def format_citations(state: PipelineState, deps: GraphDependencies | None 
             sorted(missing_ids),
         )
 
-    # logger.info(
-    #     f"인용 포맷팅 완료: 전체 컨텍스트 {len(context_chunks)}개 중 "
-    #     f"{len(citations)}개 Citation 생성 ({len(referenced_ids)}개 답변 인용)"
-    # )
     # 2026.10.19 추가 - 사진 답변: [IMG:ref] 인용을 후보 기준으로 검증(후보 밖 태그 제거, 최대 rag_max_images)
     #   후보가 없거나 기능이 꺼져 있어도 검증은 돌려 LLM이 지어낸 태그를 지운다. 근거 없음 답변에는 자동 첨부하지 않는다.
     images_enabled = getattr(settings, "answer_images_enabled", False)

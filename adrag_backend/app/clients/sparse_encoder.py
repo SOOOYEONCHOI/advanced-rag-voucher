@@ -14,7 +14,7 @@ from typing import List, Optional
 from app.core.config import Settings
 from app.utils.log.log import LoggingLogger
 
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -74,7 +74,7 @@ class SparseEncoder:
 
     async def _encode_splade(self, texts: List[str]) -> List[SparseVectorData]:
         """외부 SPLADE 서버 API 호출."""
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         from app.core.http import get_shared_async_client
         response = await get_shared_async_client().post(
             f"{self._splade_url}/encode",

@@ -9,7 +9,6 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 from app.utils.datetime import now_kst_iso
 
@@ -19,8 +18,8 @@ logger = logging.getLogger(__name__)
 class QueryLogRepository:
     """tb_query_logs + tb_query_citations Write/Read Repository."""
 
-    def __init__(self, db_path: str = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
         logger.debug("QueryLogRepository initialized")
 
     # ── tb_query_logs ──────────────────────────────────────────────────────
@@ -47,6 +46,8 @@ class QueryLogRepository:
         extracted_keywords: Optional[List[str]] = None,
         department_snapshot: Optional[str] = None,
         collection_name_snapshot: Optional[str] = None,
+        # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로(text·voice·recommended·popular), 많이 찾는 질문 집계 기준
+        input_mode: str = "text",
     ) -> Optional[int]:
         """질의 로그를 INSERT하고 log_id를 반환한다 (피드백 API 연동용)."""
         try:
@@ -107,8 +108,8 @@ class QueryLogRepository:
                         outcome_code, error_message,
                         model_id, prompt_tokens, completion_tokens, cost_usd,
                         extracted_keywords, department_snapshot,
-                        collection_name_snapshot, created_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        collection_name_snapshot, input_mode, created_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     RETURNING log_id
                     """,
                     (
@@ -132,6 +133,7 @@ class QueryLogRepository:
                         json.dumps(extracted_keywords, ensure_ascii=False) if extracted_keywords else None,
                         department_snapshot,
                         collection_name_snapshot,
+                        input_mode,
                         now_kst_iso(),
                     ),
                 )

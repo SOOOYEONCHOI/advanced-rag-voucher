@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import sidebarLogo from '../assets/brand/werag-logo-dark.png';
+import sidebarLogo from '../assets/brand/logo-rag-w.png';
 
 defineProps({
   isOpen: {
@@ -91,7 +91,10 @@ defineEmits(['close', 'selectCollection', 'logout']);
   flex-direction: column;
   padding: 1rem;
   flex-shrink: 0;
-  transition: transform 0.25s ease, margin-left 0.25s ease, visibility 0.25s;
+  transition:
+    transform 0.25s ease,
+    margin-left 0.25s ease,
+    visibility 0.25s;
   box-sizing: border-box;
 }
 .sidebar-top {
@@ -104,15 +107,17 @@ defineEmits(['close', 'selectCollection', 'logout']);
 .logo-area {
   display: flex;
   align-items: center;
+  flex: 1;
   min-width: 0;
 }
 .sidebar-brand-logo {
   display: block;
-  width: 75%;
+  width: 140px;
   max-width: 100%;
   height: auto;
   object-fit: contain;
-  mix-blend-mode: lighten;
+  object-position: left center;
+  image-rendering: auto;
 }
 /* 2026.11.04(woojin.jung) 수정 - 넓은 화면에서도 닫기(접기) 버튼 표시 */
 .sidebar.collapsed {

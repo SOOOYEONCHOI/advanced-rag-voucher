@@ -17,8 +17,8 @@ _COMMIT_COLUMNS = (
 
 
 class SpreadsheetResourceRepository:
-    def __init__(self, db: DatabaseManager | None = None, db_path: str | None = None) -> None:
-        self.db = db or get_database_manager(db_path)
+    def __init__(self, db: DatabaseManager | None = None) -> None:
+        self.db = db or get_database_manager()
 
     def get(self, resource_id: str) -> dict[str, Any] | None:
         rows = self.db.execute_query(
@@ -35,7 +35,7 @@ class SpreadsheetResourceRepository:
             query += " AND status!='deleted'"
         return [self._decode(dict(row)) for row in self.db.execute_query(query, (document_id,))]
 
-    # 2026.10.16 추가 - Phase 2(P2-13): staging은 tb_spreadsheet_staging_resources에 따로 둔다
+    # 2026.10.16 추가 - Phase 2: staging은 tb_spreadsheet_staging_resources에 따로 둔다
     def get_staging(self, resource_id: str) -> dict[str, Any] | None:
         rows = self.db.execute_query(
             "SELECT *, 'staging' AS status FROM tb_spreadsheet_staging_resources WHERE resource_id=?",
@@ -43,7 +43,7 @@ class SpreadsheetResourceRepository:
         )
         return self._decode(dict(rows[0])) if rows else None
 
-    # 2026.10.16 수정 - Phase 2(P2-13): staging 행(status='staging')과 이미 확정된 행을 함께 돌려준다
+    # 2026.10.16 수정 - Phase 2: staging 행(status='staging')과 이미 확정된 행을 함께 돌려준다
     def list_by_parse_job(self, parse_job_id: str) -> list[dict[str, Any]]:
         staging = self.db.execute_query(
             "SELECT *, 'staging' AS status FROM tb_spreadsheet_staging_resources WHERE parse_job_id=?",
@@ -66,7 +66,7 @@ class SpreadsheetResourceRepository:
         )
         return [dict(row)["document_id"] for row in rows]
 
-    # 2026.10.16 수정 - Phase 2(P2-13): staging 전용 테이블에 기록(문서 행이 생기기 전 단계)
+    # 2026.10.16 수정 - Phase 2: staging 전용 테이블에 기록(문서 행이 생기기 전 단계)
     def create_staging(self, metadata: dict[str, Any]) -> None:
         self.db.execute_update(
             """INSERT INTO tb_spreadsheet_staging_resources(
@@ -86,7 +86,7 @@ class SpreadsheetResourceRepository:
         )
 
     # 2026.08.27(sooyeon.choi) 수정 - 분석 대기 resource는 analysis_pending으로 commit
-    # 2026.10.16 수정 - Phase 2(P2-13): staging 행을 확정 테이블로 옮긴다(문서 FK — 문서 행이 먼저 있어야 함)
+    # 2026.10.16 수정 - Phase 2: staging 행을 확정 테이블로 옮긴다(문서 FK — 문서 행이 먼저 있어야 함)
     def mark_committed(self, resource_id: str, resource_path: str, status: str = "committed") -> None:
         with self.db.get_connection() as conn:
             conn.execute(
@@ -114,7 +114,7 @@ class SpreadsheetResourceRepository:
         )
 
     def delete_staging_by_parse_job(self, parse_job_id: str) -> None:
-        # 2026.10.16 수정 - Phase 2(P2-13): staging 전용 테이블에서 삭제
+        # 2026.10.16 수정 - Phase 2: staging 전용 테이블에서 삭제
         self.db.execute_update(
             "DELETE FROM tb_spreadsheet_staging_resources WHERE parse_job_id=?",
             (parse_job_id,),

@@ -104,9 +104,12 @@ export const formatTime = (value) => {
 };
 
 export const docTypeLabel = (type) => {
-  const map = { law: '법령', manual: '매뉴얼', general: '일반', spreadsheet: '스프레드시트' };
+  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - drawing: 도면
+  const map = { law: '법령', manual: '매뉴얼', general: '일반', spreadsheet: '스프레드시트', drawing: '도면' };
   return map[type] || type || '-';
 };
+// 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 문서 목록 파서 열 표시 이름(처리기 이름 → 화면 용어)
+export const parserLabel = (parser) => ({ drawing_ingest: '도면 처리기' })[parser] || parser || '-';
 export const docTypeSourceLabel = (source) => {
   const map = {
     user_selected: '사용자 선택',

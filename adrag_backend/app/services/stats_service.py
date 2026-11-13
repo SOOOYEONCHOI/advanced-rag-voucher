@@ -23,9 +23,9 @@ from app.services.stats_common import (
 class StatsService:
     """통계 서비스 — 집계 로직 및 비용 계산 담당."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self):
         from app.repositories.stats_repository import StatsRepository
-        self.repo = StatsRepository(db_path or get_settings().sqlite_db_path)
+        self.repo = StatsRepository()
         self._settings = get_settings()
 
     @staticmethod

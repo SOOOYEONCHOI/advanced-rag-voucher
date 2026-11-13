@@ -17,16 +17,18 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.utils.log.log import LoggingLogger
 from app.services.collection_service import (
     CollectionDeletionConflict,
     CollectionService,
 )
+# 2026.11.12(woojin.jung) 추가 - 채팅 시작 화면 질문(추천 질문·숨긴 질문) 설정
+from app.services.start_question_service import StartQuestionService
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.department_repository import DepartmentRepository
-from app.repositories.permissions_repository import PermissionsRepository
+# 2026.11.09(sooyeon.choi) 삭제 - 미사용 import(PermissionsRepository)
 from app.repositories.vector_repository import VectorRepository
 from app.repositories.database import get_database_manager
 from app.core.config import get_settings
@@ -34,7 +36,7 @@ from app.utils.datetime import format_kst_datetime
 from app.utils.security import get_current_principal
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -75,6 +77,12 @@ class CollectionConfigResponse(BaseModel):
 class CollectionListResponse(BaseModel):
     collections: List[CollectionConfigResponse]
     total: int
+
+
+# 2026.11.12(woojin.jung) 추가 - 채팅 시작 화면 질문 저장 요청 (개수·길이 상세 검증은 StartQuestionService)
+class StartQuestionSettingsRequest(BaseModel):
+    recommended: List[str] = Field(default_factory=list, max_length=20)
+    hidden: List[str] = Field(default_factory=list, max_length=100)
 
 
 # 2026.06.30(sooyeon.choi) 추가 - 컬렉션 수정·삭제는 생성자 또는 관리자만 허용
@@ -118,7 +126,7 @@ async def create_collection(
 
         # 생성자 부서 ID 조회 (department_id 스냅샷 저장용)
         if principal["user_id"]:
-            db = get_database_manager(get_settings().sqlite_db_path)
+            db = get_database_manager()
             user_rows = db.execute_query(
                 "SELECT department_id, department_name FROM tb_users WHERE user_id = ?",
                 (principal["user_id"],),
@@ -139,7 +147,7 @@ async def create_collection(
 
         # 비관리자가 topic_name을 지정한 경우 부서 allowed_topics에 자동 반영
         if topic_name and department_id and not principal.get("is_admin"):
-            dept_repo = DepartmentRepository(get_settings().sqlite_db_path)
+            dept_repo = DepartmentRepository()
             dept = dept_repo.get_by_id(department_id)
             if dept and topic_name not in dept["allowed_topics"]:
                 dept_repo.update(
@@ -189,7 +197,7 @@ async def list_collections(
     """등록된 컬렉션 목록을 조회한다."""
     try:
         settings = get_settings()
-        repo = CollectionRepository(settings.sqlite_db_path)
+        repo = CollectionRepository()
 
         # 2026.06.30(sooyeon.choi) 추가 - 일반 사용자는 실질 접근 컬렉션만 조회
         if principal.get("is_admin"):
@@ -202,7 +210,7 @@ async def list_collections(
                 )
             collections = repo.get_accessible_by_user(principal["user_id"])
 
-        db = get_database_manager(settings.sqlite_db_path)
+        db = get_database_manager()
         # 2026.06.18(sooyeon.choi) 수정 - 등록 컬렉션과 Qdrant 컬렉션 상태 비교
         qdrant_names = set(VectorRepository(
             host=settings.qdrant_host,
@@ -276,7 +284,7 @@ async def update_collection(
     """컬렉션 설정을 수정한다."""
     try:
         # 2026.06.30(sooyeon.choi) 추가 - 서비스 변경 전에 컬렉션 관리 권한 검증
-        repo = CollectionRepository(get_settings().sqlite_db_path)
+        repo = CollectionRepository()
         existing = _require_collection_manager(collection_id, principal, repo)
         service = CollectionService()
         config = service.update_collection(
@@ -310,6 +318,52 @@ async def update_collection(
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다")
 
 
+# 2026.11.12(woojin.jung) 추가 - 대화 주제 설정: 추천 질문·숨긴 질문·많이 찾는 질문 미리보기 조회
+@router.get("/{collection_id}/start-questions")
+async def get_start_question_settings(
+    collection_id: int,
+    principal: dict = Depends(get_current_principal),
+):
+    """대화 주제의 채팅 시작 화면 질문 설정을 조회한다 (생성자 또는 관리자)."""
+    _require_collection_manager(collection_id, principal, CollectionRepository())
+    try:
+        return StartQuestionService().get_settings(collection_id)
+    except Exception as e:
+        logger.error(f"시작 화면 질문 조회 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다")
+
+
+# 2026.11.12(woojin.jung) 추가 - 대화 주제 설정: 추천 질문·숨긴 질문 일괄 저장
+@router.put("/{collection_id}/start-questions")
+async def save_start_question_settings(
+    collection_id: int,
+    request: StartQuestionSettingsRequest,
+    principal: dict = Depends(get_current_principal),
+):
+    """추천 질문(등록 순서 = 노출 순서)과 숨긴 질문을 통째로 교체 저장한다 (생성자 또는 관리자)."""
+    _require_collection_manager(collection_id, principal, CollectionRepository())
+    try:
+        result = StartQuestionService().save_settings(
+            collection_id,
+            recommended=request.recommended,
+            hidden=request.hidden,
+            user_id=principal["user_id"],
+        )
+        logger.info(
+            "시작 화면 질문 저장: collection_id=%s actor=%s recommended=%s hidden=%s",
+            collection_id,
+            principal["user_id"],
+            len(result["recommended"]),
+            len(result["hidden"]),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"시작 화면 질문 저장 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다")
+
+
 # 2026.05.04(sooyeon.choi) 수정 - Qdrant 벡터 데이터 + SQLite 레코드 함께 삭제
 # 2026.06.16(sooyeon.choi) 수정 - _remove_collection_from_all_permissions 제거
 #   tb_user_collection_permissions.collection_id ON DELETE CASCADE가 자동 처리
@@ -322,9 +376,9 @@ async def delete_collection(
     try:
         # 2026.06.30(sooyeon.choi) 추가 - 생성자는 타인 업로드 문서를 포함해 컬렉션 전체 삭제 가능
         settings = get_settings()
-        repo = CollectionRepository(settings.sqlite_db_path)
+        repo = CollectionRepository()
         _require_collection_manager(collection_id, principal, repo)
-        db = get_database_manager(settings.sqlite_db_path)
+        db = get_database_manager()
         count_rows = db.execute_query(
             """
             SELECT SUM(CASE

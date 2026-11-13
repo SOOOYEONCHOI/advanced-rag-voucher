@@ -12,7 +12,7 @@ _cached_settings: Settings | None = None
 
 def get_runtime_settings() -> Settings:
     global _cached_version, _cached_settings
-    repository = AppSettingsRepository(get_settings().sqlite_db_path)
+    repository = AppSettingsRepository()
     version = repository.get_version()
     if _cached_settings is not None and version == _cached_version:
         return _cached_settings
@@ -31,4 +31,4 @@ def invalidate_runtime_settings() -> None:
 
 
 def get_runtime_settings_version() -> int:
-    return AppSettingsRepository(get_settings().sqlite_db_path).get_version()
+    return AppSettingsRepository().get_version()

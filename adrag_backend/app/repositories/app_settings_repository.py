@@ -3,7 +3,6 @@
 import json
 from typing import Any, Dict
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 
 
@@ -29,8 +28,8 @@ SETTING_TYPES = {
 
 
 class AppSettingsRepository:
-    def __init__(self, db_path: str | None = None) -> None:
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self) -> None:
+        self.db = get_database_manager()
 
     def get_all(self) -> Dict[str, Any]:
         rows = self.db.execute_query(

@@ -15,7 +15,7 @@ httpx.AsyncClient를 사용하여 vLLM 서버의 /v1/chat/completions 엔드포�
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import Settings
-# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용 (B6)
+# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용
 from app.core.http import get_shared_async_client
 from app.utils.log.log import LoggingLogger
 
@@ -69,7 +69,7 @@ class LLMClient:
             **kwargs,
         }
 
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         client = get_shared_async_client()
         resp = await client.post(
             f"{self.base_url}/v1/chat/completions",
@@ -112,7 +112,7 @@ class LLMClient:
             **kwargs,
         }
 
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         client = get_shared_async_client()
         async with client.stream(
             "POST",
@@ -131,7 +131,7 @@ class LLMClient:
     async def health_check(self) -> bool:
         """vLLM 서버 상태 확인."""
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용 (B6)
+            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용
             resp = await get_shared_async_client().get(
                 f"{self.base_url}/v1/models",
                 headers=self._headers(),
@@ -145,7 +145,7 @@ class LLMClient:
     async def list_models(self) -> List[str]:
         """vLLM에 로드된 모델 목록 조회."""
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용 (B6)
+            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용
             resp = await get_shared_async_client().get(
                 f"{self.base_url}/v1/models",
                 headers=self._headers(),

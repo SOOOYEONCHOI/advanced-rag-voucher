@@ -95,7 +95,7 @@ class SpreadsheetResourceService:
             if sibling["document_id"] != document_id:
                 raise ResourceConflictError("parse job에 서로 다른 document ID를 섞을 수 없습니다.")
 
-        # 2026.10.16 수정 - Phase 2(P2-13): staging 테이블과 확정 테이블을 모두 확인
+        # 2026.10.16 수정 - Phase 2: staging 테이블과 확정 테이블을 모두 확인
         existing = self.repository.get_staging(resource_id) or self.repository.get(resource_id)
         if existing:
             if existing["document_id"] != document_id or existing["parse_job_id"] != parse_job_id:
@@ -136,7 +136,7 @@ class SpreadsheetResourceService:
         self.repository.create_staging(stored)
         # 2026.08.27(sooyeon.choi) 추가 - commit/rollback 전까지 실행 중 job으로 표시한다.
         self.mark_job_active(parse_job_id)
-        # 2026.10.16 수정 - Phase 2(P2-13): 방금 만든 행은 staging 테이블에 있다
+        # 2026.10.16 수정 - Phase 2: 방금 만든 행은 staging 테이블에 있다
         return self.repository.get_staging(resource_id) or stored
 
     def commit_parse_job(self, parse_job_id: str, document_id: str) -> list[dict[str, Any]]:

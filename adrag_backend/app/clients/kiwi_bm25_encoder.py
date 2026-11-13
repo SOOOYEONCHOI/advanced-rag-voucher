@@ -2,7 +2,11 @@
 
 from typing import TYPE_CHECKING, Any, Dict
 from qdrant_client.models import Document
-from app.utils.kiwi_tokenizer import tokenize_corpus, tokenize_query_for_bm25
+from app.utils.kiwi_tokenizer import (
+    token_policy_for_version,
+    tokenize_corpus,
+    tokenize_query_for_bm25,
+)
 
 if TYPE_CHECKING:
     from app.core.config import Settings
@@ -17,6 +21,8 @@ class KiwiBm25Encoder:
         self.b = settings.bm25_b
         self.avg_len = settings.bm25_avg_len
         self.version = settings.kiwi_bm25_encoder_version
+        # 2026.11.10(sooyeon.choi) 추가 - 인코더 버전이 토큰 정책(v1/v2)을 고른다. 적재·질의가 같은 정책을 쓴다
+        self.token_policy = token_policy_for_version(self.version)
 
     def _options(self) -> Dict[str, Any]:
         return {
@@ -30,13 +36,13 @@ class KiwiBm25Encoder:
         }
 
     def normalize_document(self, text: str) -> str:
-        tokens = tokenize_corpus(text)
+        tokens = tokenize_corpus(text, self.token_policy)
         return " ".join(tokens) if tokens else text.strip()
 
     def normalize_query(self, text: str) -> str:
-        tokens = tokenize_query_for_bm25(text)
+        tokens = tokenize_query_for_bm25(text, self.token_policy)
         if not tokens:
-            tokens = tokenize_corpus(text)
+            tokens = tokenize_corpus(text, self.token_policy)
         normalized = " ".join(tokens) if tokens else text.strip()
         if not normalized:
             raise ValueError("BM25 검색 토큰이 없습니다.")

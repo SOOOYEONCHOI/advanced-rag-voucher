@@ -10,7 +10,7 @@ import math
 from typing import Any, List, Optional, Tuple
 
 from app.core.config import Settings
-# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용 (B6)
+# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용
 from app.core.http import get_shared_async_client
 from app.utils.log.log import LoggingLogger
 

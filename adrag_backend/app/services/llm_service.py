@@ -24,7 +24,7 @@ from app.prompts.templates import DEFAULT_SYSTEM_PROMPT
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 # 로컬 vLLM 전용 모듈 수준 싱글턴 — 설정이 동일하므로 요청마다 재생성할 필요 없음
@@ -42,7 +42,7 @@ def get_local_llm_service() -> "LLMService":
 class LLMService:
     """LLM 호출 비즈니스 로직."""
 
-    # 2026.07.16(sooyeon.choi) 수정 - 미사용 _THINK_BLOCK_RE 제거 (B14)
+    # 2026.07.16(sooyeon.choi) 수정 - 미사용 _THINK_BLOCK_RE 제거
     #   strip_thinking()은 문자열 split 방식만 사용하며 이 정규식은 참조된 적 없음
     # "Thinking Process:" 또는 "Reasoning:" 로 시작하는 접두 블록 제거
     _THINKING_PREFIX_RE = re.compile(

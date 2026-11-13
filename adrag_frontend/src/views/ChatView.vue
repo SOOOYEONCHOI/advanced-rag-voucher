@@ -84,10 +84,37 @@
 
           <!-- 메시지 목록 -->
           <template v-else>
-            <div v-if="messages.length === 0 && !isLoading" class="welcome">
-              <div class="welcome-icon">AI</div>
-              <h2>무엇이든 물어보세요</h2>
-              <p>문서 기반 질의응답과 안전 규정 검색을 지원합니다.</p>
+            <!-- 2026.11.12(woojin.jung) 수정 - 시작 화면에 추천 질문(대화 주제 설정 등록)·많이 찾는 질문(질의 로그 집계) 표시, 클릭 시 바로 질문 -->
+            <div v-if="messages.length === 0 && !isLoading" class="welcome faq-welcome">
+              <div class="welcome-icon"><i class="fa-solid fa-robot"></i></div>
+              <h2>무엇을 도와드릴까요?</h2>
+              <p>
+                {{ currentCollectionName ? `${currentCollectionName} 문서를 기반으로 답변합니다.` : '문서 기반 질의응답과 안전 규정 검색을 지원합니다.' }}
+                <template v-if="startQuestions.recommended.length || startQuestions.popular.length"> 아래 질문을 눌러 바로 시작해 보세요.</template>
+              </p>
+              <div v-if="startQuestions.recommended.length || startQuestions.popular.length" class="faq-columns" :class="{ single: !startQuestions.recommended.length || !startQuestions.popular.length }">
+                <section v-if="startQuestions.recommended.length" class="faq-group registered" aria-label="추천 질문">
+                  <div class="faq-group-head"><i class="fa-solid fa-thumbtack"></i><strong>추천 질문</strong></div>
+                  <div class="faq-list">
+                    <button v-for="question in startQuestions.recommended" :key="question" type="button" class="faq-item" @click="sendStartQuestion(question, 'recommended')">
+                      <span class="faq-pin"><i class="fa-solid fa-circle"></i></span>
+                      <span class="faq-q">{{ question }}</span>
+                      <i class="fa-solid fa-arrow-right go"></i>
+                    </button>
+                  </div>
+                </section>
+                <section v-if="startQuestions.popular.length" class="faq-group popular" aria-label="많이 찾는 질문">
+                  <div class="faq-group-head"><i class="fa-solid fa-arrow-trend-up"></i><strong>많이 찾는 질문</strong><span>최근 {{ startQuestions.popularDays }}일</span></div>
+                  <div class="faq-list">
+                    <button v-for="(item, pIdx) in startQuestions.popular" :key="item.question" type="button" class="faq-item" @click="sendStartQuestion(item.question, 'popular')">
+                      <span class="faq-rank">{{ pIdx + 1 }}</span>
+                      <span class="faq-q">{{ item.question }}</span>
+                      <span class="faq-cnt">{{ item.count }}회</span>
+                      <i class="fa-solid fa-arrow-right go"></i>
+                    </button>
+                  </div>
+                </section>
+              </div>
             </div>
 
             <div v-for="(msg, idx) in messages" :key="idx" class="message" :class="[msg.role, { 'source-answer-active': isSourceAnswer(idx) }]" :data-message-index="idx">
@@ -182,6 +209,11 @@
                   <i class="fa-solid fa-microphone"></i>
                   음성 질문
                   <span v-if="msg.voiceEdited" class="edited">· 인식 결과 수정됨</span>
+                </span>
+                <!-- 2026.11.12(woojin.jung) 추가 - 시작 화면 질문으로 보낸 질문 표시 -->
+                <span v-else-if="msg.role === 'user' && (msg.inputMode === 'recommended' || msg.inputMode === 'popular')" class="text-origin">
+                  <i :class="msg.inputMode === 'recommended' ? 'fa-solid fa-thumbtack' : 'fa-solid fa-arrow-trend-up'"></i>
+                  {{ msg.inputMode === 'recommended' ? '추천 질문' : '많이 찾는 질문' }}
                 </span>
                 <div v-if="msg.role === 'user'" class="message-actions user-actions">
                   <button class="message-action-btn" @click="copyMessage(msg)">
@@ -846,6 +878,12 @@ export default {
         return;
       }
 
+      // 2026.11.12(woojin.jung) 추가 - 시작 화면 질문을 다시 보낼 때도 입력 경로 유지 (많이 찾는 질문 집계 제외)
+      if (previousUserMessage.inputMode === 'recommended' || previousUserMessage.inputMode === 'popular') {
+        await chatView.sendStartQuestion(text, previousUserMessage.inputMode);
+        return;
+      }
+
       chatView.userInput.value = text;
       await nextTick();
       await chatView.sendMessageStream();
@@ -1239,6 +1277,155 @@ export default {
 }
 .voice-origin .edited {
   color: #64748b;
+}
+/* 2026.11.12(woojin.jung) 추가 - 시작 화면 질문으로 보낸 질문 배지 */
+.text-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+/* 2026.11.12(woojin.jung) 추가 - 시작 화면: 추천 질문 + 많이 찾는 질문 */
+.welcome.faq-welcome {
+  width: 100%;
+  max-width: 820px;
+  padding-top: 1rem;
+}
+.faq-welcome .welcome-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.9rem;
+  border-radius: 14px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+.faq-welcome > p {
+  margin: 0 0 1.75rem;
+  font-size: 0.92rem;
+}
+.faq-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  text-align: left;
+}
+.faq-columns.single {
+  grid-template-columns: minmax(0, 420px);
+  justify-content: center;
+}
+.faq-group {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.faq-group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0.15rem 0.6rem;
+}
+.faq-group-head i {
+  font-size: 0.82rem;
+}
+.faq-group.registered .faq-group-head i {
+  color: #2563eb;
+}
+.faq-group.popular .faq-group-head i {
+  color: #ea580c;
+}
+.faq-group-head strong {
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+.faq-group-head span {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.faq-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0.62rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.faq-item:hover,
+.faq-item:focus-visible {
+  border-color: #bfdbfe;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  outline: none;
+}
+.faq-pin,
+.faq-rank {
+  width: 18px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.faq-pin {
+  font-size: 0.4rem;
+  color: #93c5fd;
+}
+.faq-rank {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ea580c;
+}
+.faq-q {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.faq-cnt {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.faq-item .go {
+  flex-shrink: 0;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  transition:
+    color 0.15s,
+    transform 0.15s;
+}
+.faq-item:hover .go {
+  color: #2563eb;
+  transform: translateX(2px);
+}
+@media (max-width: 768px) {
+  .faq-columns {
+    grid-template-columns: 1fr;
+  }
+  .faq-welcome > p {
+    margin-bottom: 1.25rem;
+  }
 }
 .message-actions {
   display: flex;

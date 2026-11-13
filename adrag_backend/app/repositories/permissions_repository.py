@@ -8,7 +8,6 @@ import json
 import logging
 from typing import List, Optional
 
-from app.core.config import get_settings
 from app.models.data_models import (
     SecurityLevel,
     UserCollectionPermission,
@@ -25,11 +24,10 @@ logger = logging.getLogger(__name__)
 class PermissionsRepository:
     """tb_user_collection_permissions + tb_user_security_policies CRUD Repository."""
 
-    def __init__(self, db_path: str = None):
-        resolved_db_path = db_path or get_settings().sqlite_db_path
-        self.db = get_database_manager(resolved_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
         # 2026.06.30(sooyeon.choi) 추가 - 화면과 RAG가 동일한 실질 접근 컬렉션 조회를 사용
-        self.collection_repo = CollectionRepository(resolved_db_path)
+        self.collection_repo = CollectionRepository()
         logger.debug("PermissionsRepository initialized")
 
     # ── 컬렉션 접근 권한 (tb_user_collection_permissions) ─────────────────────

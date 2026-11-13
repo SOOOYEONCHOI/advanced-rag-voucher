@@ -16,7 +16,7 @@ from app.utils.log.log import LoggingLogger
 logger = LoggingLogger().getLogger(__name__)
 
 
-# 2026.07.16(sooyeon.choi) 추가 - 텍스트 해시 기반 청크 중복 제거 공통 헬퍼 (B11)
+# 2026.07.16(sooyeon.choi) 추가 - 텍스트 해시 기반 청크 중복 제거 공통 헬퍼
 #   기존: rerank.py(_dedup_chunks)와 assemble_context.py에 동일 로직이 중복 구현됨
 #   동일 본문 청크 중 score가 가장 높은 청크를 유지한다 (첫 등장 위치 보존).
 #   SHA256 사용: 재시작·분산 환경에서도 결정적.
@@ -36,7 +36,7 @@ def dedup_chunks_by_text(chunks: List[Dict]) -> List[Dict]:
     return result
 
 
-# 2026.07.16(sooyeon.choi) 추가 - 유효 관련성 임계값 계산 헬퍼 (B5)
+# 2026.07.16(sooyeon.choi) 추가 - 유효 관련성 임계값 계산 헬퍼
 #   우선순위: threshold_override(시스템 폴백 전용) > relevance_threshold(사용자/요청) > settings 기본값
 #   check_relevance 엣지·assemble_context·스트리밍 경로가 동일 규칙을 공유한다.
 def effective_threshold(state, settings) -> float:

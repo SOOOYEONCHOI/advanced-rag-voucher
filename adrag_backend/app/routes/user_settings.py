@@ -38,7 +38,7 @@ def _resolve_collection_id(qdrant_name: str) -> Optional[int]:
     """qdrant_name → collection_id 변환. 빈 문자열이거나 미등록이면 None 반환."""
     if not qdrant_name:
         return None
-    col = CollectionRepository(get_settings().sqlite_db_path).get_by_qdrant_name(qdrant_name)
+    col = CollectionRepository().get_by_qdrant_name(qdrant_name)
     return col.collection_id if col else None
 
 

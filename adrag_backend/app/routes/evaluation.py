@@ -114,7 +114,7 @@ async def create_dataset(
         gen_config=persist_config,
         created_by=admin.get("admin_id"),
     )
-    # 생성 파이프라인은 dataset/generator.py — 지연 import (P4)
+    # 생성 파이프라인은 dataset/generator.py — 지연 import
     from app.evaluation.dataset.generator import start_generation
     start_generation(dataset_id=dataset, gen_config=runtime_config)
     return {"dataset_id": dataset, "status": "generating"}

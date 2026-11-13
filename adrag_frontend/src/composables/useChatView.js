@@ -25,6 +25,8 @@ export const useChatView = ({ router, route }) => {
   const chatCollections = ref([]);
   const selectedCollection = ref('');
   const collectionsLoaded = ref(false);
+  // 2026.11.12(woojin.jung) 추가 - 채팅 시작 화면 질문(추천 질문·많이 찾는 질문)
+  const startQuestions = ref({ recommended: [], popular: [] });
 
   const sourcesPanelOpen = ref(false);
   const selectedCitationId = ref(null);
@@ -162,6 +164,17 @@ export const useChatView = ({ router, route }) => {
     }
   };
 
+  // 2026.11.12(woojin.jung) 추가 - 대화 주제의 시작 화면 질문 조회 (실패하면 질문 없이 기본 시작 화면 표시)
+  const loadStartQuestions = async (collectionName) => {
+    try {
+      const res = await chatApi.startQuestions(collectionName);
+      if (selectedCollection.value !== collectionName) return;
+      startQuestions.value = { recommended: res.data.recommended || [], popular: res.data.popular || [], popularDays: res.data.popular_days ?? 30 };
+    } catch {
+      startQuestions.value = { recommended: [], popular: [] };
+    }
+  };
+
   const loadModels = async (collectionName) => {
     availableModels.value = [];
     try {
@@ -204,8 +217,10 @@ export const useChatView = ({ router, route }) => {
     lastError.value = '';
     sourcesPanelOpen.value = false;
     sidebarOpen.value = false;
+    startQuestions.value = { recommended: [], popular: [] }; // 2026.11.12(woojin.jung) 추가 - 이전 대화 주제 질문 노출 방지
 
-    await Promise.all([loadChatHistory(col.qdrant_name), loadModels(col.qdrant_name)]);
+    // 2026.11.12(woojin.jung) 수정 - 시작 화면 질문도 함께 조회
+    await Promise.all([loadChatHistory(col.qdrant_name), loadModels(col.qdrant_name), loadStartQuestions(col.qdrant_name)]);
     await loadUserLlmSetting(col.qdrant_name);
   };
 
@@ -312,7 +327,8 @@ export const useChatView = ({ router, route }) => {
       return;
     }
 
-    const inputMode = options.inputMode === 'voice' ? 'voice' : 'text';
+    // 2026.11.12(woojin.jung) 수정 - 시작 화면 추천 질문(recommended)·많이 찾는 질문(popular) 입력 경로 추가
+    const inputMode = ['voice', 'recommended', 'popular'].includes(options.inputMode) ? options.inputMode : 'text';
     const voiceTranscriptionId = options.voiceTranscriptionId ?? null;
     const voiceEdited = inputMode === 'voice' && Boolean(options.voiceEdited);
 
@@ -362,8 +378,9 @@ export const useChatView = ({ router, route }) => {
         llm_model: selectedModel.value?.model_id,
       };
 
+      // 2026.11.12(woojin.jung) 수정 - 직접 입력 외 경로는 input_mode로 전달 (많이 찾는 질문 집계에서 시작 화면 질문 클릭 제외)
+      if (inputMode !== 'text') payload.input_mode = inputMode;
       if (inputMode === 'voice') {
-        payload.input_mode = 'voice';
         payload.voice_edited = voiceEdited;
         if (voiceTranscriptionId !== null && voiceTranscriptionId !== '') payload.voice_transcription_id = voiceTranscriptionId;
       }
@@ -461,6 +478,9 @@ export const useChatView = ({ router, route }) => {
 
   const sendStreamingMessage = sendMessageStream;
 
+  // 2026.11.12(woojin.jung) 추가 - 시작 화면 질문 클릭 시 바로 질문 (kind: 'recommended' | 'popular')
+  const sendStartQuestion = (question, kind) => sendMessageStream({ text: question, inputMode: kind });
+
   // 2026.06.24(woojin.jung) 추가 - 피드백 반영 및 실패 시 이전 상태 복구
   const submitMessageFeedback = async (message, value) => {
     if (!message?.logId || message.feedbackPending) return;
@@ -506,6 +526,8 @@ export const useChatView = ({ router, route }) => {
     sourcesPanelOpen.value = false;
     selectedCitationId.value = null;
     activeCitations.value = [];
+    // 2026.11.12(woojin.jung) 추가 - 새 대화 시작 화면에 최신 시작 화면 질문 표시
+    await loadStartQuestions(selectedCollection.value);
   };
 
   const logoutUser = async () => {
@@ -598,6 +620,7 @@ export const useChatView = ({ router, route }) => {
     selectedCollection,
     collectionsLoaded,
     currentCollectionName,
+    startQuestions, // 2026.11.12(woojin.jung) 추가
     sourcesPanelOpen,
     selectedCitationId,
     activeCitations,
@@ -614,6 +637,7 @@ export const useChatView = ({ router, route }) => {
     sendMessage,
     sendMessageStream,
     sendStreamingMessage,
+    sendStartQuestion, // 2026.11.12(woojin.jung) 추가
     submitMessageFeedback,
     submitMessageFeedbackDetail,
     newChat,

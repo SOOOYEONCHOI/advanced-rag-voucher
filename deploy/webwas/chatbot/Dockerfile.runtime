@@ -5,7 +5,7 @@
 # 설명: docs/design/운영배포_가이드_서버별_v1.1.md §4.1 · docs/design/운영배포_수정배포_가이드_v1.1.md §4.1
 #
 # TODO(결정필요: P-2 기본 이미지 패치 버전 — MAIP 와 맞추려면 python:3.12.15-slim 처럼 정확한 태그로 고정한다)
-# TODO(결정필요: P-2 .xls 를 받으면 LibreOffice 가 필요하다(Q-P1-4). 지금 Dockerfile 과 같이 넣지 않았다)
+# 2026.11.13(sooyeon.choi) 수정 - LibreOffice(시트 미리보기·.xls)와 LibreDWG(도면 등록)를 넣었다
 ARG PYTHON_IMAGE=python:3.12-slim
 
 # ── 1단계: 의존성 빌드 ─────────────────────────────────────
@@ -28,6 +28,17 @@ RUN pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.py
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt && pip check
 
+# 2026.11.13(sooyeon.choi) 도면 파싱 기능 추가 - DWG→DXF 변환기 LibreDWG(GPLv3)를 소스로 빌드해 dwg2dxf 만 쓴다(별도 프로세스 호출, 링크 없음)
+#   운영 도면 등록(DRAWING_PARSE_MODE=backend)에 필요. 빌드 PC 에서만 인터넷(ftp.gnu.org)을 쓴다
+ARG LIBREDWG_VERSION=0.13.3
+RUN apt-get update && apt-get install -y --no-install-recommends make xz-utils curl \
+    && curl -fsSL "https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz" -o /tmp/libredwg.tar.xz \
+    && tar -xJf /tmp/libredwg.tar.xz -C /tmp \
+    && cd /tmp/libredwg-${LIBREDWG_VERSION} \
+    && ./configure --disable-bindings --disable-docs --prefix=/opt/libredwg \
+    && make -j"$(nproc)" && make install \
+    && cd / && rm -rf /tmp/libredwg* /var/lib/apt/lists/*
+
 # ── 2단계: 실행 ────────────────────────────────────────────
 FROM ${PYTHON_IMAGE}
 
@@ -37,10 +48,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/opt/venv/bin:$PATH
 
 # poppler-utils: PDF 처리, curl: 헬스체크
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils curl \
+# 2026.11.13(sooyeon.choi) 수정 - adrag_backend/Dockerfile 과 맞춤: 원본 Excel 시트 PDF 미리보기·.xls 변환용 LibreOffice UNO 와 한글 글꼴
+#   (SHEET_PREVIEW_PYTHON=/usr/bin/python3 은 python3-uno 가 설치하는 데비안 python). 한글 글꼴은 도면 이미지(fonts.yaml)에도 쓴다
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        poppler-utils libreoffice-calc python3-uno fonts-noto-cjk fonts-nanum curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
+# 2026.11.13(sooyeon.choi) 도면 파싱 기능 추가 - LibreDWG. 변환기는 PATH·LANG 만 넘겨 실행하므로(LD_LIBRARY_PATH 없음)
+#   라이브러리는 ldconfig 에 등록하고, LIBREDWG_BIN 기본값 dwg2dxf 로 찾도록 /usr/local/bin 에 링크한다
+COPY --from=builder /opt/libredwg /opt/libredwg
+RUN echo /opt/libredwg/lib > /etc/ld.so.conf.d/libredwg.conf && ldconfig \
+    && ln -s /opt/libredwg/bin/dwg2dxf /usr/local/bin/dwg2dxf \
+    && env -i PATH=/usr/local/bin:/usr/bin:/bin dwg2dxf --version
 
 WORKDIR /app
 EXPOSE 8081

@@ -12,7 +12,7 @@
     </div>
 
     <nav class="nav-menu">
-      <div class="nav-section-title">관리</div>
+      <div class="nav-section-title">{{ isAdmin ? '관리' : '챗봇 관리' }}</div>
       <router-link
         to="/admin"
         v-if="!isAdmin"
@@ -35,6 +35,7 @@
         <i class="fa-solid fa-database"></i>
         대화 주제 설정
       </router-link>
+      <div class="nav-section-title nav-section-gap" v-if="!isAdmin">현황 및 설정</div>
       <router-link
         to="/statistics"
         v-if="!isAdmin"
@@ -55,7 +56,7 @@
         @click.capture="blockNavigation"
       >
         <i class="fa-solid fa-puzzle-piece"></i>
-        UI 연동 방식
+        챗봇 연동 설정
       </router-link>
       <router-link
         v-if="isAdmin"
@@ -134,7 +135,7 @@
 </template>
 
 <script setup>
-import sidebarLogo from '../assets/brand/werag-logo-dark.png';
+import sidebarLogo from '../assets/brand/logo-rag-w.png';
 
 const props = defineProps({
   isOpen: {
@@ -190,15 +191,17 @@ const blockNavigation = (event) => {
 .logo-area {
   display: flex;
   align-items: center;
+  flex: 1;
   min-width: 0;
 }
 .sidebar-brand-logo {
   display: block;
-  width: 75%;
+  width: 140px;
   max-width: 100%;
   height: auto;
   object-fit: contain;
-  mix-blend-mode: lighten;
+  object-position: left center;
+  image-rendering: auto;
 }
 .btn-close-sidebar {
   display: none;

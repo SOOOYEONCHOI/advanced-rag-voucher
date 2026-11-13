@@ -53,11 +53,11 @@ class PermissionsUpdateRequest(BaseModel):
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
 def _get_db():
-    return get_database_manager(get_settings().sqlite_db_path)
+    return get_database_manager()
 
 
 def _get_dept_repo() -> DepartmentRepository:
-    return DepartmentRepository(get_settings().sqlite_db_path)
+    return DepartmentRepository()
 
 
 def _get_user_row(user_id: str, db):
@@ -189,7 +189,7 @@ async def create_user(
     )
 
     # 기본 보안 정책 생성
-    PermissionsRepository(get_settings().sqlite_db_path).create_default_policy(body.login_id)
+    PermissionsRepository().create_default_policy(body.login_id)
 
     logger.info("사용자 생성: %s → 부서 %s", body.login_id, body.department_id)
     return {

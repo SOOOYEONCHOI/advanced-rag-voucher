@@ -86,7 +86,7 @@ def build_rag_graph(deps: GraphDependencies | None = None):
         "build_response": "build_response",
     })
     # 2026.07.16(sooyeon.choi) 수정 - retrieve 시스템 오류(타임아웃/컬렉션 오류/Qdrant 장애)는
-    #   재시도 없이 즉시 종료 (B2). 기존 무조건 edge에서 조건 분기로 전환.
+    #   재시도 없이 즉시 종료. 기존 무조건 edge에서 조건 분기로 전환.
     graph.add_conditional_edges("retrieve", check_retrieval, {
         "rerank": "rerank",
         "build_response": "build_response",

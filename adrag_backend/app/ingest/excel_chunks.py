@@ -2,9 +2,9 @@
 
 - 기존 임베딩·Qdrant 적재 단계를 그대로 쓰도록 docling 스프레드시트 청크와 같은 메타데이터 이름을 쓴다
   (``sheet_name``·``source_range``·``display_markdown``·``chunk_key``·``block_type``, 출처 표시 R4-4).
-- 이미지 청크(content_type=image)는 적재하지 않는다(사진 포인트는 넣지 않음, Phase 2 P2-3).
-  사진은 배치 행으로 저장되고 텍스트 청크의 ``resource_ids``로 연결된다(P2-8).
-- Phase 2(P2-7·P2-9): 버전 무관 키 ``source_key``(예: ``09:step:6``), ``MAX_CHUNK_SIZE`` 초과 시 행 단위 분할
+- 이미지 청크(content_type=image)는 적재하지 않는다(사진 포인트는 넣지 않음, Phase 2).
+  사진은 배치 행으로 저장되고 텍스트 청크의 ``resource_ids``로 연결된다.
+- Phase 2: 버전 무관 키 ``source_key``(예: ``09:step:6``), ``MAX_CHUNK_SIZE`` 초과 시 행 단위 분할
   (머리말 ``[… > …]``·열 안내 줄을 조각마다 반복, ``part_no``).
 """
 from __future__ import annotations

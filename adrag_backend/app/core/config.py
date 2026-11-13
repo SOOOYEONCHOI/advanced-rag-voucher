@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         "Instruct: Given a web search query, retrieve relevant passages "
         "that answer the query\nQuery: {query}"
     )
-    # 2026.07.16(sooyeon.choi) 추가 - vLLM 서버측 토큰 truncation (B3)
+    # 2026.07.16(sooyeon.choi) 추가 - vLLM 서버측 토큰 truncation
     #   -1: 모델 최대 길이로 서버가 안전하게 잘라냄 (reranker와 동일 규약)
     #    0: 파라미터 미전송 (truncate_prompt_tokens를 지원하지 않는 서버용)
     #   >0: 지정 토큰 수로 truncation
@@ -99,10 +99,7 @@ class Settings(BaseSettings):
     splade_api_url: str = "http://splade-server:8000"
     splade_model_name: str = "naver/splade-cocondenser-ensembledistil"
 
-    # ── SQLite ──────────────────────────────────────────
-    # 2026.10.16 수정 - Phase 1.5: 앱 DB는 PostgreSQL(app.core.db_config). 이 값은 저장소 생성자 하위 호환 인자와
-    #   이관 스크립트 원본 경로로만 남는다(설계 Q-15.7, 정리는 Phase 2).
-    sqlite_db_path: str = "./instance/db/db_rag_metadata.db"
+    #   (app.core.db_config). 이 값으로 정하던 파일 폴더는 아래 "파일 저장" 설정(UPLOADED_FILES_BASE_DIR 기준)으로 옮김
 
     # ── 청킹 ────────────────────────────────────────────
     max_chunk_size: int
@@ -139,18 +136,27 @@ class Settings(BaseSettings):
     #   metadata_weight, filter_hard/soft_threshold 제거 (vLLM CE score 단일 방식 단순화)
     enable_metadata_filtering: bool
     enable_query_preprocessing: bool
+    # 2026.11.10(sooyeon.choi) 추가 - 질의의 "N조/N항/N호"를 "제N조" 법령 표기로 바꾸고 법령 질의로 분류할지.
+    #   기본 true(기존 동작). SOP 전용 환경은 false 권장
+    query_law_notation_normalize: bool = True
     rag_diagnostic_log: bool = False
     # 2026.06.29(sooyeon.choi) 추가 - 기본 검색은 Dense+Kiwi BM25, BM42는 프로필로 선택
     retrieval_profile: str = "dense_kiwi"
     # 2026.07.07(sooyeon.choi) 수정 - Qdrant 서버 측 Dense+Kiwi BM25 hybrid 검색 전환
     retrieval_engine: str = "qdrant_hybrid"  # "legacy" | "qdrant_hybrid"
     hybrid_rrf_k: int = 60                  # Hybrid RRF 상수 (코드 레벨 기본값)
+    # 2026.11.11(sooyeon.choi) 추가 - 질의 유형별 RRF 가중치 표. legacy=기존, sop=법령 조문 외 Dense 1.0/BM25 1.5
+    query_type_profile: str = "legacy"
+    # 2026.11.11(sooyeon.choi) 추가 - Dense 가중치 중 원문 질의 비중(0~1). 비우면 원문·재작성 질의 균등(기존)
+    dense_original_query_share: Optional[float] = None
     # 2026.06.29(sooyeon.choi) 추가 - 법령 문서용 BM25 빈도 포화·문서 길이 보정값을 환경 설정으로 분리
     bm25_k1: float = 1.2
     bm25_b: float = 0.5
     bm25_avg_len: float = 128.0
     kiwi_bm25_vector_name: str = "kiwi_bm25"
-    kiwi_bm25_encoder_version: str = "kiwi-bm25-v1"
+    # 2026.11.10(sooyeon.choi) 수정 - 값이 토큰 정책도 고른다. v1=기존, kiwi-bm25-v2=모델 코드·규격·호기 보존
+    #   (바꾸면 scripts/rebuild_kiwi_bm25.py로 기존 포인트 BM25 벡터를 다시 계산해야 한다)
+    kiwi_bm25_encoder_version: str = "kiwi-bm25-v2"   # kiwi-bm25-v1 | kiwi-bm25-v2
     dense_prefetch_k: int = 80
     sparse_prefetch_k: int = 80
     # relevance_threshold: float = 0.3        # rerank 후 컨텍스트 포함 최소 관련성 점수
@@ -191,7 +197,7 @@ class Settings(BaseSettings):
     answer_correctness_judge_temperature: float = 0.0
     openai_api_key: Optional[str] = None
 
-    # 2026.11.06(sooyeon.choi) 수정 - 복원은 보존을 전제로 한다(보존 OFF + 복원 ON이면 기동 실패, 설계 v1.1 10절 B-15)
+    # 2026.11.06(sooyeon.choi) 수정 - 복원은 보존을 전제로 한다(보존 OFF + 복원 ON이면 기동 실패, 설계 v1.1 10절)
     @model_validator(mode="after")
     def validate_document_version_restore(self):
         if self.document_version_restore_enabled and not self.document_version_vector_retention_enabled:
@@ -206,6 +212,17 @@ class Settings(BaseSettings):
         if value not in {"v1", "v2", "f2", "judge"}:
             raise ValueError("answer_correctness_primary must be v1, v2, f2, or judge")
         return value
+
+    # 2026.11.11(sooyeon.choi) 추가 - 빈 값은 미설정(균등 배분), 0~1 밖은 오류
+    @field_validator("dense_original_query_share", mode="before")
+    @classmethod
+    def validate_dense_original_query_share(cls, value):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        share = float(value)
+        if not 0.0 <= share <= 1.0:
+            raise ValueError("DENSE_ORIGINAL_QUERY_SHARE는 0~1 사이여야 합니다")
+        return share
 
     @field_validator("answer_correctness_fallback_chain")
     @classmethod
@@ -225,6 +242,9 @@ class Settings(BaseSettings):
     # ── 파일 저장 ────────────────────────────────────────
     # 원본 업로드 파일 영구 보관 경로 (연/월 하위 폴더 자동 생성)
     uploaded_files_base_dir: str = "instance/data"
+    #   chunk, db/ingest_jobs (예: /data/data → /data/chunk, /data/db/ingest_jobs). 계산은 app/core/storage_paths.py
+    chunk_output_dir: str = ""
+    ingest_queue_dir: str = ""
     # 2026.05.22(sooyeon.choi) 추가 - Docling 파싱 결과 마크다운 저장 경로 (빈 문자열이면 저장 안 함)
     md_save_dir: str = "instance/parsed_md"
     # 2026.10.16 추가 - 엑셀 전용 처리기(excel_ingest) 분기 모드
@@ -235,10 +255,34 @@ class Settings(BaseSettings):
     excel_md_keep_last: int = Field(default=5, gt=0)
     # .xls → .xlsx LibreOffice 변환 제한 시간(초)
     excel_xls_convert_timeout: int = Field(default=120, gt=0)
+    # 2026.10.28(woojin.jung) 추가 - LibreOffice UNO 기반 단일 시트 PDF 미리보기 실행 설정
+    # 2026.10.28(woojin.jung) 수정 - 실행 위치와 무관하게 백엔드 instance를 기본 작업 경로로 사용
+    sheet_preview_work_root: str = "instance/sheet_preview"
+    sheet_preview_python: str = "/usr/bin/python3"
+    sheet_preview_soffice: str = "/usr/bin/soffice"
+    sheet_preview_timeout_seconds: int = Field(default=120, gt=0)
+    sheet_preview_max_concurrency: int = Field(default=2, gt=0, le=4)
+    # 2026.10.28(woojin.jung) 추가 - 완성된 시트 미리보기 PDF 디스크 캐시 설정
+    sheet_preview_cache_enabled: bool = True
+    sheet_preview_cache_ttl_hours: int = Field(default=168, gt=0)
+    sheet_preview_cache_max_bytes: int = Field(default=1073741824, gt=0)
     # 2026.10.22(sooyeon.choi) 추가 - 엑셀 사진 전부 자동 연결
     #   true : 장식·양식 머리글을 뺀 모든 사진을 셀 위치 기준(Step → 행 겹침 → 가장 가까운 청크)으로 청크에 연결
     #   false: Phase 2 동작(SOP Step 사진만 연결). 이미 적재한 문서는 다시 등록해야 바뀐다
     excel_image_link_all: bool = True
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+    #   off(기본): 기존 동작 그대로 — .dwg는 거부, .dxf는 지원하지 않는 형식
+    #   backend  : .dwg·.dxf를 도면 처리기로 변환·추출·이미지 저장까지 처리한다(임베딩·검색 데이터 저장 없음)
+    drawing_parse_mode: Literal["off", "backend"] = "off"
+    dwg_converter: Literal["libredwg"] = "libredwg"
+    libredwg_bin: str = "dwg2dxf"
+    dwg_convert_timeout_sec: int = Field(default=120, gt=0)
+    dwg_convert_max_mem_mb: int = Field(default=2048, gt=0)  # 변환 프로세스 메모리 상한(Linux에서만 적용)
+    drawing_max_upload_mb: int = Field(default=100, gt=0)
+    drawing_template_dir: str = ""                            # 비우면 app/ingest/drawing/templates
+    drawing_render_max_px: int = Field(default=4000, ge=800)  # 전체 도면 이미지 긴 변
+    drawing_render_timeout_sec: int = Field(default=90, gt=0)
+    drawing_md_keep_last: int = Field(default=5, gt=0)
     # 2026.10.19 추가 - 문서 목록 [최신본 변경]
     document_version_replace_enabled: bool = True
     # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, R1-5, D-22). 기본값은 기존 동작 그대로(둘 다 false)

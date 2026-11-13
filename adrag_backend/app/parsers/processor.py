@@ -216,14 +216,12 @@ class DocumentChunkingProcessor:
         ext = Path(file_path).suffix.lstrip(".").lower()
         process_start = time.perf_counter()
         logger.info("[PARSE][pipeline] 시작 file=%s ext=%s", file_path, ext)
-        # logger.info(f"문서 처리 시작: {file_path} (ext={ext})")
 
         # 1. 로딩 (마크다운 메타데이터 획득)
         if md_meta is None:
             loader = _get_loader(file_path, self.config)
             load_start = time.perf_counter()
             logger.info("[PARSE][step=load] 시작 loader=%s", type(loader).__name__)
-            # logger.info(f"로더 선택: {type(loader).__name__}")
             # 2026.08.27(sooyeon.choi) 추가 - Excel IR document_id 계약 전달
             if ext in OOXML_SPREADSHEET_EXTENSIONS:
                 md_meta = loader.load(file_path, document_id=document_id)
@@ -235,14 +233,12 @@ class DocumentChunkingProcessor:
                 len(md_meta),
                 time.perf_counter() - load_start,
             )
-            # logger.info(f"로딩 완료: {len(md_meta)}페이지")
             # 2026.05.22(sooyeon.choi) 추가 - 파싱 결과 마크다운 저장
             save_dir = get_settings().md_save_dir
             if save_dir:
                 _save_markdown(file_path, md_meta, save_dir)
         else:
             logger.info("[PARSE][step=load] 캐시사용pages=%s", len(md_meta))
-            # logger.info("캐시된 마크다운 메타데이터 재사용")
 
         total_pages = len(md_meta)
 
@@ -272,7 +268,6 @@ class DocumentChunkingProcessor:
             len(docs),
             time.perf_counter() - convert_start,
         )
-        # logger.info(f"LCDocument 변환 완료: {len(docs)}개")
 
         # 3. 문서 유형 판정
         first_page_text = docs[0].page_content if docs else ""
@@ -293,7 +288,6 @@ class DocumentChunkingProcessor:
         )
         law_flag = decision.effective_doc_type == "law"
         manual_flag = decision.effective_doc_type == "manual"
-        # logger.info(f"문서 유형 판정: law={law_flag}, manual={manual_flag}")
 
         # 4. 청킹
         # 2026.07.16(sooyeon.choi) 수정 - 유형별 if/else 분기를 청커 레지스트리 조회로 전환 (3단계)
@@ -310,7 +304,6 @@ class DocumentChunkingProcessor:
             doc_type,
             time.perf_counter() - chunk_start,
         )
-        # logger.info(f"청킹 완료: {len(chunks)}개 청크 (유형: {doc_type})")
         logger.info(
             "[PARSE][pipeline] 완료 file=%s pages=%s chunks=%s doc_type=%s elapsed=%.2fs",
             file_path,

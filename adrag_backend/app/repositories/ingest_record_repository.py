@@ -1,6 +1,6 @@
 """문서 버전·청크·사진 배치·흐름도 기록 (2026.10.16 Phase 2, Alembic 0003).
 
-설계: docs/design/reports/phase-2-plan.md P2-4·P2-6~P2-10·P2-13
+설계: docs/design/reports/phase-2-plan.md
 - 적재 1회 = 버전 1행(현재는 v1·active) + 청크 N행(Qdrant 포인트와 1:1) + 청크↔사진 연결 + 흐름도.
 - 모든 쓰기는 호출자가 연 트랜잭션(``DatabaseManager.get_connection``) 안에서 문서 행 저장과 함께 실행된다.
   (이전 계보의 같은 이름 파일은 doc_key 자동 개정 판단을 포함해 D-01과 맞지 않아 새로 썼다.)
@@ -48,7 +48,7 @@ class IngestRecordRepository:
             (doc_key, product_model or None, document_id),
         )
 
-    # ── 버전 (P2-6) ─────────────────────────────────────────────────────────
+    # ── 버전 ─────────────────────────────────────────────────────────
 
     def create_active_version(self, document_id: str, version_no: int, **fields: Any) -> None:
         """버전 행을 active로 만든다. 개정본 전환(이전 active → retired)은 Phase 3."""
@@ -164,7 +164,7 @@ class IngestRecordRepository:
             (document_id,),
         )
         if not doc:
-            raise RuntimeError("최신본을 바꿀 문서가 없거나 삭제되었습니다.")
+            raise RuntimeError("새 버전을 등록할 문서가 없거나 삭제되었습니다.")
         previous_version_no = doc[0][0]  # 2026.11.06(sooyeon.choi) 수정 - 적용 이력(from_version_no)용
         state = self.db.execute_query(
             "SELECT status FROM tb_document_versions WHERE document_id = ? AND version_no = ? FOR UPDATE",
@@ -207,7 +207,7 @@ class IngestRecordRepository:
                 fields.get("parser_type"), fields.get("total_pages"), fields.get("chunk_count"), document_id,
             ),
         )
-        # 2026.11.06(sooyeon.choi) 수정 - 이 버전 작업의 점유 표식 해제(자기 소유만, B-01)
+        # 2026.11.06(sooyeon.choi) 수정 - 이 버전 작업의 점유 표식 해제(자기 소유만)
         self.db.execute_update(
             "UPDATE tb_documents SET pending_job_id = NULL WHERE document_id = ? AND pending_job_id = "
             "(SELECT job_id FROM tb_document_versions WHERE document_id = ? AND version_no = ?)",
@@ -303,7 +303,7 @@ class IngestRecordRepository:
         actor_id: Optional[str] = None, job_id: Optional[str] = None, initial: bool = False,
     ) -> dict[str, Any]:
         """적용 이력 1행. initial이면 순번 1(신규 문서), 아니면 tb_documents.activation_revision을 1 올린다.
-        호출자의 전환 트랜잭션 안에서 실행한다(B-04)."""
+        호출자의 전환 트랜잭션 안에서 실행한다."""
         if initial:
             revision = 1
         else:
@@ -389,7 +389,7 @@ class IngestRecordRepository:
         if isinstance(snapshot, str):
             snapshot = json.loads(snapshot)
         if not snapshot:
-            raise RestoreStateError("METADATA_MISSING", "이전 버전 정보가 부족해 복원할 수 없습니다.")
+            raise RestoreStateError("METADATA_MISSING", "이 버전의 정보가 부족해 적용할 수 없습니다.")
         from_version_no = int(doc["version_no"] or 1)
         self.db.execute_update(
             "UPDATE tb_document_versions SET status = 'retired', retired_at = now() "
@@ -450,7 +450,7 @@ class IngestRecordRepository:
         )
         return [dict(r) for r in rows]
 
-    # ── 청크 (P2-7) ─────────────────────────────────────────────────────────
+    # ── 청크 ─────────────────────────────────────────────────────────
 
     def insert_chunks(self, rows: Iterable[dict[str, Any]]) -> int:
         params = [
@@ -470,7 +470,7 @@ class IngestRecordRepository:
         self.db.execute_update("DELETE FROM tb_flow_graphs WHERE document_id = ?", (document_id,))
         return deleted
 
-    # ── 청크↔사진 (P2-8) ───────────────────────────────────────────────────
+    # ── 청크↔사진 ───────────────────────────────────────────────────
 
     def insert_chunk_resources(self, links: Iterable[tuple[str, str, int]]) -> int:
         """(chunk_id, resource_id, sort_order). 확정 리소스가 없는 연결은 건너뛴다(FK)."""
@@ -484,7 +484,7 @@ class IngestRecordRepository:
             [(chunk_id, resource_id, order, resource_id) for chunk_id, resource_id, order in params],
         )
 
-    # ── 사진 배치 (P2-4, excel_ingest 경로) ───────────────────────────────────
+    # ── 사진 배치 (excel_ingest 경로) ───────────────────────────────────
 
     def insert_resources(self, rows: Iterable[dict[str, Any]]) -> int:
         params = [
@@ -499,7 +499,7 @@ class IngestRecordRepository:
             params,
         )
 
-    # ── 흐름도 (P2-10) ─────────────────────────────────────────────────────
+    # ── 흐름도 ─────────────────────────────────────────────────────
 
     def insert_flow_graphs(self, document_id: str, version_no: int, graphs: Iterable[dict[str, Any]]) -> int:
         params = [

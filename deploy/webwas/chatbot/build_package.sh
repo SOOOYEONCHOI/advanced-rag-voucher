@@ -48,7 +48,10 @@ if ! docker image inspect "$RUNTIME_IMAGE" >/dev/null 2>&1; then
 fi
 # 네트워크를 끊고 의존성을 불러 본다(8.3 반입 전 검증)
 docker run --rm --network none "$RUNTIME_IMAGE" sh -c \
-    'pip check && python -c "import fastapi, uvicorn, psycopg, sqlalchemy, alembic, qdrant_client, langgraph, kiwipiepy, openpyxl, pdfplumber, torch; print(\"imports ok\")"'
+    'pip check && python -c "import fastapi, uvicorn, psycopg, sqlalchemy, alembic, qdrant_client, langgraph, kiwipiepy, openpyxl, pdfplumber, torch, ezdxf, matplotlib; print(\"imports ok\")" \
+     && test -x /usr/bin/soffice && /usr/bin/python3 -c "import uno; print(\"uno ok\")" \
+     && env -i PATH=/usr/local/bin:/usr/bin:/bin dwg2dxf --version'
+# 2026.11.13(sooyeon.choi) 수정 - 도면용 ezdxf·matplotlib·dwg2dxf(앱과 같이 PATH 만 준 환경), 시트 미리보기용 soffice·uno 도 확인
 
 echo "== 2. backend 소스 (허용 목록)"
 for item in "${BACKEND_INCLUDE[@]}"; do

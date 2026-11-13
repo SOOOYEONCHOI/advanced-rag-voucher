@@ -12,6 +12,7 @@ from app.routes.chat import router as chat_router
 # 2026.04.01(sooyeon.choi) 수정 - 멀티컬렉션 관리 기능 추가
 from app.routes.collections import router as collections_router
 from app.routes.ingest import router as ingest_router
+from app.routes.drawings import router as drawings_router  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
 from app.routes.parse import router as parse_router
 from app.routes.query import router as query_router
 from app.routes.voice import router as voice_router
@@ -62,7 +63,7 @@ def _cleanup_spreadsheet_resources() -> None:
         root = Path(__file__).resolve().parent / root
     service = SpreadsheetResourceService(
         root,
-        SpreadsheetResourceRepository(db_path=settings.sqlite_db_path),
+        SpreadsheetResourceRepository(),
         settings.resource_max_upload_bytes,
     )
     # 2026.08.27(sooyeon.choi) 수정 - 실행 중 job 제외와 삭제 실패 재시도를 함께 수행
@@ -117,7 +118,7 @@ async def _session_cleanup_loop() -> None:
         try:
             logger.info("[스케줄러] 만료 세션 정리 시작")
             await asyncio.sleep(_SESSION_CLEANUP_INTERVAL_SECONDS)
-            repo = MetadataRepository(settings.sqlite_db_path)
+            repo = MetadataRepository()
             deleted = repo.delete_expired_query_contexts()
             logger.info(f"[스케줄러] 만료 세션 정리 완료: {deleted}건 삭제")
         except asyncio.CancelledError:
@@ -211,6 +212,7 @@ app.include_router(chat_router, prefix="/api")
 # 2026.04.01(sooyeon.choi) 수정 - 멀티컬렉션 관리 기능 추가
 app.include_router(collections_router, prefix="/api")
 app.include_router(ingest_router, prefix="/api")
+app.include_router(drawings_router, prefix="/api")  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
 app.include_router(parse_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 app.include_router(voice_router, prefix="/api")

@@ -320,7 +320,7 @@ class EvalRepository:
         note: str = "",
         created_by: Optional[str] = None,
     ) -> int:
-        """수동 JSON 골드셋 직접 등록 (P2 검증용)."""
+        """수동 JSON 골드셋 직접 등록."""
         version_row = self._db.execute_query(
             "SELECT COALESCE(MAX(version), 0) + 1 AS v FROM tb_eval_goldsets WHERE dataset_id = ?",
             (dataset_id,),

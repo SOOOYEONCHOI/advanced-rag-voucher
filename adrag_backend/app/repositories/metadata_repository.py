@@ -23,7 +23,6 @@ routes/services 교체 완료 전까지 하위 호환성을 유지한다.
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import get_settings
 from app.models.data_models import (
     QueryContext,
     UserPermission,
@@ -41,13 +40,12 @@ logger = logging.getLogger(__name__)
 class MetadataRepository:
     """내부적으로 전문 Repository에 위임한다."""
 
-    def __init__(self, db_path: Optional[str] = None):
-        db_path = db_path or get_settings().sqlite_db_path
-        self._db = get_database_manager(db_path)
-        self._doc = DocumentRepository(db_path)
-        self._perm = PermissionsRepository(db_path)
-        self._session = SessionRepository(db_path)
-        self._log = QueryLogRepository(db_path)
+    def __init__(self):
+        self._db = get_database_manager()
+        self._doc = DocumentRepository()
+        self._perm = PermissionsRepository()
+        self._session = SessionRepository()
+        self._log = QueryLogRepository()
         logger.debug("MetadataRepository (facade) initialized")
 
     # ── 문서 ────────────────────────────────────────────────────────────────
@@ -140,6 +138,7 @@ class MetadataRepository:
         extracted_keywords: Optional[List[str]] = None,
         department_snapshot: Optional[str] = None,
         collection_name_snapshot: Optional[str] = None,
+        input_mode: str = "text",  # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로
     ) -> Optional[int]:
         """질의 로그를 INSERT하고 log_id를 반환한다."""
         # 2026.06.19(sooyeon.choi) 추가 - 결과 코드·응답 본문·통계 스냅샷 위임
@@ -164,6 +163,7 @@ class MetadataRepository:
             extracted_keywords=extracted_keywords,
             department_snapshot=department_snapshot,
             collection_name_snapshot=collection_name_snapshot,
+            input_mode=input_mode,
         )
 
     def set_query_feedback(

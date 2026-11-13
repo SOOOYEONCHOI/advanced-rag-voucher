@@ -63,6 +63,11 @@ python-pptx>=1.0.0,<2.0.0
 openpyxl>=3.1.2,<4.0.0
 Pillow>=10.4.0,<11.0.0
 pdfplumber>=0.11.0,<1.0.0
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - DXF 읽기(ezdxf, MIT)·도면 이미지 렌더(matplotlib)
+#   numpy<2 고정과 맞추려고 contourpy도 1.4 미만(1.4부터 numpy 2 필요)
+ezdxf==1.4.2
+matplotlib>=3.9,<3.11
+contourpy<1.4
 
 # ── Testing ─────────────────────────────────────────────
 hypothesis>=6.112.0,<7.0.0

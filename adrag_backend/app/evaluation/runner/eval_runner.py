@@ -4,7 +4,7 @@
 - 항목 단위 Semaphore 동시성 제어, 항목별 부분실패 허용
 - 진행률은 항목 완료 시마다 DB 갱신
 - run_type:
-    retrieval  — 채널별 검색 + 리랭크만 (LLM 미사용, 저비용)  [P2 구현]
+    retrieval  — 채널별 검색 + 리랭크만 (LLM 미사용, 저비용)
     full       — 검색 + 규칙 기반 답변/Citation 평가
 
 집계 세그먼트: all + type:{question_type} + tag:{tag} (①축 한국어 세그먼트 보존).

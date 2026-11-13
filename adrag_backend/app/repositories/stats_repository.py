@@ -11,7 +11,6 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 
 logger = logging.getLogger(__name__)
@@ -30,8 +29,8 @@ def _date_str(dt: datetime) -> str:
 class StatsRepository:
     """집계 쿼리 전담 (읽기 전용)."""
 
-    def __init__(self, db_path: Optional[str] = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
 
     # ── 기간 필터 헬퍼 ──────────────────────────────────────────────────────
 

@@ -1,0 +1,13 @@
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - CAD 글꼴 → 서버 글꼴(한글이 □로 나오지 않게)
+# 왼쪽은 도면 문자 스타일의 글꼴 파일 이름(대소문자 무시), 오른쪽은 서버 글꼴 파일 이름.
+# 목록에 없거나 서버에 없는 글꼴은 default로 바꾼다.
+default: NotoSansCJK-Regular.ttc
+fallbacks: [NotoSansCJK-Regular.ttc, NotoSansCJKkr-Regular.otf, NanumGothic.ttf, malgun.ttf]
+map:
+  gothic.ttf: NotoSansCJK-Regular.ttc
+  malgun.ttf: NotoSansCJK-Regular.ttc
+  malgunbd.ttf: NotoSansCJK-Regular.ttc
+  batang.ttc: NotoSansCJK-Regular.ttc
+  gulim.ttc: NotoSansCJK-Regular.ttc
+  whgtxt.shx: NotoSansCJK-Regular.ttc
+  whgdtxt.shx: NotoSansCJK-Regular.ttc

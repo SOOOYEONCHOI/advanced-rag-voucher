@@ -20,7 +20,7 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Bearer 토큰 파서
 _bearer = HTTPBearer(auto_error=False)
 
-# 2026.07.16(sooyeon.choi) 추가 - 보안등급 계층 단일 정의 (B10)
+# 2026.07.16(sooyeon.choi) 추가 - 보안등급 계층 단일 정의
 #   기존: build_metadata_filter.py와 routes/ingest.py에 동일 dict가 중복 정의되어
 #   등급 추가/변경 시 한쪽 누락 위험 → 공통 모듈로 통합
 # 보안등급 계층: 상위 등급은 하위 등급도 조회 가능
@@ -30,6 +30,31 @@ SECURITY_HIERARCHY: dict[str, list[str]] = {
     "confidential": ["public", "internal", "confidential"],
     "restricted":   ["public", "internal", "confidential", "restricted"],
 }
+
+
+# 2026.11.09(sooyeon.choi) 추가 - 문서 열람 범위 계산 공통 함수
+#   주의: 검색 필터(graphs/nodes/build_metadata_filter.py)는 accessible_collections가 비면 "전체 허용"으로
+#   규칙이 달라 이 함수를 쓰지 않는다(빈 목록 = 열람 불가인 아래 규칙과 다름).
+def document_scope(permissions) -> tuple[set[str], set[str]]:
+    """사용자 권한(UserPermission) → (접근 가능한 대화 주제 qdrant_name 집합, 열람 가능한 보안 등급 집합).
+
+    권한 행이 없으면 둘 다 빈 집합(아무 문서도 열람 불가). 관리자 여부는 호출하는 쪽에서 먼저 판단한다.
+    """
+    if not permissions:
+        return set(), set()
+    accessible = set(permissions.accessible_collections or [])
+    allowed = set(SECURITY_HIERARCHY.get(permissions.max_security_level or "public", ["public"]))
+    return accessible, allowed
+
+
+def in_document_scope(
+    scope: tuple[set[str], set[str]],
+    collection_name: Optional[str],
+    security_level: Optional[str],
+) -> bool:
+    """문서(대화 주제·보안 등급)가 열람 범위 안이면 True. 보안 등급 기본값 처리는 호출하는 쪽 규칙을 따른다."""
+    accessible, allowed = scope
+    return collection_name in accessible and security_level in allowed
 
 
 # ── 비밀번호 ─────────────────────────────────────────────────────────────────
@@ -95,6 +120,25 @@ def decode_access_token(token: str) -> dict:
 
 # ── FastAPI Depends ───────────────────────────────────────────────────────────
 
+# 2026.11.09(sooyeon.choi) 추가 - Depends 3종 공통 토큰 확인
+def _decode_bearer_payload(credentials: Optional[HTTPAuthorizationCredentials]) -> dict:
+    """Bearer 토큰을 복호화한다. 토큰이 없거나 복호화에 실패하면 401(WWW-Authenticate: Bearer)."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="인증 토큰이 필요합니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return decode_access_token(credentials.credentials)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않거나 만료된 토큰입니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 # admin 토큰만 허용하는 Depends 함수
 async def get_current_admin(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
@@ -103,20 +147,7 @@ async def get_current_admin(
 
     인증 실패 시 401을 반환한다.
     """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="인증 토큰이 필요합니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않거나 만료된 토큰입니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = _decode_bearer_payload(credentials)
 
     if payload.get("type") != "admin_access":
         raise HTTPException(
@@ -135,21 +166,7 @@ async def get_current_principal(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict:
     """JWT Bearer 토큰에서 현재 주체(admin/user)를 추출한다."""
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="인증 토큰이 필요합니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않거나 만료된 토큰입니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = _decode_bearer_payload(credentials)
 
     token_type = payload.get("type")
     if token_type not in {"admin_access", "user_access"}:
@@ -172,20 +189,7 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict:
     """JWT Bearer 토큰에서 일반 사용자 정보를 추출한다."""
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="인증 토큰이 필요합니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않거나 만료된 토큰입니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = _decode_bearer_payload(credentials)
 
     if payload.get("type") != "user_access" or not payload.get("sub"):
         raise HTTPException(

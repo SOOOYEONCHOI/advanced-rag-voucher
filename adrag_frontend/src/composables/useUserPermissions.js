@@ -48,6 +48,8 @@ export const useUserPermissions = ({ router }) => {
   const savingUsers = ref(new Set());
   const savedUsers = ref(new Set());
   const showAddModal = ref(false);
+  const showAddPrerequisiteModal = ref(false);
+  const resumeAddAfterDepartment = ref(false);
   const showPermissionModal = ref(false);
   const showDepartmentModal = ref(false);
   const showEditUserModal = ref(false);
@@ -165,7 +167,20 @@ export const useUserPermissions = ({ router }) => {
 
   const openAddModal = () => {
     resetAddModal();
+    if (departmentOptions.value.length === 0) {
+      showAddPrerequisiteModal.value = true;
+      return;
+    }
     showAddModal.value = true;
+  };
+
+  const closeAddPrerequisiteModal = () => {
+    showAddPrerequisiteModal.value = false;
+  };
+
+  const startDepartmentForUserAdd = () => {
+    showAddPrerequisiteModal.value = false;
+    openDepartmentModal(null, true);
   };
 
   const closeAddModal = () => {
@@ -229,7 +244,8 @@ export const useUserPermissions = ({ router }) => {
     return department.categories.filter((id) => !(user._selectedCollections || []).includes(id)).length;
   };
 
-  const openDepartmentModal = async (department = null) => {
+  const openDepartmentModal = async (department = null, shouldResumeUserAdd = false) => {
+    resumeAddAfterDepartment.value = shouldResumeUserAdd;
     departmentTarget.value = department;
     departmentModalError.value = '';
     departmentDraft.value = department
@@ -256,10 +272,11 @@ export const useUserPermissions = ({ router }) => {
     }
   };
 
-  const closeDepartmentModal = () => {
+  const closeDepartmentModal = ({ preserveUserAddFlow = false } = {}) => {
     showDepartmentModal.value = false;
     departmentTarget.value = null;
     departmentModalError.value = '';
+    if (!preserveUserAddFlow) resumeAddAfterDepartment.value = false;
   };
 
   const saveDepartmentDraft = async () => {
@@ -269,6 +286,7 @@ export const useUserPermissions = ({ router }) => {
       return showToast('이미 등록된 부서명입니다.', 'error');
     }
     const isEditing = Boolean(departmentTarget.value);
+    const shouldResumeUserAdd = !isEditing && resumeAddAfterDepartment.value;
     departmentSaving.value = true;
     try {
       const payload = { name, topic_names: [...departmentDraft.value.categories] };
@@ -278,9 +296,15 @@ export const useUserPermissions = ({ router }) => {
       } else {
         await adminApi.createDepartment(payload);
       }
-      closeDepartmentModal();
+      closeDepartmentModal({ preserveUserAddFlow: shouldResumeUserAdd });
       showToast(`부서가 ${isEditing ? '수정' : '추가'}되었습니다.`);
       await loadAll();
+      if (shouldResumeUserAdd) {
+        resetAddModal();
+        newUser.value.department = name;
+        showAddModal.value = true;
+        resumeAddAfterDepartment.value = false;
+      }
     } catch (err) {
       showToast(getErrorMessage(err, '부서 저장에 실패했습니다.'), 'error');
     } finally {
@@ -488,8 +512,11 @@ export const useUserPermissions = ({ router }) => {
     loadAll,
     saveUser,
     showAddModal,
+    showAddPrerequisiteModal,
     openAddModal,
     closeAddModal,
+    closeAddPrerequisiteModal,
+    startDepartmentForUserAdd,
     addLoading,
     addError,
     newUser,

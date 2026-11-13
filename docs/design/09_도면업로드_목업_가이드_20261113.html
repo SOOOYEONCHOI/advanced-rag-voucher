@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>도면 업로드 연동판</title>
+<!--
+  2026-11-13 도면 업로드(Phase 6 1단계: 파싱·저장·검수) 목업 연동판 (프런트엔드 전달용)
+  - 화면 디자인: docs/design/drawing/admin_UI-12_도면업로드_목업_20261112_v0.6.html 의 CSS·배치·클래스 이름·문구를 따르고,
+    11-12 구현된 화면(AdminView.vue · DrawingResultDialog.vue · useDocumentUpload.js · useAdminDocuments.js)과 맞췄다.
+  - 노란 주석 = 화면 영역별 API. A 업로드 카드 / B 처리 현황 / C 문서 목록 / D 처리 결과 / E 검수 / F 버전 이력.
+  - 화면 값은 가상 API 응답(실제 서버 응답 형태: routes/ingest.py · routes/drawings.py)에서 그린다. 서버 요청 없음.
+  - 도면 이미지·품번·품명·사람 이름은 모두 합성 값이다(실제 샘플 도면·추출값 없음, CLAUDE.md 절대 규칙 3).
+  - v0.6 목업 대비: 탭 "주기" → "주기·치수"(치수·기타 글자 포함), 처리 정보 표를 구현 필드로, 검수 409 확인 흐름·
+    결과 조회 중/실패·다른 사용자 보기를 응답 필드(can_review)로 표시.
+  - 오른쪽 위 [API 표시]로 주석을 켜고 끄고, [API 요약표]로 영역·단계·오류·경고 코드 표를 연다(둘 다 제품에 구현하지 않음).
+  - 해시 옵션: #select | #progress | #done | #result | #missing | #dup | #fail | #history | #off | #loading | #loaderror,
+    뒤에 &other | &admin (보는 사람), &noanno (주석 끄기)
+-->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{--blue:#2563eb;--line:#e2e8f0;--muted:#64748b;--ink:#1e293b}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;background:#f1f5f9;color:#374151;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+[hidden]{display:none!important}
+.admin-layout{display:flex;min-height:100vh}
+.sidebar{width:260px;flex:none;background:#1e293b;color:#e2e8f0;padding:1.25rem 1rem}
+.logo{font-weight:800;font-size:1.15rem;color:#fff;margin:0 .5rem 1.5rem;letter-spacing:.5px}
+.nav-section-title{color:#64748b;font-size:.75rem;margin:1rem .5rem .4rem}
+.nav-item{display:flex;gap:.6rem;align-items:center;padding:.6rem .75rem;border-radius:8px;color:#cbd5e1;font-size:.88rem}
+.nav-item.active{background:#334155;color:#fff}
+.admin-main{flex:1;min-width:0}
+.admin-header{background:#fff;border-bottom:1px solid var(--line);padding:1.25rem 2rem;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.admin-header h1{font-size:1.25rem;color:#0f172a;margin:0 0 .25rem}
+.admin-header p{font-size:.85rem;color:var(--muted);margin:0}
+.collections-badge{display:flex;gap:6px;align-items:center;background:#eff6ff;color:#1d4ed8;padding:.4rem .8rem;border-radius:999px;font-size:.8rem;white-space:nowrap}
+.admin-content{padding:1.5rem 2rem 6rem;display:flex;flex-direction:column;gap:1.25rem}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.5rem}
+.card-title{font-size:.95rem;color:var(--ink);font-weight:700;display:flex;gap:8px;align-items:center;margin-bottom:1rem}
+.drop-zone{border:2px dashed #cbd5e1;border-radius:10px;padding:2rem;text-align:center;color:#94a3b8}
+.drop-zone.has-file{border-color:#22c55e;background:#f0fdf4;border-style:solid}
+.drop-icon{font-size:2rem;margin-bottom:.5rem;color:#94a3b8}
+.drop-placeholder p{margin:.25rem 0;color:#475569}
+.batch-selection{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-top:.6rem}
+.btn-text{border:none;background:none;color:#475569;font-size:.8rem;padding:.2rem .4rem;border-radius:6px}
+.btn-text:hover{background:#f1f5f9}
+.btn-text.danger{color:#dc2626}
+.btn-text.primary{color:var(--blue);font-weight:600}
+.upload-form{margin-top:1rem}
+.form-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:.82rem;color:#374151;font-weight:600}
+.required{color:#ef4444}
+.form-group select{border:1px solid #d1d5db;border-radius:8px;padding:.6rem .75rem;font-size:.88rem;color:#374151;background:#fff}
+.form-group select:disabled{background:#f3f4f6;color:#6b7280}
+.form-hint{color:var(--muted);font-size:.78rem;line-height:1.45}
+.btn-upload{width:100%;margin-top:1rem;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:.8rem 1.5rem;font-size:.9rem;font-weight:600}
+.btn-upload:disabled{background:#94a3b8}
+.batch-progress{padding-top:1.25rem;margin-top:1.25rem;border-top:1px solid var(--line);font-size:.875rem}
+.batch-progress-header{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.6rem}
+.batch-progress-title{font-size:.9rem;margin:0 .4rem 0 0;color:var(--ink)}
+.summary-chip{border-radius:999px;padding:.15rem .6rem;font-size:.78rem;background:#f1f5f9;color:#475569}
+.summary-chip.running{background:#dbeafe;color:var(--blue)}
+.summary-chip.failed{background:#fee2e2;color:#dc2626}
+.summary-chip.review{background:#ffedd5;color:#c2410c}
+.overall-progress{height:6px;border-radius:999px;background:#e2e8f0;display:flex;overflow:hidden;margin-bottom:.8rem}
+.overall-progress span.completed{background:#22c55e}.overall-progress span.failed{background:#ef4444}.overall-progress span.running{background:#3b82f6}
+.upload-file-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px}
+.upload-file-head{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,2fr) 90px;gap:1rem;padding:.5rem 1rem;background:#f8fafc;color:var(--muted);font-size:.78rem;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.upload-file{padding:.75rem 1rem;border-bottom:1px solid var(--line)}
+.upload-file:last-child{border-bottom:none}
+.upload-file.failed{background:#fffafa}
+.upload-file-main{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,2fr) 90px;gap:1rem;align-items:center}
+.upload-file-name{display:flex;gap:.5rem;align-items:center;min-width:0}
+.upload-file-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.86rem;color:var(--ink)}
+.upload-file-size{color:#94a3b8;font-size:.75rem;white-space:nowrap}
+.icon-drawing{color:#0f766e}
+.model-input{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:.35rem .5rem;font-size:.82rem}
+.model-locked{font-size:.82rem;color:#334155}
+.model-locked-label{color:#94a3b8;font-size:.72rem;margin-right:.35rem}
+.upload-file-status{display:flex;flex-direction:column;gap:4px}
+.upload-state{align-self:flex-start;border-radius:20px;padding:.2rem .6rem;font-size:.78rem;background:#f1f5f9;color:#475569}
+.upload-state.running{background:#dbeafe;color:var(--blue)}
+.upload-state.completed{background:#dcfce7;color:#15803d}
+.upload-state.review{background:#ffedd5;color:#c2410c}
+.upload-state.failed{background:#fee2e2;color:#dc2626}
+.upload-steps{display:flex;gap:4px;padding:0;margin:0;list-style:none}
+.upload-steps li{flex:1;height:5px;border-radius:999px;background:#e2e8f0}
+.upload-steps li.done{background:#22c55e}.upload-steps li.active{background:#3b82f6}.upload-steps li.error{background:#ef4444}
+.upload-step-label{color:var(--muted);font-size:.78rem}
+.upload-file-message{margin:.5rem 0 0;font-size:.8rem;color:#475569;display:flex;gap:.4rem;align-items:flex-start;line-height:1.45}
+.upload-file-message.error{color:#dc2626}
+.upload-file-message.info{color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:.45rem .6rem}
+.batch-result{margin-top:.55rem;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:.45rem .7rem;font-size:.8rem}
+.batch-result summary{cursor:pointer;color:#334155}
+.batch-result dl{display:grid;grid-template-columns:110px 1fr;gap:.25rem .75rem;margin:.6rem 0 .3rem}
+.batch-result dt{color:var(--muted)}.batch-result dd{margin:0;color:var(--ink)}
+.card-title-row{display:flex;justify-content:space-between;align-items:center}
+.btn-refresh{border:1px solid var(--line);background:#fff;border-radius:8px;width:34px;height:34px;color:#475569}
+.topic-filter-bar{display:flex;flex-wrap:wrap;gap:.5rem;margin:-.25rem 0 1rem}
+.topic-chip{display:inline-flex;gap:.4rem;align-items:center;padding:.3rem .45rem .3rem .75rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:#475569;font-size:.82rem}
+.topic-chip.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.topic-chip-count{padding:0 .4rem;border-radius:999px;background:#f1f5f9;color:var(--muted);font-size:.74rem;font-weight:600}
+.topic-chip.active .topic-chip-count{background:rgba(255,255,255,.22);color:#fff}
+.topic-sep{width:1px;background:var(--line);margin:0 .25rem}
+.topic-chip.type-chip i{color:#0f766e}.topic-chip.type-chip.active i{color:#fff}
+.table-scroll{overflow-x:auto}
+.doc-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:1240px}
+.doc-table th{background:#f8fafc;padding:.6rem .75rem;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
+.doc-table td{padding:.7rem .75rem;border-bottom:1px solid #f1f5f9;color:#374151;vertical-align:top}
+.doc-table tr:last-child td{border-bottom:none}
+.model-name{font-weight:600;color:var(--ink);display:block}
+.filename-cell-content{display:flex;gap:.4rem;align-items:center;margin-top:3px}
+.filename-link{border:none;background:none;padding:0;color:var(--blue);font-size:.8rem;text-decoration:underline;text-underline-offset:2px}
+.drawing-meta{margin-top:3px;font-size:.76rem;color:#0f766e;font-family:Consolas,monospace}
+.badge{display:inline-block;white-space:nowrap;padding:.15rem .55rem;border-radius:999px;font-size:.75rem;font-weight:600}
+.badge.spreadsheet{background:#dcfce7;color:#166534}.badge.manual{background:#ede9fe;color:#5b21b6}
+.badge.drawing{background:#ccfbf1;color:#0f766e}
+.state-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.state-chip{font-size:.7rem;padding:.05rem .4rem;border-radius:4px;background:#f1f5f9;color:var(--muted);white-space:nowrap}
+.state-chip.pending{background:#fff7ed;color:#c2410c}
+.state-chip.reviewed{background:#dcfce7;color:#15803d}
+.state-chip.warn{background:#fee2e2;color:#dc2626}
+.topic-link{white-space:nowrap;border:none;background:none;padding:.1rem .4rem;border-radius:4px;color:#334155;font-size:.84rem}
+.version-badge{background:#eff6ff;color:#1d4ed8;border-radius:6px;padding:.1rem .45rem;font-size:.76rem;font-weight:700}
+.document-actions{display:flex;gap:.35rem;flex-wrap:nowrap}
+.btn-doc-action{display:inline-flex;gap:.3rem;align-items:center;border:1px solid var(--line);background:#fff;border-radius:6px;padding:.3rem .55rem;font-size:.76rem;color:#334155;white-space:nowrap}
+.btn-doc-action.btn-drawing-result{border-color:#99f6e4;color:#0f766e;background:#f0fdfa}
+.btn-delete-doc{border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:6px;width:30px}
+.btn-doc-action:disabled,.btn-delete-doc:disabled{opacity:.45}
+/* 대화상자 */
+.dialog-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.dialog-overlay.nested{z-index:55}
+.dialog-box{background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.25);width:min(1040px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column}
+.dialog-box.small{width:min(460px,100%);padding:1.4rem}
+.dialog-head{display:flex;justify-content:space-between;align-items:flex-start;padding:1.2rem 1.4rem .6rem}
+.dialog-title{font-size:1.02rem;font-weight:700;color:var(--ink);display:flex;gap:.5rem;align-items:center}
+.dialog-sub{font-size:.8rem;color:var(--muted);margin-top:.3rem}
+.dialog-close{border:none;background:none;font-size:1.3rem;color:#94a3b8;line-height:1}
+.dialog-banner{margin:0 1.4rem .6rem;padding:.6rem .8rem;border-radius:8px;font-size:.82rem;display:flex;gap:.5rem;align-items:flex-start;line-height:1.5}
+.dialog-banner.warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.dialog-banner.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.drawing-state{margin:1rem 1.4rem;padding:1rem;border-radius:8px;background:#f8fafc;color:#475569;font-size:.86rem}
+.drawing-state.error{background:#fef2f2;color:#b91c1c}
+.tabs{display:flex;gap:.2rem;padding:0 1.4rem;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{border:none;background:none;padding:.6rem .8rem;font-size:.84rem;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:700}
+.tab-body{padding:1.1rem 1.4rem;overflow:auto;flex:1}
+.summary-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1.25rem}
+.thumb-main{border:1px solid var(--line);border-radius:10px;background:#fff;cursor:zoom-in;display:block;width:100%;padding:0}
+.thumb-main svg{display:block;width:100%;height:auto}
+.thumb-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.5rem}
+.thumb-crop{border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px;cursor:zoom-in;text-align:left}
+.thumb-crop svg{display:block;width:100%;height:70px}
+.thumb-crop span{display:block;font-size:.72rem;color:var(--muted);margin-top:2px}
+.kv{width:100%;border-collapse:collapse;font-size:.82rem}
+.kv th{width:110px;text-align:left;color:var(--muted);font-weight:500;padding:.38rem .5rem;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.kv td{padding:.38rem .5rem;border-bottom:1px solid #f1f5f9;color:var(--ink)}
+.kv td.missing{color:#dc2626;font-weight:600}
+.mono{font-family:Consolas,monospace}
+.sec-title{font-size:.82rem;font-weight:700;color:#334155;margin:1rem 0 .4rem}
+.sec-title.first{margin-top:0}
+.tab-tools{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.grid-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.grid-table th{background:#f8fafc;text-align:left;padding:.45rem .55rem;border:1px solid var(--line);color:#475569;font-weight:600;white-space:nowrap}
+.grid-table td{padding:.45rem .55rem;border:1px solid var(--line)}
+.empty-note{color:var(--muted);font-size:.84rem;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem;text-align:center}
+.note-list{margin:0;padding-left:1.2rem;line-height:1.8;font-size:.84rem}
+.drawing-text{margin:0 0 .3rem;font-size:.84rem;line-height:1.6}
+.warn-group{border:1px solid var(--line);border-radius:10px;margin-bottom:.8rem;overflow:hidden}
+.warn-group h4{margin:0;padding:.55rem .8rem;font-size:.82rem;background:#f8fafc;border-bottom:1px solid var(--line)}
+.warn-item{display:grid;grid-template-columns:170px 1fr 60px;gap:.75rem;padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-size:.8rem}
+.warn-item:last-child{border-bottom:none}
+.warn-item code{font-size:.74rem;color:#475569}
+.warn-empty{margin:0;padding:.55rem .8rem;font-size:.8rem;color:#94a3b8}
+.dialog-actions{display:flex;justify-content:flex-end;gap:.5rem;padding:.9rem 1.4rem;border-top:1px solid var(--line);flex-wrap:wrap}
+.btn-cancel{border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:.55rem 1rem;font-size:.84rem;color:#374151}
+.btn-review{border:none;background:#16a34a;color:#fff;border-radius:8px;padding:.55rem 1rem;font-size:.84rem;font-weight:600}
+.btn-review:disabled,.btn-cancel:disabled{opacity:.5}
+.btn-search-disabled{border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;border-radius:8px;padding:.55rem 1rem;font-size:.84rem}
+.btn-search-disabled small{font-size:.7rem;margin-left:.3rem}
+.dialog-hint{color:var(--muted);font-size:.82rem;line-height:1.55}
+.viewer{background:#0f172a;padding:1rem;border-radius:0 0 14px 14px;flex:1;overflow:auto}
+.viewer svg{display:block;margin:0 auto;background:#fff;max-width:100%;height:auto}
+.version-row{display:flex;justify-content:space-between;gap:1rem;border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;margin-bottom:.5rem;font-size:.84rem}
+.version-row.current{border-color:#93c5fd;background:#eff6ff}
+.version-reason{margin:.35rem 0 0;font-size:.78rem;color:var(--muted)}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:90;padding:11px 18px;background:#047857;color:#fff;border-radius:8px;box-shadow:0 8px 24px #0002;font-size:.85rem}
+.toast.error{background:#b91c1c}
+/* 연동판 패널 */
+.demo{position:fixed;right:14px;top:14px;z-index:80;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:11px 14px;width:360px;max-width:calc(100vw - 28px);font-size:12px;box-shadow:0 5px 24px #0f172a30}
+.demo strong{color:#fbbf24}
+.demo .row{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+.demo label{display:flex;gap:6px;align-items:center}
+.demo select,.demo button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:5px;padding:5px 8px;font-size:12px}
+.demo select{max-width:230px}
+.demo button.anno.on{background:#f59e0b;border-color:#f59e0b;color:#1e293b}
+.demo p{margin:8px 0 0;color:#cbd5e1;line-height:1.55}
+.demo.collapsed .row,.demo.collapsed p{display:none}
+.demo-fold{float:right}
+body:has(.dialog-overlay:not([hidden])) .demo{opacity:.25}
+body:has(.dialog-overlay:not([hidden])) .demo:hover,body:has(.dialog-overlay:not([hidden])) .demo:focus-within{opacity:1}
+/* =====================================================================
+   연동판 전용 — 화면 영역별 API 주석·요약표 (원본 목업 CSS는 위에 그대로)
+   ===================================================================== */
+.tag{display:none;margin:10px 0 0;padding:6px 9px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font:11.5px/1.55 ui-monospace,Consolas,monospace;color:#78350f;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.show-anno .tag{display:block}
+.tag .st{font-weight:700;margin-right:6px;color:#b45309}
+.tag code{font:inherit;color:#92400e}
+.show-anno .anno-box{outline:2px dashed #f59e0b;outline-offset:3px;border-radius:6px}
+.tag.in-dialog{margin:0 1.4rem .6rem}
+#apiOverlay .dialog-box{width:min(960px,100%)}
+#apiOverlay .tab-body h3{font-size:14px;margin:20px 0 8px;color:#0f172a}
+#apiOverlay .tab-body h3:first-child{margin-top:0}
+#apiOverlay .api-table{width:100%;border-collapse:collapse}
+#apiOverlay .api-table td,#apiOverlay .api-table th{padding:7px 9px;vertical-align:top;font-size:12.5px;line-height:1.55;border-bottom:1px solid var(--line);text-align:left}
+#apiOverlay .api-table th{background:#f8fafc;color:#475569;font-weight:600}
+#apiOverlay code{font:12px ui-monospace,Consolas,monospace;background:#f1f5f9;border-radius:4px;padding:1px 4px;color:#0f172a}
+#apiOverlay ul{margin:6px 0;padding-left:18px;color:#334155;font-size:13px}
+#apiOverlay li{margin:3px 0}
+#apiOverlay pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:12px;font:11.5px/1.5 ui-monospace,Consolas,monospace;overflow:auto;max-height:340px}
+@media (max-width:1100px){.demo{top:auto;bottom:8px}}
+@media (max-width:900px){
+  .sidebar{display:none}
+  .admin-header,.admin-content{padding-left:16px;padding-right:16px}
+  .form-row,.summary-grid{grid-template-columns:1fr}
+  .upload-file-head{display:none}
+  .upload-file-main{grid-template-columns:1fr}
+  .demo{left:8px;right:8px;width:auto}
+  .warn-item{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body class="show-anno">
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="logo">We.RAG</div>
+    <div class="nav-section-title">관리</div>
+    <div class="nav-item active"><i class="fa-solid fa-file-arrow-up"></i>문서 관리</div>
+    <div class="nav-item"><i class="fa-solid fa-database"></i>대화 주제 설정</div>
+    <div class="nav-item"><i class="fa-solid fa-chart-bar"></i>내 활동 현황</div>
+    <div class="nav-item"><i class="fa-solid fa-puzzle-piece"></i>챗봇 연동 설정</div>
+    <div class="nav-item"><i class="fa-solid fa-user-lock"></i>사용자 권한</div>
+  </aside>
+
+  <div class="admin-main">
+    <header class="admin-header">
+      <div>
+        <h1>문서 관리</h1>
+        <p>문서를 업로드하면 파싱 → 청킹 → 임베딩 → Vector DB 저장까지 자동으로 처리됩니다.</p>
+      </div>
+      <div class="collections-badge"><i class="fa-solid fa-database"></i> 대화 주제 2개</div>
+    </header>
+
+    <div class="admin-content">
+      <!-- A 업로드 카드 -->
+      <div class="card">
+        <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> 문서 업로드</div>
+        <div id="dropZone" class="drop-zone anno-box">
+          <div class="drop-placeholder">
+            <i class="fa-solid fa-file-circle-plus drop-icon"></i>
+            <p>파일을 드래그하거나 클릭하여 선택 · 최대 10개</p>
+            <span id="extText"></span>
+          </div>
+        </div>
+        <div id="tagOptions"></div>
+        <div id="batchSelection" class="batch-selection" hidden></div>
+
+        <div class="upload-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>대화 주제</label>
+              <select><option>조립 작업표준</option><option>설비 매뉴얼</option></select>
+            </div>
+            <div class="form-group">
+              <label>문서 유형 <span class="required">*</span></label>
+              <select id="docTypeSelect"></select>
+              <div id="docTypeHint" class="form-hint"></div>
+            </div>
+            <div class="form-group">
+              <label>파서 선택</label>
+              <select id="parserSelect"><option>Docling API (PDF·DOCX·PPTX·이미지)</option><option>pdfplumber (PDF 전용, 빠름)</option></select>
+              <div id="parserHint" class="form-hint"></div>
+            </div>
+          </div>
+          <button id="uploadBtn" class="btn-upload"></button>
+          <div id="tagUpload"></div>
+        </div>
+
+        <!-- B 처리 현황 -->
+        <section id="batchProgress" class="batch-progress" hidden>
+          <div class="batch-progress-header">
+            <h2 class="batch-progress-title">처리 현황</h2>
+            <strong id="batchCount"></strong>
+            <span id="batchChips"></span>
+          </div>
+          <div id="overall" class="overall-progress"></div>
+          <ul class="upload-file-list">
+            <li class="upload-file-head"><span>파일</span><span>모델명</span><span>상태</span><span></span></li>
+          </ul>
+          <ul id="fileList" class="upload-file-list anno-box" style="border-top:none;border-radius:0 0 10px 10px;margin-top:-1px"></ul>
+          <div id="tagJobs"></div>
+        </section>
+      </div>
+
+      <!-- C 문서 목록 -->
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title"><i class="fa-solid fa-list"></i> 업로드된 문서</div>
+          <button class="btn-refresh" title="새로고침"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+        <div id="topicBar" class="topic-filter-bar" role="group" aria-label="대화 주제로 거르기"></div>
+        <div class="table-scroll anno-box">
+          <table class="doc-table">
+            <thead>
+              <tr><th>모델명 · 파일(현재 버전)</th><th>문서 유형</th><th>총 페이지</th><th>대화주제</th><th>업로더</th><th>파서</th><th>현재 버전</th><th>최근 변경일</th><th>작업</th></tr>
+            </thead>
+            <tbody id="docRows"></tbody>
+          </table>
+        </div>
+        <div id="tagDocs"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- D 처리 결과 대화상자 -->
+<div id="resultOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1">
+    <div class="dialog-head">
+      <div>
+        <div id="resultTitle" class="dialog-title"><i class="fa-solid fa-compass-drafting" style="color:#0f766e"></i>도면 처리 결과</div>
+        <div id="resultSub" class="dialog-sub"></div>
+      </div>
+      <button class="dialog-close" aria-label="도면 처리 결과 닫기" data-close="resultOverlay">×</button>
+    </div>
+    <div id="tagResult"></div>
+    <div id="resultState"></div>
+    <div id="resultBanner"></div>
+    <div id="resultTabs" class="tabs" role="tablist"></div>
+    <div id="resultBody" class="tab-body"></div>
+    <div id="tagReview"></div>
+    <div class="dialog-actions">
+      <button class="btn-search-disabled" disabled title="검수한 도면은 다음 단계에서 검색에 적용됩니다."><i class="fa-solid fa-magnifying-glass"></i> 검색 적용<small>다음 단계</small></button>
+      <span style="flex:1"></span>
+      <button id="reviewBtn" class="btn-review"></button>
+      <button class="btn-cancel" data-close="resultOverlay">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- E 검수 확인 (필수 항목 누락) -->
+<div id="confirmOverlay" class="dialog-overlay nested" hidden>
+  <div class="dialog-box small" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" tabindex="-1">
+    <div id="confirmTitle" class="dialog-title"><i class="fa-solid fa-triangle-exclamation" style="color:#f97316"></i>필수 항목 확인</div>
+    <p id="confirmText" class="dialog-hint"></p>
+    <div class="tag"><span class="st">E 확인 창</span>[원본 확인함 · 검수 완료] → <code>POST …/drawing-review</code> 본문 <code>{"confirm_missing": true}</code>. 본문 없이 보내면 409 <code>MISSING_FIELDS_CONFIRM_REQUIRED</code>(<code>detail.missing_fields</code>)</div>
+    <div class="dialog-actions" style="padding:.6rem 0 0;border-top:none">
+      <button class="btn-cancel" data-close="confirmOverlay">취소</button>
+      <button id="confirmOk" class="btn-review">원본 확인함 · 검수 완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 확대 -->
+<div id="viewerOverlay" class="dialog-overlay nested" hidden>
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="viewerTitle" tabindex="-1">
+    <div class="dialog-head" style="padding-bottom:.8rem"><div id="viewerTitle" class="dialog-title"></div><button class="dialog-close" aria-label="닫기" data-close="viewerOverlay">×</button></div>
+    <div class="tag in-dialog"><span class="st">D 이미지</span>기존 <code>ImageViewer</code> 재사용. 이미지는 <code>GET /api/spreadsheet-resources/{resource_id}</code>(blob, 인증 헤더, <code>AuthenticatedImage</code>). 권한 없는 문서 이미지는 404</div>
+    <div id="viewerBody" class="viewer"></div>
+  </div>
+</div>
+
+<!-- F 버전 이력 -->
+<div id="historyOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" style="width:min(640px,100%)" role="dialog" aria-modal="true" aria-labelledby="historyTitle" tabindex="-1">
+    <div class="dialog-head">
+      <div><div id="historyTitle" class="dialog-title"><i class="fa-solid fa-clock-rotate-left" style="color:#2563eb"></i>버전 이력</div><div id="historySub" class="dialog-sub"></div></div>
+      <button class="dialog-close" aria-label="닫기" data-close="historyOverlay">×</button>
+    </div>
+    <div class="tag in-dialog"><span class="st">F 버전 이력</span><code>GET /ingest/documents/{document_id}/versions</code> — 도면 문서는 <code>restore_supported=false</code>, 버전 행 <code>restore_block_code="DRAWING_NOT_SUPPORTED"</code>·<code>restore_block_reason</code>. <b>화면 코드 변경 없음</b>(기존 DocumentVersionHistoryDialog가 응답대로 [선택 버전 적용]을 숨김)</div>
+    <div class="tab-body">
+      <div id="historyList"></div>
+    </div>
+    <div class="dialog-actions"><button class="btn-cancel" data-close="historyOverlay">닫기</button></div>
+  </div>
+</div>
+
+<!-- API 요약표 -->
+<div id="apiOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="apiTitle" tabindex="-1">
+    <div class="dialog-head">
+      <div><div id="apiTitle" class="dialog-title">화면 영역별 API 요약</div>
+        <div class="dialog-sub">상세: <a href="drawing/도면업로드_화면설계_현행기준_v1.0.md">drawing/도면업로드_화면설계_현행기준_v1.0.md</a> · <a href="reports/phase-6.md">reports/phase-6.md</a> · OpenAPI <code>/docs</code></div></div>
+      <button class="dialog-close" aria-label="API 요약 닫기" data-close="apiOverlay">×</button>
+    </div>
+    <div class="tab-body">
+<h3>공통</h3><ul>
+<li>URL은 <code>/api</code> 기준, 인증은 기존 <code>Authorization: Bearer</code>. 401은 기존 로그인 만료 처리.</li>
+<li>서버 설정 <code>DRAWING_PARSE_MODE</code>: 기본 <code>off</code>. <code>backend</code>일 때만 <code>/ingest/options</code>의 <code>drawing_ingest_extensions</code>가 <code>["dwg","dxf"]</code>로 내려온다. 화면은 이 배열만 보고 도면 기능을 켠다(설정 이름을 화면에 하드코딩하지 않음).</li>
+<li>권한: 처리 결과 <b>보기</b>는 문서를 볼 수 있는 사용자 모두(볼 수 없으면 404). <b>검수</b>는 업로드한 본인 또는 관리자, 그리고 <b>현재 버전만</b> — 버튼은 역할명이 아니라 응답의 <code>can_review</code>로 정한다.</li>
+<li>도면은 이번 단계에서 <b>임베딩·검색 DB에 넣지 않는다</b>(<code>search_status="not_indexed"</code>, <code>chunk_count=0</code>). 챗봇 화면 변경 없음.</li>
+<li>기존 API 필드는 그대로이고 <code>drawing</code> 계열 필드만 추가된다. 도면이 아니면 <code>drawing=null</code>. 모르는 필드는 무시한다.</li>
+<li>시간은 KST 문자열(<code>YYYY-MM-DD HH:mm:ss</code>) — 다시 변환하지 않는다. 오른쪽 위 연동판 패널·노란 주석은 확인용이며 제품에 구현하지 않는다.</li>
+</ul>
+
+<h3>영역과 API</h3><table class="api-table"><thead><tr><th>영역</th><th>화면 요소(구현 위치)</th><th>이벤트</th><th>API / 처리</th></tr></thead><tbody>
+<tr><td>A 업로드 카드</td><td>확장자 안내, <code>accept</code>, 문서 유형 "도면(자동)", 파서 비활성·안내 (<code>AdminView.vue</code>, <code>useDocumentUpload.js</code>)</td><td>화면 진입</td><td><code>GET /ingest/options</code> → <code>drawing_ingest_extensions</code>, <code>drawing_max_upload_mb</code>(기본 100), <code>drawing_parse_mode</code></td></tr>
+<tr><td>A 업로드</td><td>[N개 업로드 시작]</td><td>클릭(파일마다 1회)</td><td><code>POST /ingest/upload</code> multipart <code>file</code>·<code>collection_name</code>·<code>product_model</code>(·<code>document_type</code>·<code>parser_type</code>는 도면이면 서버가 무시하고 <code>drawing</code>/<code>drawing_ingest</code>로 기록) → 202 <code>{job_id, status:"queued"}</code></td></tr>
+<tr><td>B 처리 현황</td><td>행 단계 칸 5개, 상태 칩, 결과 요약, 같은 품번 안내, 오류 문구·[재시도]</td><td>접수 후 폴링</td><td><code>GET /ingest/jobs/{job_id}</code> → <code>current_step</code>, 완료 시 <code>result.drawing</code>, 실패 시 <code>error_code</code>. 재시도 <code>POST /ingest/jobs/{job_id}/retry</code>(실패한 단계부터)</td></tr>
+<tr><td>C 문서 목록</td><td>3줄째 품번·Rev, 도면 배지·상태 칩, "1매 · A3", 파서 "도면 처리기", [처리 결과], 유형 칩 "도면 N"</td><td>진입·새로고침·검수 후</td><td><code>GET /ingest/documents</code> → 항목마다 <code>drawing</code>. 유형 칩은 클라이언트 필터(<code>doc_type==='drawing'</code>, 대화 주제와 AND)</td></tr>
+<tr><td>D 처리 결과</td><td><code>DrawingResultDialog.vue</code> 탭 6개, 썸네일·확대</td><td>[처리 결과] / [처리 결과 보기]</td><td><code>GET /ingest/documents/{document_id}/versions/{version_no}/drawing-result</code>, 이미지 <code>GET /spreadsheet-resources/{resource_id}</code></td></tr>
+<tr><td>E 검수</td><td>[검수 완료]/[검수 취소], 필수 항목 확인 창</td><td>클릭</td><td>완료 <code>POST …/versions/{v}/drawing-review</code>(본문 <code>{"confirm_missing": true}</code>는 누락 도면만), 취소 <code>DELETE …/versions/{v}/drawing-review</code> → <code>{document_id, version_no, review}</code>. 성공 후 목록 재조회</td></tr>
+<tr><td>F 버전 이력</td><td>기존 <code>DocumentVersionHistoryDialog.vue</code></td><td>[버전 이력]</td><td><code>GET /ingest/documents/{id}/versions</code> → <code>restore_supported=false</code>, 행 <code>restore_block_code=DRAWING_NOT_SUPPORTED</code>. 화면 변경 없음</td></tr>
+<tr><td>새 버전 등록</td><td>기존 대화상자</td><td>[업로드 및 등록]</td><td><code>POST /ingest/documents/{id}/versions</code> — 도면 문서에 도면이 아닌 파일, 도면이 아닌 문서에 도면 파일이면 400(문구 <code>detail</code> 그대로 표시). 도면 새 버전은 같은 품번 안내 없음</td></tr>
+</tbody></table>
+
+<h3>단계 칸 ↔ current_step (도면 5칸)</h3><table class="api-table"><thead><tr><th>칸</th><th>파일 준비</th><th>변환·보정</th><th>항목 추출</th><th>도면 이미지</th><th>저장</th></tr></thead><tbody>
+<tr><td><code>current_step</code></td><td><code>queued</code> <code>validate</code> <code>parse</code></td><td><code>drawing_convert</code></td><td><code>drawing_extract</code></td><td><code>drawing_render</code></td><td><code>drawing_store</code></td></tr>
+<tr><td>진행 문구</td><td>파일 준비 중</td><td>변환·보정 중</td><td>항목 추출 중</td><td>도면 이미지 만드는 중</td><td>저장 중</td></tr>
+</tbody></table>
+<p class="dialog-hint">처리기는 파일 확장자가 <code>drawing_ingest_extensions</code>에 있거나 <code>result.doc_type==='drawing'</code>이면 도면(<code>stepsFor(item)</code>). 엑셀·docling은 기존 4칸 그대로. DXF는 변환이 없어 변환·보정 칸이 곧바로 지나간다.</p>
+
+<h3>작업 결과 <code>result.drawing</code> / 목록 <code>drawing</code></h3><table class="api-table"><thead><tr><th>필드</th><th>뜻</th><th>쓰는 곳</th></tr></thead><tbody>
+<tr><td><code>part_no</code> <code>part_name</code> <code>rev</code></td><td>표제란 품번·품명·개정(없으면 <code>null</code> → "품번 미검출"/"미검출")</td><td>B 요약, C 3줄째</td></tr>
+<tr><td><code>sheet_size</code> <code>scale</code></td><td>용지(A0~A4, 판정 못하면 <code>null</code>)·축척</td><td>B 요약, C "1매 · A3"</td></tr>
+<tr><td><code>bom_rows</code></td><td>부품표 행 수(0이면 "없음(가공품)")</td><td>B 요약</td></tr>
+<tr><td><code>warn_count</code> <code>info_count</code></td><td>경고(사람 확인)·정보(자동 조치) 수</td><td>B "경고 N", C 칩(0이면 숨김)</td></tr>
+<tr><td><code>needs_review</code> <code>missing_fields</code></td><td>필수 항목(<code>part_no</code>·<code>part_name</code>·<code>revision</code>) 누락 여부·목록</td><td>B "완료 · 확인 필요", D 배너, E 확인 창</td></tr>
+<tr><td><code>same_part_no_documents</code> (작업 결과만)</td><td><code>[{document_id, product_model, original_filename, collection_display_name}]</code>. 새 문서 등록 시 같은 품번 도면</td><td>B 안내 문구(자동 교체 없음)</td></tr>
+<tr><td><code>review_status</code> (목록만)</td><td><code>pending</code> | <code>reviewed</code></td><td>C "미검수"/"검수 완료"</td></tr>
+<tr><td><code>search_status</code></td><td>이번 단계는 항상 <code>not_indexed</code></td><td>C "검색 미적용"</td></tr>
+</tbody></table>
+
+<h3>처리 결과 <code>drawing-result</code> 응답 → 탭</h3><table class="api-table"><thead><tr><th>탭</th><th>응답 필드</th></tr></thead><tbody>
+<tr><td>머리</td><td><code>product_model</code> · <code>filename</code> · <code>version_no</code> · <code>uploaded_by</code>, <code>is_current</code>, <code>can_review</code>, <code>review{status, reviewer, reviewed_at}</code>, <code>summary.missing_fields</code></td></tr>
+<tr><td>요약</td><td><code>images.preview</code>(없으면 <code>full</code>) 썸네일 → 누르면 <code>images.full</code>, <code>images.crops{title_block, bom, revision}</code>(있는 것만). 표제란 <code>title_block.fields</code>(<code>part_no</code> <code>part_name</code> <code>revision</code> <code>rev_major</code> <code>rev_iter</code> <code>date</code> <code>scale</code> <code>material</code> <code>material_group</code> <code>after_treatment</code> <code>part_spec</code> <code>drawn</code> <code>checked</code> <code>approved</code>), <code>metadata.drawing_kind</code>(<code>assembly</code>|<code>part</code>), <code>metadata.bom_part_nos.length</code></td></tr>
+<tr><td>부품표</td><td><code>tables[kind="bom"]</code>의 <code>columns</code> 순서대로 <code>rows</code>. 열 이름 표: <code>item_no</code> 번호 · <code>revision</code> REV · <code>part_no</code> 품번 · <code>part_name</code> 품명 · <code>qty</code> 수량 · <code>material</code> 재질 · <code>material_group</code> 재질 그룹 · <code>part_spec</code> 사양 · <code>after_treatment</code> 후처리 (모르는 열은 키 그대로)</td></tr>
+<tr><td>개정이력</td><td><code>tables[kind="revision"]</code>: <code>rev</code> 개정 · <code>description</code> 내용 · <code>date</code> 날짜 · <code>drawn</code> 작성 · <code>checked</code> 검토</td></tr>
+<tr><td>주기·치수</td><td><code>notes.items[]</code>, <code>notes.general_tolerance</code>, <code>notes.spec_memos[]</code>, <code>dimension_count</code> + <code>dimensions[].text</code>(최대 300개만 내려옴), <code>misc_texts[]</code></td></tr>
+<tr><td>경고·정보</td><td><code>warnings[]</code> = <code>{code, level:"warn"|"info", message, count?}</code> — <code>level</code>로 두 묶음. 문구는 서버 <code>message</code> 그대로</td></tr>
+<tr><td>처리 정보</td><td><code>processing.source{format, acadver, release, converter{name, version, elapsed_ms, sanitize_fixes}}</code>(DXF는 <code>converter</code> 없음 → "변환 없음(DXF)"), <code>title_block.method</code>, <code>sheet.size</code>, <code>processing.stats{entity_count, text_count}</code>, <code>processing.timings{convert_ms, extract_ms, render_ms}</code>, <code>processing.md_dir</code></td></tr>
+</tbody></table>
+<details><summary class="dialog-hint" style="cursor:pointer">응답 예시 펼치기(합성 값)</summary><pre id="sampleJson"></pre></details>
+
+<h3>작업 실패 <code>error_code</code> → 안내 문구 (<code>useDocumentUpload.js</code>)</h3><table class="api-table"><thead><tr><th>코드</th><th>화면 문구</th></tr></thead><tbody id="errTable"></tbody></table>
+
+<h3>경고·정보 코드 (서버 <code>message</code>를 그대로 표시)</h3><table class="api-table"><thead><tr><th>코드</th><th>level</th><th>뜻</th></tr></thead><tbody>
+<tr><td><code>W_TITLE_MISSING</code></td><td>warn</td><td>표제란 필수 항목을 찾지 못함 — <code>missing</code> 배열 포함, <code>needs_review=true</code>의 원인</td></tr>
+<tr><td><code>W_TEMPLATE_MISMATCH</code></td><td>warn</td><td>표제란 양식 일치율이 낮아 라벨 주변 방식으로 읽음</td></tr>
+<tr><td><code>W_TABLE_PARSE</code></td><td>warn</td><td>표 머리글은 찾았지만 행·열 복원 실패</td></tr>
+<tr><td><code>W_ENCODING</code></td><td>warn</td><td>구조 복구하며 읽음 / 깨진 글자 1% 초과</td></tr>
+<tr><td><code>W_RENDER_SKIPPED</code></td><td>warn</td><td>범위 밖·경계 오류 엔티티를 그리지 않음</td></tr>
+<tr><td><code>W_RENDER_FAILED</code></td><td>warn</td><td>도면 이미지를 만들지 못함(추출 결과는 저장) — <code>images</code>가 비어 "도면 이미지를 만들지 못했습니다" 표시</td></tr>
+<tr><td><code>W_SANITIZED</code></td><td>info</td><td>변환 결과의 잘못된 참조 항목 자동 수정</td></tr>
+<tr><td><code>W_FONT_FALLBACK</code></td><td>info</td><td>도면 글꼴을 서버 한글 글꼴로 대체</td></tr>
+<tr><td><code>W_CONVERTER_WARN</code></td><td>info</td><td>변환기가 경고를 남김</td></tr>
+</tbody></table>
+
+<h3>오류 응답</h3><p class="dialog-hint">기존 API는 문자열 <code>detail</code>, 검수 409만 객체 <code>{"detail":{"code","message","missing_fields"}}</code>. 화면은 <code>detail</code>이 문자열이면 그대로, 객체면 <code>detail.message</code>를 보여 준다.</p><table class="api-table"><thead><tr><th>API</th><th>HTTP / 내용</th><th>화면 처리</th></tr></thead><tbody>
+<tr><td>upload</td><td>413 <code>도면 파일은 {N} MiB 이하여야 합니다.</code></td><td>행 오류 문구. 화면도 선택 시 같은 검사(<code>drawing_max_upload_mb</code>)로 미리 막음</td></tr>
+<tr><td>upload</td><td>400 <code>도면 파일 rejected(E_…): …</code> (서명·빈 파일·지원 안 하는 버전)</td><td>행 오류 문구(<code>detail</code> 그대로)</td></tr>
+<tr><td>drawing-result</td><td>404 문서 없음·볼 수 없음 / 버전 없음 / 도면 결과 없음 / 결과 파일 없음</td><td>대화상자 안 오류 상태(<code>loadError</code>), 닫기만 가능</td></tr>
+<tr><td>drawing-review</td><td>403 <code>업로드한 본인 또는 관리자만 검수할 수 있습니다.</code></td><td>오류 토스트. 보통 <code>can_review=false</code>라 버튼이 이미 비활성</td></tr>
+<tr><td>drawing-review</td><td>409 <code>현재 버전만 검수할 수 있습니다.</code></td><td>오류 토스트</td></tr>
+<tr><td>drawing-review POST</td><td>409 <code>MISSING_FIELDS_CONFIRM_REQUIRED</code> + <code>missing_fields</code></td><td>정상 흐름에서는 화면이 먼저 확인 창을 띄우므로 받지 않음. 받으면 확인 창을 띄움</td></tr>
+<tr><td>new version</td><td>400 도면 ↔ 비도면 형식 불일치</td><td>기존 새 버전 등록 오류 문구로 표시</td></tr>
+</tbody></table>
+
+<h3>연동 체크리스트</h3><ul>
+<li><code>DRAWING_PARSE_MODE=off</code>: 확장자 안내·<code>.dwg</code> 선택·유형 칩·[처리 결과]가 모두 없고 기존 화면과 같다(회귀).</li>
+<li>도면 2개 + 엑셀 1개를 함께 올리면 도면 행은 5칸, 엑셀 행은 4칸. 도면만 고르면 문서 유형 "도면(자동)" 고정·파서 비활성.</li>
+<li>완료 행 요약·같은 품번 안내·"완료 · 확인 필요" 칩, 실패 행의 <code>error_code</code> 문구와 [재시도].</li>
+<li>목록 3줄째 품번·Rev, 상태 칩, "1매 · A3", 유형 칩 토글이 대화 주제 칩과 함께 걸림.</li>
+<li>처리 결과 6개 탭이 응답 필드대로 그려지고, 이미지는 인증 이미지로 로드·확대. 빈 표·빈 이미지 문구 확인.</li>
+<li>다른 사용자 도면은 보기만(<code>can_review=false</code>, 버튼 비활성·툴팁). 검수 완료 → 토스트 → 목록 "검수 완료", 취소도 같은 흐름.</li>
+<li>대화상자 공통 규칙: 바깥 클릭으로 닫지 않음, Esc 닫기, 포커스 가둠, 닫으면 연 버튼으로 포커스 복귀.</li>
+<li>목업의 품번·사람 이름·건수·시간을 하드코딩하지 않는다(모두 응답 값).</li>
+</ul>
+    </div>
+    <div class="dialog-actions"><button class="btn-review" style="background:var(--blue)" data-close="apiOverlay">닫기</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<aside class="demo" aria-label="연동판 시나리오">
+  <strong>연동판 · 도면 업로드</strong><button type="button" class="demo-fold" id="demoFold">접기</button>
+  <div class="row"><label>화면 <select id="scenario">
+    <option value="select">① 파일 선택(도면+엑셀)</option>
+    <option value="progress">② 처리 진행 중</option>
+    <option value="done" selected>③ 처리 완료 · 목록</option>
+    <option value="result">④ 처리 결과 · 검수</option>
+    <option value="missing">⑤ 필수 항목 누락</option>
+    <option value="dup">⑥ 같은 품번 안내</option>
+    <option value="fail">⑦ 변환 실패</option>
+    <option value="history">⑧ 버전 이력(도면)</option>
+    <option value="off">⑨ 도면 처리 꺼짐(off)</option>
+    <option value="loading">⑩ 처리 결과 불러오는 중</option>
+    <option value="loaderror">⑪ 처리 결과 조회 실패(404)</option>
+  </select></label></div>
+  <div class="row"><label>보는 사람 <select id="viewer">
+    <option value="owner">업로드한 본인</option>
+    <option value="other">다른 일반 사용자</option>
+    <option value="admin">관리자</option>
+  </select></label></div>
+  <div class="row"><button type="button" class="anno on" id="annoBtn" aria-pressed="true">API 표시</button><button type="button" id="apiBtn">API 요약표</button></div>
+  <p id="demoDesc"></p>
+</aside>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tag = (label, html, cls = '') => `<div class="tag ${cls}"><span class="st">${label}</span>${html}</div>`;
+
+// ── 화면 상수: 구현 코드 값 그대로(useDocumentUpload.js · DrawingResultDialog.vue) ──
+const DRAWING_UPLOAD_STEPS = [
+  { label: '파일 준비', jobSteps: ['queued', 'validate', 'parse'] },
+  { label: '변환·보정', jobSteps: ['drawing_convert'] },
+  { label: '항목 추출', jobSteps: ['drawing_extract'] },
+  { label: '도면 이미지', jobSteps: ['drawing_render'] },
+  { label: '저장', jobSteps: ['drawing_store'] },
+];
+const UPLOAD_STEPS = [{ label: '파일 준비' }, { label: '파싱·청킹' }, { label: '임베딩' }, { label: '저장' }];
+const DRAWING_ERROR_MESSAGES = {
+  E_UNSUPPORTED_FORMAT: '도면 파일 형식이 아니거나 지원하지 않는 버전입니다.',
+  E_CONVERT_FAILED: 'DWG를 변환하지 못했습니다. 원본을 CAD 프로그램에서 다시 저장(AutoCAD 2000~2018 형식)한 뒤 올려 주세요.',
+  E_CONVERT_TIMEOUT: '변환 시간이 초과되었습니다. 도면이 너무 크면 나눠서 올려 주세요.',
+  E_DXF_LOAD: '도면을 읽지 못했습니다. 원본 파일을 확인해 주세요.',
+  E_EMPTY_DRAWING: '도면에 내용이 없습니다.',
+};
+const TITLE_FIELDS = [['part_no', '품번', true], ['part_name', '품명'], ['revision', '개정'], ['date', '날짜'], ['scale', '축척'], ['material', '재질'], ['material_group', '재질 그룹'], ['after_treatment', '후처리'], ['part_spec', 'PART SPEC'], ['drawn', '작성'], ['checked', '검토'], ['approved', '승인']];
+const REQUIRED = { part_no: '품번', part_name: '품명', revision: '개정' };
+const COLUMN_LABELS = { item_no: '번호', revision: 'REV', part_no: '품번', part_name: '품명', qty: '수량', material: '재질', material_group: '재질 그룹', part_spec: '사양', after_treatment: '후처리' };
+const REVISION_LABELS = { rev: '개정', description: '내용', date: '날짜', drawn: '작성', checked: '검토' };
+const CROP_LABELS = { title_block: '표제란', bom: '부품표', revision: '개정이력', notes: '주기' };
+
+// ── 가상 API 응답(실제 서버 응답 형태). 모든 값은 합성 ──
+const OPTIONS_ON = { drawing_parse_mode: 'backend', drawing_ingest_extensions: ['dwg', 'dxf'], drawing_max_upload_mb: 100 };
+const OPTIONS_OFF = { drawing_parse_mode: 'off', drawing_ingest_extensions: [], drawing_max_upload_mb: 100 };
+
+const BOM_COLS = ['item_no', 'revision', 'part_no', 'part_name', 'qty', 'material', 'material_group', 'part_spec', 'after_treatment'];
+const REV_COLS = ['rev', 'description', 'date', 'drawn', 'checked'];
+function makeResult(o) {
+  const f = o.fields;
+  const bom = o.bom || [];
+  const warnings = o.warnings || [];
+  const missing = Object.keys(REQUIRED).filter((k) => !f[k]);
+  const warn = warnings.filter((w) => w.level === 'warn').length;
+  return {
+    document_id: o.id, version_no: o.ver || 1, is_current: true, product_model: o.model, filename: o.file,
+    collection_name: 'assembly_sop', uploaded_by: o.uploader, can_review: false, review: { status: 'pending', reviewer: null, reviewed_at: null },
+    summary: { part_no: f.part_no || null, part_name: f.part_name || null, rev: f.revision || null, sheet_size: 'A3', scale: f.scale, drawing_kind: bom.length ? 'assembly' : 'part', bom_rows: bom.length, revision_rows: o.revs.length, note_items: o.notes.length, warn_count: warn, info_count: warnings.length - warn, needs_review: missing.length > 0, missing_fields: missing, search_status: 'not_indexed' },
+    metadata: { doc_type: 'drawing', part_no: f.part_no || null, part_name: f.part_name || null, rev: f.revision || null, drawing_kind: bom.length ? 'assembly' : 'part', sheet_size: 'A3', bom_part_nos: bom.map((r) => r.part_no) },
+    title_block: { method: missing.length ? 'label' : 'template:yest_a3_v1', fields: f },
+    sheet: { size: 'A3', paper_mm: [420, 297], units: 'mm' },
+    tables: [...(bom.length ? [{ kind: 'bom', columns: BOM_COLS, rows: bom }] : []), { kind: 'revision', columns: REV_COLS, rows: o.revs }],
+    notes: { items: o.notes, general_tolerance: 'KS B ISO 2768-m', spec_memos: o.memos || [] },
+    dimensions: o.dims.map((text) => ({ text })), dimension_count: o.dims.length, misc_texts: o.misc || [], confidential: false,
+    warnings,
+    images: { full: `res-${o.id}-full`, preview: `res-${o.id}-preview`, crops: { title_block: `res-${o.id}-tb`, ...(bom.length ? { bom: `res-${o.id}-bom` } : {}), revision: `res-${o.id}-rev` } },
+    processing: { source: o.source, stats: { entity_count: o.stats[0], text_count: o.stats[1] }, timings: o.timings, md_dir: `instance/parsed_md/drawing/${f.part_no || 'unknown'}/job-xxxx/`, file_size: o.size, created_at: o.at },
+    search_status: 'not_indexed',
+    _kind: bom.length ? 'assembly' : 'part',
+  };
+}
+const LIBREDWG = (ms, fixes) => ({ filename: '', format: 'dwg', acadver: 'AC1027', release: 'R2013', converter: { name: 'libredwg', version: '0.13.3', elapsed_ms: ms, sanitize_fixes: fixes } });
+const R = {
+  'doc-d1': makeResult({
+    id: 'doc-d1', model: 'conveyor_module_assy', file: 'conveyor_module_assy.dwg', uploader: 'sooyeon.choi', size: 3250585, at: '2026-11-12 10:21:04',
+    fields: { part_no: 'DW-100200', part_name: 'ASSY_CONVEYOR MODULE(SAMPLE)', revision: 'B.2', rev_major: 'B', rev_iter: 2, date: '2026-10-28', scale: '1:10', material: 'NONE', material_group: 'ASSY', after_treatment: 'NONE', part_spec: 'ASSY', drawn: '설계자A', checked: '검토자B', approved: '승인자C', units: 'mm' },
+    bom: [
+      { item_no: '1', revision: 'A', part_no: 'DW-100201', part_name: 'FRAME_MAIN', qty: '1', material: 'SS400', material_group: 'STEEL', part_spec: '-', after_treatment: '도장' },
+      { item_no: '2', revision: 'B', part_no: 'DW-100231', part_name: 'SHAFT_DRIVE', qty: '2', material: 'S45C', material_group: 'STEEL', part_spec: 'Ø40', after_treatment: '흑착색' },
+      { item_no: '3', revision: 'A', part_no: 'DW-100244', part_name: 'COVER_SIDE', qty: '1', material: 'AL5052', material_group: 'ALUMINUM', part_spec: 't2.0', after_treatment: '아노다이징' },
+      { item_no: '4', revision: '-', part_no: 'BRG-6205ZZ', part_name: 'BEARING', qty: '4', material: '-', material_group: '구매품', part_spec: '6205ZZ', after_treatment: '-' },
+      { item_no: '5', revision: '-', part_no: 'BLT-M8X20', part_name: 'BOLT_HEX', qty: '12', material: 'SCM435', material_group: '구매품', part_spec: 'M8×20', after_treatment: '-' },
+    ],
+    revs: [{ rev: 'B', description: '커버 고정 볼트 수량 변경', date: '2026-10-28', drawn: '설계자A', checked: '검토자B' }, { rev: 'A', description: '최초 작성', date: '2026-09-02', drawn: '설계자A', checked: '검토자B' }],
+    notes: ['일반 공차는 KS B ISO 2768-m 을 따른다.', '날카로운 모서리는 C0.5 모따기.', '도장 색상은 사내 표준 회색.'],
+    memos: ['볼트 체결 토크는 사내 체결 기준을 따른다.'],
+    dims: ['1200', '640', '2-Ø12 THRU', '(380)', '180', 'Ø40'], misc: ['VIEW A'],
+    warnings: [
+      { code: 'W_RENDER_SKIPPED', level: 'warn', message: '도면 범위 밖·경계 오류 엔티티를 그리지 않았습니다. 이미지에서 일부가 빠질 수 있습니다.', count: 12 },
+      { code: 'W_SANITIZED', level: 'info', message: '변환 결과의 잘못된 참조 항목을 자동으로 고쳤습니다.', count: 4 },
+      { code: 'W_FONT_FALLBACK', level: 'info', message: '도면 글꼴을 서버 한글 글꼴로 바꿔 그렸습니다.', count: 2 },
+    ],
+    source: LIBREDWG(400, 4), stats: [18420, 512], timings: { convert_ms: 400, extract_ms: 2800, render_ms: 21000 },
+  }),
+  'doc-d2': makeResult({
+    id: 'doc-d2', model: 'shaft_drive', file: 'shaft_drive.dwg', uploader: 'woojin.jung', ver: 2, size: 145408, at: '2026-11-11 16:02:10',
+    fields: { part_no: 'DW-100231', part_name: 'SHAFT_DRIVE', revision: 'B.1', rev_major: 'B', rev_iter: 1, date: '2026-10-20', scale: '1:2', material: 'S45C', material_group: 'STEEL', after_treatment: '흑착색', part_spec: 'Ø40', drawn: '설계자A', checked: '검토자B', approved: '승인자C', units: 'mm' },
+    revs: [{ rev: 'B', description: '키홈 길이 수정', date: '2026-10-20', drawn: '설계자A', checked: '검토자B' }],
+    notes: ['일반 공차는 KS B ISO 2768-m 을 따른다.', '열처리 HRC 28~32.'],
+    dims: ['190', '120', 'Ø40', 'Ø40 h7', 'C0.5'],
+    warnings: [{ code: 'W_SANITIZED', level: 'info', message: '변환 결과의 잘못된 참조 항목을 자동으로 고쳤습니다.', count: 4 }],
+    source: LIBREDWG(20, 4), stats: [612, 48], timings: { convert_ms: 20, extract_ms: 100, render_ms: 1100 },
+  }),
+  'doc-d3': makeResult({
+    id: 'doc-d3', model: 'lift_unit_assy', file: 'lift_unit_assy.dxf', uploader: 'sooyeon.choi', size: 2104320, at: '2026-11-12 10:40:51',
+    fields: { part_no: 'DW-100300', part_name: 'ASSY_LIFT UNIT(SAMPLE)', revision: '', date: '2026-11-01', scale: '1:10', material: 'NONE', material_group: 'ASSY', after_treatment: 'NONE', part_spec: 'ASSY', drawn: '설계자A', checked: '', approved: '', units: 'mm' },
+    bom: [
+      { item_no: '1', revision: 'A', part_no: 'DW-100301', part_name: 'BASE_PLATE', qty: '1', material: 'SS400', material_group: 'STEEL', part_spec: 't12', after_treatment: '도장' },
+      { item_no: '2', revision: 'A', part_no: 'DW-100302', part_name: 'GUIDE_ROD', qty: '2', material: 'S45C', material_group: 'STEEL', part_spec: 'Ø20', after_treatment: '경질크롬' },
+    ],
+    revs: [], notes: ['일반 공차는 KS B ISO 2768-m 을 따른다.'], dims: ['800', '450'],
+    warnings: [
+      { code: 'W_TITLE_MISSING', level: 'warn', message: '표제란 필수 항목(개정)을 찾지 못했습니다.', missing: ['revision'] },
+      { code: 'W_TEMPLATE_MISMATCH', level: 'warn', message: '등록된 표제란 양식과 일치율이 낮아 라벨 주변 방식으로 읽었습니다.' },
+    ],
+    source: { filename: '', format: 'dxf', acadver: 'AC1032', release: 'R2018' }, stats: [9340, 288], timings: { convert_ms: null, extract_ms: 1500, render_ms: 9800 },
+  }),
+};
+R['doc-d2'].version_no = 2;
+
+let state = { scenario: 'done', viewer: 'owner', drawingOnly: false, topic: '', reviewed: { 'doc-d1': false, 'doc-d2': true, 'doc-d3': false }, tab: 'summary', current: null, reviewing: false };
+const ME = { owner: 'sooyeon.choi', other: 'minji.kim', admin: 'admin' };
+const isAdmin = () => state.viewer === 'admin';
+
+// GET /ingest/drawing-result 응답(보는 사람·검수 상태 반영) — 서버의 can_review 계산을 흉내낸다
+function apiDrawingResult(id) {
+  const r = JSON.parse(JSON.stringify(R[id]));
+  r.can_review = (isAdmin() || r.uploaded_by === ME[state.viewer]) && r.is_current;
+  r.review = state.reviewed[id] ? { status: 'reviewed', reviewer: id === 'doc-d2' ? 'woojin.jung' : ME[state.viewer], reviewed_at: '2026-11-12 11:05:32' } : { status: 'pending', reviewer: null, reviewed_at: null };
+  return r;
+}
+// GET /ingest/documents 의 DocumentItem
+function apiDocuments() {
+  const off = state.scenario === 'off';
+  const drawingItem = (id, extra) => {
+    const r = R[id]; const s = r.summary;
+    return { document_id: id, filename: r.filename, product_model: r.product_model, collection_name: 'assembly_sop', collection_display_name: '조립 작업표준', doc_type: 'drawing', parser_type: 'drawing_ingest', total_pages: 1, chunk_count: 0, uploaded_by: r.uploaded_by, version_no: r.version_no, updated_at: r.processing.created_at,
+      can_edit: r.uploaded_by === ME[state.viewer], can_delete: r.uploaded_by === ME[state.viewer] || isAdmin(),
+      drawing: { part_no: s.part_no, part_name: s.part_name, rev: s.rev, sheet_size: s.sheet_size, warn_count: s.warn_count, needs_review: s.needs_review, review_status: state.reviewed[id] ? 'reviewed' : 'pending', search_status: 'not_indexed' }, ...extra };
+  };
+  const list = [];
+  if (!off) list.push(drawingItem('doc-d1'), drawingItem('doc-d2'));
+  if (!off && state.scenario === 'missing') list.push(drawingItem('doc-d3'));
+  list.push(
+    { document_id: 'doc-x1', filename: 'lineA_assembly_sop.xlsx', product_model: '라인A 조립 SOP', collection_display_name: '조립 작업표준', doc_type: 'spreadsheet', parser_type: 'excel_ingest', total_pages: 12, uploaded_by: 'sooyeon.choi', version_no: 3, updated_at: '2026-11-10 09:12:40', can_edit: ME[state.viewer] === 'sooyeon.choi', can_delete: ME[state.viewer] === 'sooyeon.choi' || isAdmin(), drawing: null },
+    { document_id: 'doc-p1', filename: 'conveyor_manual.pdf', product_model: '컨베이어 설비 매뉴얼', collection_display_name: '설비 매뉴얼', doc_type: 'manual', parser_type: 'docling', total_pages: 48, uploaded_by: 'woojin.jung', version_no: 1, updated_at: '2026-11-05 14:30:11', can_edit: ME[state.viewer] === 'woojin.jung', can_delete: ME[state.viewer] === 'woojin.jung' || isAdmin(), drawing: null },
+  );
+  return list;
+}
+// GET /ingest/jobs/{job_id} 의 result.drawing (작업 결과 요약)
+const jobDrawing = (id, same = []) => ({ ...R[id].summary, same_part_no_documents: same });
+
+const DESC = {
+  select: '도면 2개와 엑셀 1개를 함께 고른 상태. 섞여 있으면 문서 유형은 도면이 아닌 파일에만 적용되고, 파서 선택 아래에 도면 처리기 안내가 나온다. 도면만 고르면 문서 유형 "도면(자동)" 고정.',
+  progress: '처리기별 단계 칸: 도면은 5칸(current_step 표 참고), 엑셀은 기존 4칸. 폴링은 기존 GET /ingest/jobs/{job_id} 그대로.',
+  done: '완료 행에 result.drawing 요약과 [처리 결과 보기]. 목록은 3줄째 품번·Rev, 상태 칩, [처리 결과]. 유형 칩 "도면 N"으로 거른다.',
+  result: '처리 결과 대화상자. 보는 사람을 바꾸면 응답 can_review가 바뀌어 검수 버튼이 활성/비활성된다.',
+  missing: 'summary.needs_review=true(개정 누락): 처리 현황 "완료 · 확인 필요", 대화상자 배너, [검수 완료] → 확인 창 → confirm_missing:true.',
+  dup: '작업 결과 same_part_no_documents가 있으면 안내만(D-01). 자동 교체·선택 상자 없음.',
+  fail: '작업 실패 error_code=E_CONVERT_FAILED → 안내 문구 + 기존 [재시도](실패한 단계부터 다시).',
+  history: '도면 문서의 버전 이력: 서버가 restore_supported=false·DRAWING_NOT_SUPPORTED를 줘서 기존 창이 적용 버튼을 숨긴다.',
+  off: 'options.drawing_ingest_extensions=[]: 도면 안내·유형 칩·도면 행이 없고 .dwg는 고를 수 없다(기존 화면과 같음).',
+  loading: 'drawing-result 응답 전 상태. 탭·검수 버튼 없음.',
+  loaderror: 'drawing-result 404(볼 수 없는 문서·결과 파일 없음 등): 대화상자 안에 detail 문구, 닫기만.',
+};
+
+/* ── A 업로드 카드 / B 처리 현황 ── */
+function uploadItems() {
+  const s = state.scenario;
+  const a = { name: 'conveyor_module_assy.dwg', size: '3.1 MB', drawing: true, model: 'conveyor_module_assy' };
+  const b = { name: 'shaft_drive_rev_b.dwg', size: '142 KB', drawing: true, model: 'shaft_drive_rev_b' };
+  const x = { name: 'lineB_assembly_sop.xlsx', size: '2.4 MB', drawing: false, model: 'lineB_assembly_sop' };
+  if (s === 'select') return [{ ...a, status: 'selected' }, { ...b, status: 'selected' }, { ...x, status: 'selected' }];
+  if (s === 'progress') return [{ ...a, status: 'running', job: { status: 'running', current_step: 'drawing_render' } }, { ...b, status: 'queued', job: { status: 'queued', current_step: 'queued' } }, { ...x, status: 'running', job: { status: 'running', current_step: 'chunk' }, stepIdx: 1 }];
+  if (['done', 'result', 'history', 'loading', 'loaderror'].includes(s)) return [{ ...a, status: 'completed', job: { status: 'completed', current_step: 'completed', result: { doc_type: 'drawing', document_id: 'doc-d1', version_no: 1, chunk_count: 0, drawing: jobDrawing('doc-d1') } } }, { ...x, status: 'completed', excel: true }];
+  if (s === 'missing') return [{ ...a, name: 'lift_unit_assy.dxf', size: '2.0 MB', model: 'lift_unit_assy', status: 'completed', job: { status: 'completed', current_step: 'completed', result: { doc_type: 'drawing', document_id: 'doc-d3', version_no: 1, chunk_count: 0, drawing: jobDrawing('doc-d3') } } }];
+  if (s === 'dup') return [{ ...b, status: 'completed', job: { status: 'completed', current_step: 'completed', result: { doc_type: 'drawing', document_id: 'doc-d4', version_no: 1, chunk_count: 0, drawing: jobDrawing('doc-d2', [{ document_id: 'doc-d2', product_model: 'shaft_drive', original_filename: 'shaft_drive.dwg', collection_display_name: '조립 작업표준' }]) } } }];
+  if (s === 'fail') return [{ ...a, name: 'old_layout_r14.dwg', model: 'old_layout_r14', size: '880 KB', status: 'failed', job: { status: 'failed', current_step: 'drawing_convert', error_code: 'E_CONVERT_FAILED', error: 'DWG를 DXF로 변환하지 못했습니다. … (E_CONVERT_FAILED): …' } }];
+  return [];
+}
+const stepIndex = (item) => {
+  if (!item.drawing) return item.stepIdx ?? 0;
+  const i = DRAWING_UPLOAD_STEPS.findIndex((st) => st.jobSteps.includes(item.job?.current_step));
+  return i < 0 ? 0 : i;
+};
+function renderUpload() {
+  const items = uploadItems();
+  const opts = state.scenario === 'off' ? OPTIONS_OFF : OPTIONS_ON;
+  const on = opts.drawing_ingest_extensions.length > 0;
+  const selecting = items.some((i) => i.status === 'selected');
+  const hasDrawing = selecting && items.some((i) => i.drawing);
+  const allDrawing = selecting && items.every((i) => i.drawing);
+  $('extText').textContent = 'PDF · DOCX · PPTX · XLSX · 이미지' + (on ? ' · 도면(DWG·DXF)' : '');
+  $('tagOptions').innerHTML = tag('A 옵션', `<code>GET /ingest/options</code> → <code>drawing_ingest_extensions=${JSON.stringify(opts.drawing_ingest_extensions)}</code>, <code>drawing_max_upload_mb=${opts.drawing_max_upload_mb}</code>. 배열이 비어 있지 않을 때만 " · 도면(DWG·DXF)" 안내와 <code>accept</code>에 확장자 추가. 선택 시 크기 초과면 행 오류 "도면 파일은 100 MiB 이하여야 합니다."`);
+  $('dropZone').classList.toggle('has-file', items.length > 0);
+  $('batchSelection').hidden = !selecting;
+  $('batchSelection').innerHTML = selecting ? `<span>선택 ${items.length}/10개</span><button class="btn-text"><i class="fa-solid fa-trash-can"></i> 목록 비우기</button>` : '';
+
+  const dt = $('docTypeSelect');
+  dt.innerHTML = allDrawing ? '<option>도면(자동)</option>' : '<option>자동</option><option>일반 문서</option><option>매뉴얼</option><option>법령</option><option>스프레드시트</option>';
+  dt.disabled = allDrawing;
+  $('docTypeHint').innerHTML = hasDrawing
+    ? '<i class="fa-solid fa-circle-info"></i> 도면은 전용 처리기로 처리됩니다. 처리 후 검수하며, 검색에는 아직 쓰이지 않습니다.' + (allDrawing ? '' : ' 문서 유형은 도면이 아닌 파일에만 적용됩니다.')
+    : '파일 형식과 문서 구조를 분석하여 적절한 청킹 방식을 자동 적용합니다.';
+  $('parserSelect').disabled = selecting && items.every((i) => i.drawing || i.name.endsWith('.xlsx'));
+  $('parserHint').innerHTML = (hasDrawing ? '<div><i class="fa-solid fa-circle-info"></i> 도면은 도면 처리기로 처리됩니다.</div>' : '') + (selecting && items.some((i) => i.name.endsWith('.xlsx')) ? '<div><i class="fa-solid fa-circle-info"></i> 엑셀은 전용 처리기로 처리됩니다(문서 유형·파서 선택과 관계없음).</div>' : '');
+
+  const pending = items.filter((i) => ['running', 'queued'].includes(i.status));
+  $('uploadBtn').disabled = !selecting;
+  $('uploadBtn').innerHTML = selecting ? `<i class="fa-solid fa-rocket"></i> ${items.length}개 업로드 시작` : pending.length ? '<i class="fa-solid fa-hourglass-half"></i> 처리가 끝나면 추가 업로드할 수 있습니다' : '<i class="fa-solid fa-rocket"></i> 업로드할 파일을 선택하세요';
+  $('tagUpload').innerHTML = tag('A 업로드', `파일마다 <code>POST /ingest/upload</code>(multipart <code>file</code>·<code>collection_name</code>·<code>product_model</code>) → 202 <code>{job_id}</code>. 도면이면 서버가 <code>document_type</code>·<code>parser_type</code>를 무시(<code>drawing</code>/<code>drawing_ingest</code>). 400 서명·버전 거부, 413 크기 초과는 <code>detail</code> 문구 그대로`);
+
+  $('batchProgress').hidden = !items.length || selecting;
+  if (!items.length || selecting) { $('fileList').innerHTML = ''; $('tagJobs').innerHTML = ''; return; }
+  const review = (i) => i.status === 'completed' && i.job?.result?.drawing?.needs_review;
+  const done = items.filter((i) => i.status === 'completed').length;
+  const run = items.filter((i) => i.status === 'running').length;
+  const q = items.filter((i) => i.status === 'queued').length;
+  const f = items.filter((i) => i.status === 'failed').length;
+  const r = items.filter(review).length;
+  $('batchCount').textContent = `${items.length}개 중 ${done}개 완료`;
+  $('batchChips').innerHTML = [run && `<span class="summary-chip running">처리 중 ${run}</span>`, q && `<span class="summary-chip">대기 ${q}</span>`, f && `<span class="summary-chip failed">실패 ${f}</span>`, r && `<span class="summary-chip review">확인 필요 ${r}</span>`].filter(Boolean).join(' ');
+  const w = (n) => (n / items.length) * 100;
+  $('overall').innerHTML = `<span class="completed" style="width:${w(done)}%"></span><span class="failed" style="width:${w(f)}%"></span><span class="running" style="width:${w(run)}%"></span>`;
+
+  $('fileList').innerHTML = items.map((it) => {
+    const steps = it.drawing ? DRAWING_UPLOAD_STEPS : UPLOAD_STEPS;
+    const st = review(it) ? 'review' : it.status;
+    const stateLabel = { completed: '완료', review: '완료 · 확인 필요', running: '처리 중', queued: '대기', failed: '실패' }[st];
+    const cur = it.status === 'completed' ? steps.length : stepIndex(it);
+    const stepHtml = it.status === 'queued' ? '' : `<ol class="upload-steps">${steps.map((s, i) => `<li class="${i < cur ? 'done' : i > cur ? '' : it.status === 'failed' ? 'error' : 'active'}" title="${s.label}"></li>`).join('')}</ol>`;
+    const label = it.status === 'running' ? `${steps[cur].label} 중` : it.status === 'failed' ? `${steps[cur].label} 단계에서 실패` : it.status === 'queued' ? '대기 중' : it.drawing ? '도면 저장 완료 · 검색 미적용' : '처리 완료';
+    let extra = '';
+    if (it.status === 'failed') extra += `<p class="upload-file-message error"><i class="fa-solid fa-circle-exclamation"></i>${esc(DRAWING_ERROR_MESSAGES[it.job.error_code] || it.job.error)}</p>`;
+    const d = it.job?.result?.drawing;
+    if (d?.same_part_no_documents?.length) {
+      extra += `<p class="upload-file-message info"><i class="fa-solid fa-circle-info"></i><span>같은 품번(${esc(d.part_no)}) 문서가 이미 있습니다: ${esc(d.same_part_no_documents.map((x) => x.product_model || x.original_filename).join(', '))}. 개정본이면 그 문서의 [새 버전 등록]으로 올려 주세요. 이 파일은 새 문서로 등록되었습니다.</span></p>`;
+    }
+    if (d) {
+      extra += `<details class="batch-result" open><summary>도면 처리 결과 · <strong>${esc(d.part_no || '품번 미검출')}</strong> · Rev ${esc(d.rev || '미검출')} · 경고 ${d.warn_count}</summary>
+        <dl><dt>품명</dt><dd>${esc(d.part_name || '-')}</dd><dt>용지 · 축척</dt><dd>${esc(d.sheet_size || '-')} · ${esc(d.scale || '-')}</dd><dt>부품표</dt><dd>${d.bom_rows ? d.bom_rows + '행' : '없음(가공품)'}</dd><dt>대화 주제</dt><dd>조립 작업표준</dd><dt>검색</dt><dd>미적용(검수 후 다음 단계에서 적용)</dd></dl>
+        <button class="btn-text primary" data-open-result="${state.scenario === 'dup' ? 'doc-d2' : it.job.result.document_id}"><i class="fa-solid fa-up-right-from-square"></i> 처리 결과 보기</button></details>`;
+    } else if (it.excel) {
+      extra += `<details class="batch-result"><summary>처리 결과 · 9페이지 · 64개 청크</summary><dl><dt>문서 유형</dt><dd>스프레드시트 · 파일 확장자</dd><dt>대화 주제</dt><dd>조립 작업표준</dd></dl></details>`;
+    }
+    return `<li class="upload-file ${it.status}">
+      <div class="upload-file-main">
+        <div class="upload-file-name"><i class="${it.drawing ? 'fa-solid fa-compass-drafting icon-drawing' : 'fa-regular fa-file-lines'}"></i><strong title="${esc(it.name)}">${esc(it.name)}</strong><span class="upload-file-size">${it.size}</span></div>
+        <div><span class="model-locked"><span class="model-locked-label">모델명</span>${esc(it.model)}</span></div>
+        <div class="upload-file-status"><span class="upload-state ${st}">${it.status === 'running' ? '<i class="fa-solid fa-spinner fa-spin"></i> ' : ''}${stateLabel}</span>${stepHtml}<span class="upload-step-label">${label}</span></div>
+        <div>${it.status === 'failed' ? '<button class="btn-text danger"><i class="fa-solid fa-rotate-right"></i> 재시도</button>' : ''}</div>
+      </div>${extra}</li>`;
+  }).join('');
+
+  const sample = items.find((i) => i.drawing && i.job)?.job;
+  $('tagJobs').innerHTML = tag('B 처리 현황', `<code>GET /ingest/jobs/{job_id}</code> 폴링(기존 간격) — 지금 응답 <code>status=${esc(sample?.status)}</code>, <code>current_step=${esc(sample?.current_step)}</code>${sample?.error_code ? `, <code>error_code=${esc(sample.error_code)}</code> → 안내 문구, [재시도] <code>POST /ingest/jobs/{job_id}/retry</code>(실패한 단계부터)` : ''}. 완료 시 <code>result.doc_type="drawing"</code>·<code>result.drawing</code>{<code>part_no</code> <code>rev</code> <code>part_name</code> <code>sheet_size</code> <code>scale</code> <code>bom_rows</code> <code>warn_count</code> <code>needs_review</code> <code>missing_fields</code> <code>same_part_no_documents</code>}. <code>needs_review=true</code>면 상태 칩 "완료 · 확인 필요"·요약 칩 "확인 필요 N"`);
+}
+
+/* ── C 문서 목록 ── */
+const typeLabel = (t) => ({ law: '법령', manual: '매뉴얼', general: '일반', spreadsheet: '스프레드시트', drawing: '도면' }[t] || t);
+const parserLabel = (p) => ({ drawing_ingest: '도면 처리기' }[p] || p || '-');
+function renderDocs() {
+  let docs = apiDocuments();
+  const topics = ['조립 작업표준', '설비 매뉴얼'];
+  const drawingCount = docs.filter((d) => d.doc_type === 'drawing').length;
+  $('topicBar').innerHTML =
+    [['', '전체', docs.length], ...topics.map((t) => [t, t, docs.filter((d) => d.collection_display_name === t).length])]
+      .map(([v, l, c]) => `<button class="topic-chip ${state.topic === v ? 'active' : ''}" data-topic="${esc(v)}"><span>${esc(l)}</span><span class="topic-chip-count">${c}</span></button>`).join('') +
+    (drawingCount ? `<span class="topic-sep"></span><button class="topic-chip type-chip ${state.drawingOnly ? 'active' : ''}" data-type-chip aria-pressed="${state.drawingOnly}"><i class="fa-solid fa-compass-drafting"></i><span>도면</span><span class="topic-chip-count">${drawingCount}</span></button>` : '');
+  docs = docs.filter((d) => (!state.topic || d.collection_display_name === state.topic) && (!state.drawingOnly || d.doc_type === 'drawing'));
+  $('docRows').innerHTML = docs.map((doc) => {
+    const dr = doc.drawing;
+    return `<tr>
+      <td style="min-width:260px"><span class="model-name">${esc(doc.product_model)}${doc.can_edit ? ' <i class="fa-solid fa-pen" style="font-size:.65rem;color:#94a3b8"></i>' : ''}</span>
+        <div class="filename-cell-content"><i class="${doc.doc_type === 'drawing' ? 'fa-solid fa-compass-drafting icon-drawing' : 'fa-regular fa-file-lines'}"></i><button class="filename-link" title="원본 열기">${esc(doc.filename)}</button></div>
+        ${dr ? `<div class="drawing-meta">${esc(dr.part_no || '품번 미검출')} · Rev ${esc(dr.rev || '미검출')}</div>` : ''}</td>
+      <td><span class="badge ${doc.doc_type}">${typeLabel(doc.doc_type)}</span>
+        ${dr ? `<div class="state-chips"><span class="state-chip">검색 미적용</span><span class="state-chip ${dr.review_status === 'reviewed' ? 'reviewed' : 'pending'}">${dr.review_status === 'reviewed' ? '검수 완료' : '미검수'}</span>${dr.warn_count ? `<span class="state-chip warn">경고 ${dr.warn_count}</span>` : ''}</div>` : ''}</td>
+      <td>${dr ? `${doc.total_pages ?? 1}매 · ${esc(dr.sheet_size || '-')}` : doc.total_pages ?? '-'}</td>
+      <td><button class="topic-link" data-topic="${esc(doc.collection_display_name)}">${esc(doc.collection_display_name)}</button></td>
+      <td>${esc(doc.uploaded_by)}</td>
+      <td>${esc(parserLabel(doc.parser_type))}</td>
+      <td><span class="version-badge">v${doc.version_no}</span></td>
+      <td style="white-space:nowrap">${esc(doc.updated_at.slice(0, 16))}</td>
+      <td><div class="document-actions">
+        ${dr ? `<button class="btn-doc-action btn-drawing-result" title="도면 처리 결과·검수" data-open-result="${doc.document_id}"><i class="fa-solid fa-clipboard-check"></i><span>처리 결과</span></button>` : ''}
+        <button class="btn-doc-action" ${doc.can_edit ? '' : 'disabled title="본인이 업로드한 문서만 새 버전을 등록할 수 있습니다."'}><i class="fa-solid fa-arrow-up-from-bracket"></i><span>새 버전 등록</span></button>
+        <button class="btn-doc-action" data-history="${doc.document_id}"><i class="fa-solid fa-clock-rotate-left"></i><span>버전 이력</span></button>
+        <button class="btn-delete-doc" ${doc.can_delete ? '' : 'disabled'} title="문서 삭제"><i class="fa-solid fa-trash"></i></button>
+      </div></td></tr>`;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:2rem">조건에 맞는 문서가 없습니다.</td></tr>`;
+  $('tagDocs').innerHTML = tag('C 문서 목록', `<code>GET /ingest/documents</code> — 도면 항목 <code>doc_type="drawing"</code>, <code>parser_type="drawing_ingest"</code>(→ "도면 처리기"), <code>total_pages=1</code>, <code>drawing</code>{<code>part_no</code> <code>part_name</code> <code>rev</code> <code>sheet_size</code> <code>warn_count</code> <code>needs_review</code> <code>review_status</code> <code>search_status</code>}(도면이 아니면 <code>null</code>). 유형 칩은 도면이 1건 이상일 때만, 클라이언트 필터(대화 주제와 AND). [처리 결과]는 <code>drawing</code>이 있을 때만 → D(현재 <code>version_no</code>). 검수 후 목록 재조회`);
+}
+
+/* ── 합성 도면(SVG) — A3 420×297, 영역 크롭은 viewBox ── */
+const REGIONS = { full: '0 0 420 297', title_block: '262 238 152 53', bom: '262 168 152 66', revision: '262 6 152 28' };
+function drawingSvg(r, region = 'full', extraAttr = '') {
+  const t = r.title_block.fields;
+  const bom = r.tables.find((x) => x.kind === 'bom')?.rows || [];
+  const revs = r.tables.find((x) => x.kind === 'revision')?.rows || [];
+  const cell = (x, y, w, label, value) => `<rect x="${x}" y="${y}" width="${w}" height="12" fill="none" stroke="#111" stroke-width=".4"/><text x="${x + 1.5}" y="${y + 3.6}" font-size="2.6" fill="#555">${esc(label)}</text><text x="${x + 1.5}" y="${y + 9.6}" font-size="3.6" fill="#111">${esc(value || '')}</text>`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${REGIONS[region]}" ${extraAttr} font-family="Noto Sans KR, sans-serif" role="img" aria-label="합성 도면 ${esc(region)}">`;
+  svg += `<rect x="0" y="0" width="420" height="297" fill="#fff"/><rect x="8" y="6" width="406" height="285" fill="none" stroke="#111" stroke-width=".8"/>`;
+  if (r._kind === 'assembly') {
+    svg += `<g stroke="#1f2937" stroke-width=".7" fill="none"><rect x="40" y="60" width="180" height="70" rx="2"/><rect x="48" y="68" width="164" height="54"/><circle cx="70" cy="95" r="16"/><circle cx="70" cy="95" r="5"/><circle cx="190" cy="95" r="16"/><circle cx="190" cy="95" r="5"/><line x1="70" y1="79" x2="190" y2="79"/><line x1="70" y1="111" x2="190" y2="111"/><rect x="40" y="160" width="180" height="40"/><line x1="60" y1="160" x2="60" y2="200"/><line x1="200" y1="160" x2="200" y2="200"/><rect x="230" y="60" width="22" height="140"/></g><g stroke="#2563eb" stroke-width=".35" stroke-dasharray="4 1.5 1 1.5"><line x1="30" y1="95" x2="230" y2="95"/><line x1="130" y1="50" x2="130" y2="210"/></g>`;
+  } else {
+    svg += `<g stroke="#1f2937" stroke-width=".7" fill="none"><rect x="50" y="90" width="40" height="40"/><rect x="90" y="96" width="120" height="28"/><rect x="210" y="102" width="30" height="16"/><circle cx="300" cy="110" r="20"/><circle cx="300" cy="110" r="8"/></g><g stroke="#2563eb" stroke-width=".35" stroke-dasharray="4 1.5 1 1.5"><line x1="40" y1="110" x2="250" y2="110"/><line x1="270" y1="110" x2="330" y2="110"/><line x1="300" y1="80" x2="300" y2="140"/></g><g stroke="#111" stroke-width=".3" font-size="3.6" fill="#111"><line x1="50" y1="145" x2="240" y2="145"/><text x="135" y="143" stroke="none">190</text><line x1="90" y1="80" x2="210" y2="80"/><text x="140" y="78" stroke="none">120</text><text x="312" y="88" stroke="none">Ø40</text></g>`;
+  }
+  svg += `<g font-size="3" fill="#111"><rect x="264" y="8" width="148" height="24" fill="none" stroke="#111" stroke-width=".4"/>`;
+  revs.forEach((x, i) => { svg += `<text x="266" y="${14 + i * 6}">${esc(x.rev)}  ${esc(x.description)}  ${esc(x.date)}</text>`; });
+  svg += `<line x1="264" y1="26" x2="412" y2="26" stroke="#111" stroke-width=".3"/><text x="266" y="30.4" fill="#555">REV  DESCRIPTION  DATE  DRAWN</text></g>`;
+  if (bom.length) {
+    svg += `<g font-size="2.8" fill="#111"><rect x="264" y="170" width="148" height="${8 + bom.length * 6}" fill="none" stroke="#111" stroke-width=".4"/><text x="266" y="175" fill="#555">NO  PART NUMBER   PART NAME            Q'TY  MATERIAL</text><line x1="264" y1="177" x2="412" y2="177" stroke="#111" stroke-width=".3"/>`;
+    bom.forEach((b, i) => { svg += `<text x="266" y="${182 + i * 6}">${esc(b.item_no)}   ${esc(b.part_no)}   ${esc(b.part_name)}   ${esc(b.qty)}   ${esc(b.material)}</text>`; });
+    svg += `</g>`;
+  }
+  svg += `<g font-size="3.2" fill="#111"><text x="14" y="244" font-weight="700">Notes</text>`;
+  r.notes.items.forEach((n, i) => { svg += `<text x="14" y="${251 + i * 6}">${i + 1}. ${esc(n)}</text>`; });
+  svg += `</g><g>${cell(264, 240, 74, 'PART NUMBER', t.part_no)}${cell(338, 240, 74, 'REVISION', t.revision)}${cell(264, 252, 148, 'PART NAME', t.part_name)}${cell(264, 264, 37, 'SCALE', t.scale)}${cell(301, 264, 37, 'DATE', t.date)}${cell(338, 264, 74, 'MATERIAL', t.material)}${cell(264, 276, 49, 'DRAWN', t.drawn)}${cell(313, 276, 49, 'CHECKED', t.checked)}${cell(362, 276, 50, 'APPROVED', t.approved)}</g>`;
+  svg += `<text x="12" y="12" font-size="3" fill="#94a3b8">SYNTHETIC SAMPLE — 목업용 합성 도면</text></svg>`;
+  return svg;
+}
+const imgRegion = (r, resId) => (resId === r.images.full || resId === r.images.preview ? 'full' : Object.entries(r.images.crops).find(([, v]) => v === resId)?.[0] || 'full');
+
+/* ── D 처리 결과 대화상자 ── */
+let loadMode = 'ok';
+function openResult(id) {
+  state.current = id; state.tab = 'summary';
+  renderResult(); openModal('resultOverlay');
+}
+function renderResult() {
+  const id = state.current;
+  $('tagResult').innerHTML = tag('D 처리 결과', `열 때 <code>GET /ingest/documents/${esc(id)}/versions/{version_no}/drawing-result</code>(목록의 현재 <code>version_no</code>, 작업 결과에서 열면 <code>result.version_no</code>). 볼 수 있는 사용자 모두. 응답→탭 대응은 [API 요약표]`, 'in-dialog');
+  ['resultBanner', 'resultTabs', 'resultBody', 'tagReview'].forEach((k) => ($(k).innerHTML = ''));
+  $('resultSub').textContent = '';
+  const rb = $('reviewBtn');
+  if (loadMode === 'loading') { $('resultState').innerHTML = '<p class="drawing-state"><i class="fa-solid fa-spinner fa-spin"></i> 처리 결과를 불러오는 중입니다.</p>'; rb.hidden = true; return; }
+  if (loadMode === 'error') { $('resultState').innerHTML = '<p class="drawing-state error" role="alert">해당 문서를 찾을 수 없습니다.</p>'; rb.hidden = true; return; }
+  $('resultState').innerHTML = '';
+  const r = apiDrawingResult(id);
+  const reviewed = r.review.status === 'reviewed';
+  const missingLabels = r.summary.missing_fields.map((k) => REQUIRED[k] || k);
+  $('resultSub').textContent = `${r.product_model || '-'} · ${r.filename} · v${r.version_no}${r.uploaded_by ? ` · 업로더 ${r.uploaded_by}` : ''}`;
+  $('resultBanner').innerHTML = missingLabels.length
+    ? `<div class="dialog-banner warn" role="status"><i class="fa-solid fa-triangle-exclamation"></i><span>표제란 필수 항목(<strong>${missingLabels.join('·')}</strong>)을 찾지 못했습니다. 원본 도면을 확인한 뒤 검수 완료로 기록해 주세요. 값 수정은 지원하지 않습니다.</span></div>`
+    : reviewed ? `<div class="dialog-banner ok" role="status"><i class="fa-solid fa-circle-check"></i><span>검수 완료 · ${esc(r.review.reviewer || '-')} · ${esc(r.review.reviewed_at || '-')}</span></div>` : '';
+  const warnItems = r.warnings.filter((w) => w.level === 'warn');
+  const infoItems = r.warnings.filter((w) => w.level !== 'warn');
+  const tabs = [['summary', '요약'], ['bom', '부품표'], ['revision', '개정이력'], ['notes', '주기·치수'], ['warnings', `경고·정보 ${warnItems.length}+${infoItems.length}`], ['processing', '처리 정보']];
+  $('resultTabs').innerHTML = tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" role="tab" aria-selected="${state.tab === k}" data-tab="${k}">${l}</button>`).join('');
+  $('resultBody').innerHTML = tabBody(r, warnItems, infoItems);
+  rb.hidden = false;
+  rb.disabled = !r.can_review || state.reviewing;
+  rb.title = r.can_review ? '' : '업로드한 본인 또는 관리자만 현재 버전을 검수할 수 있습니다.';
+  rb.className = reviewed ? 'btn-cancel' : 'btn-review';
+  rb.innerHTML = state.reviewing ? '<i class="fa-solid fa-spinner fa-spin"></i> 처리 중' : reviewed ? '<i class="fa-solid fa-rotate-left"></i> 검수 취소' : '<i class="fa-solid fa-check"></i> 검수 완료';
+  $('tagReview').innerHTML = tag('E 검수', `지금 응답 <code>can_review=${r.can_review}</code>, <code>review.status="${r.review.status}"</code>, <code>summary.missing_fields=${JSON.stringify(r.summary.missing_fields)}</code>. 완료 <code>POST …/drawing-review</code>(누락 도면은 확인 창 후 <code>{"confirm_missing":true}</code>) · 취소 <code>DELETE …/drawing-review</code> → 응답 <code>review</code>로 배너 갱신, 토스트, 목록 재조회. [검색 적용]은 항상 비활성(다음 단계)`, 'in-dialog');
+}
+function tabBody(r, warnItems, infoItems) {
+  const f = r.title_block.fields;
+  if (state.tab === 'summary') {
+    const rows = TITLE_FIELDS.map(([k, label, mono]) => ({ label, mono, missing: Boolean(REQUIRED[k]) && !f[k], value: k === 'revision' && f.rev_iter ? `${f.revision} (개정 ${f.rev_major} · 반복 ${f.rev_iter})` : f[k] }))
+      .concat([{ label: '도면 종류', value: r.metadata.drawing_kind === 'assembly' ? '조립도(부품표 있음)' : '가공품' }]);
+    const crops = Object.entries(r.images.crops);
+    return `<div class="summary-grid"><div>
+        <button class="thumb-main" data-zoom="${r.images.full}" data-zoom-title="전체 도면" aria-label="전체 도면 크게 보기">${drawingSvg(r, 'full')}</button>
+        <div class="thumb-row">${crops.map(([region, rid]) => `<button class="thumb-crop" data-zoom="${rid}" data-zoom-title="${CROP_LABELS[region]}">${drawingSvg(r, region, 'preserveAspectRatio="xMidYMid meet"')}<span>${CROP_LABELS[region] || region}</span></button>`).join('')}</div>
+      </div><div>
+        <h4 class="sec-title first">표제란</h4><table class="kv"><tbody>${rows.map((x) => `<tr><th>${x.label}</th><td class="${x.missing ? 'missing' : ''} ${x.mono ? 'mono' : ''}">${x.missing ? '미검출' : esc(x.value || '-')}</td></tr>`).join('')}</tbody></table>
+        <h4 class="sec-title">검색에 쓸 정보(다음 단계)</h4><p class="dialog-hint" style="margin:0">품번·품명·개정·재질·사양·도면 종류·부품표 품번 ${r.metadata.bom_part_nos.length}개를 저장했습니다. 검수한 도면은 다음 단계에서 검색에 적용하면 챗봇 답변에서 볼 수 있습니다.</p>
+      </div></div>`;
+  }
+  if (state.tab === 'bom' || state.tab === 'revision') {
+    const kind = state.tab;
+    const tbl = r.tables.find((x) => x.kind === kind);
+    if (!tbl || !tbl.rows.length) return `<p class="empty-note">${kind === 'bom' ? '부품표가 없는 도면(가공품)입니다.' : '개정 이력이 비어 있습니다.'}</p>`;
+    const lbl = (c) => (kind === 'revision' ? REVISION_LABELS[c] : COLUMN_LABELS[c]) || c;
+    const rid = r.images.crops[kind];
+    return `<div class="tab-tools"><span class="dialog-hint">${tbl.rows.length}행</span>${rid ? `<button class="btn-text primary" data-zoom="${rid}" data-zoom-title="${CROP_LABELS[kind]}"><i class="fa-solid fa-magnifying-glass-plus"></i> 원본 영역 보기</button>` : ''}</div>
+      <div class="table-scroll"><table class="grid-table"><thead><tr>${tbl.columns.map((c) => `<th>${lbl(c)}</th>`).join('')}</tr></thead><tbody>${tbl.rows.map((row) => `<tr>${tbl.columns.map((c) => `<td class="${c === 'part_no' && kind === 'bom' ? 'mono' : ''}">${esc(row[c] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  if (state.tab === 'notes') {
+    const n = r.notes;
+    return `<h4 class="sec-title first">주기</h4>${n.items.length ? `<ol class="note-list">${n.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : '<p class="empty-note">주기를 찾지 못했습니다.</p>'}
+      <h4 class="sec-title">일반공차 규격</h4><p class="drawing-text">${esc(n.general_tolerance || '-')}</p>
+      ${n.spec_memos.length ? `<h4 class="sec-title">규격 메모</h4>${n.spec_memos.map((m) => `<p class="drawing-text">${esc(m)}</p>`).join('')}` : ''}
+      <h4 class="sec-title">치수 ${r.dimension_count}개</h4><p class="drawing-text mono">${esc(r.dimensions.map((d) => d.text).join(' · ') || '-')}</p>
+      ${r.misc_texts.length ? `<h4 class="sec-title">기타 글자</h4><p class="drawing-text">${esc(r.misc_texts.join(' · '))}</p>` : ''}`;
+  }
+  if (state.tab === 'warnings') {
+    const g = (level, title, items, empty) => `<div class="warn-group"><h4><i class="${level === 'warn' ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-info'}" style="color:${level === 'warn' ? '#dc2626' : '#2563eb'}"></i> ${title} ${items.length}</h4>${items.map((w) => `<div class="warn-item"><code>${esc(w.code)}</code><span>${esc(w.message)}</span><span style="color:#64748b">${w.count ?? ''}</span></div>`).join('')}${items.length ? '' : `<p class="warn-empty">${empty}</p>`}</div>`;
+    return g('warn', '경고 — 확인 필요', warnItems, '확인이 필요한 항목이 없습니다.') + g('info', '정보 — 자동 조치됨', infoItems, '없음');
+  }
+  const p = r.processing; const c = p.source.converter || {};
+  const sec = (ms) => (ms == null ? '-' : `${(ms / 1000).toFixed(1)} s`);
+  const conv = c.name ? [c.name, c.version, c.sanitize_fixes ? `보정 ${c.sanitize_fixes}건` : ''].filter(Boolean).join(' · ') : '변환 없음(DXF)';
+  return `<table class="kv"><tbody>
+    <tr><th>원본 형식</th><td>${esc(p.source.format || '-')} ${esc(p.source.release || p.source.acadver || '')}</td></tr>
+    <tr><th>변환기</th><td>${esc(conv)}</td></tr>
+    <tr><th>표제란 방식</th><td>${esc(r.title_block.method || '-')}</td></tr>
+    <tr><th>용지 · 축척</th><td>${esc(r.sheet.size || '미판정')} · ${esc(f.scale || '-')}</td></tr>
+    <tr><th>엔티티 · 글자</th><td>${p.stats.entity_count ?? '-'} · ${p.stats.text_count ?? '-'}</td></tr>
+    <tr><th>소요 시간</th><td>변환 ${sec(p.timings.convert_ms)} · 추출 ${sec(p.timings.extract_ms)} · 이미지 ${sec(p.timings.render_ms)}</td></tr>
+    <tr><th>확인용 md</th><td class="mono">${esc(p.md_dir || '-')}</td></tr>
+    <tr><th>검색 데이터</th><td>저장하지 않음(검색 미적용)</td></tr></tbody></table>`;
+}
+function zoom(resId, title) {
+  const r = apiDrawingResult(state.current);
+  $('viewerTitle').innerHTML = `<i class="fa-solid fa-image"></i> ${esc(title)} · ${esc(r.title_block.fields.part_no || '')}`;
+  const region = imgRegion(r, resId);
+  $('viewerBody').innerHTML = drawingSvg(r, region, `width="${region === 'full' ? 1200 : 900}"`);
+  openModal('viewerOverlay');
+}
+function toast(msg, type = 'success') {
+  const t = $('toast'); t.textContent = msg; t.className = `toast ${type === 'error' ? 'error' : ''}`; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 2200);
+}
+function submitReview() {
+  const id = state.current;
+  const was = state.reviewed[id];
+  state.reviewing = true; renderResult();
+  setTimeout(() => {
+    state.reviewing = false; state.reviewed[id] = !was;
+    closeModal('confirmOverlay');
+    toast(was ? '검수를 취소했습니다.' : '검수 완료로 기록했습니다.');
+    refresh();
+  }, 500);
+}
+function onReview() {
+  const r = apiDrawingResult(state.current);
+  if (r.review.status !== 'reviewed' && r.summary.missing_fields.length) {
+    $('confirmText').innerHTML = `필수 항목(<strong>${r.summary.missing_fields.map((k) => REQUIRED[k]).join('·')}</strong>)이 비어 있습니다.<br>원본 도면을 확인했으면 검수 완료로 기록합니다. 비어 있는 값은 그대로 저장됩니다.`;
+    openModal('confirmOverlay'); return;
+  }
+  submitReview();
+}
+
+/* ── F 버전 이력(도면) — 기존 창, 응답만 다름 ── */
+function openHistory(id) {
+  const doc = apiDocuments().find((d) => d.document_id === id);
+  if (!doc) return;
+  if (doc.doc_type !== 'drawing') { $('demoDesc').textContent = '(연동판) 도면이 아닌 문서의 버전 이력은 08_이전버전복원_목업_가이드를 따른다.'; return; }
+  $('historySub').textContent = `${doc.product_model} · ${doc.collection_display_name} · ${doc.filename}`;
+  const vers = doc.version_no === 2 ? [[2, '2026-11-11 16:02', 'shaft_drive.dwg', 'Rev B.1', true], [1, '2026-10-21 09:40', 'shaft_drive_old.dwg', 'Rev A.3', false]] : [[1, doc.updated_at.slice(0, 16), doc.filename, `Rev ${doc.drawing.rev || '미검출'}`, true]];
+  $('historyList').innerHTML = vers.map(([n, at, f, rev, cur]) => `<div class="version-row ${cur ? 'current' : ''}"><div><strong>v${n}</strong> ${cur ? '<span class="state-chip reviewed">현재 버전</span>' : ''}<div class="dialog-hint" style="margin-top:.2rem">${esc(f)} · ${rev} · ${at}</div>${cur ? '' : '<p class="version-reason"><i class="fa-solid fa-circle-info"></i> 도면은 아직 검색에 쓰이지 않아 이전 버전 적용 대상이 아닙니다.</p>'}</div></div>`).join('');
+  openModal('historyOverlay');
+}
+
+/* ── 대화상자 공통: 바깥 클릭 무시, Esc 닫기, 닫으면 연 버튼으로 포커스 복귀 ── */
+const stack = [];
+function openModal(id) { if (!$(id).hidden) return; $(id).hidden = false; stack.push({ id, opener: document.activeElement }); $(id).querySelector('[tabindex="-1"]').focus(); }
+function closeModal(id) {
+  if ($(id).hidden) return;
+  $(id).hidden = true;
+  const i = stack.findIndex((s) => s.id === id);
+  if (i >= 0) { const [{ opener }] = stack.splice(i, 1); if (opener && document.contains(opener)) opener.focus(); }
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && stack.length) closeModal(stack[stack.length - 1].id); });
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-close],[data-open-result],[data-tab],[data-zoom],[data-topic],[data-type-chip],[data-history]');
+  if (!el) return;
+  if (el.dataset.close) closeModal(el.dataset.close);
+  else if (el.dataset.openResult) { loadMode = 'ok'; openResult(el.dataset.openResult); }
+  else if (el.dataset.tab) { state.tab = el.dataset.tab; renderResult(); }
+  else if (el.dataset.zoom) zoom(el.dataset.zoom, el.dataset.zoomTitle);
+  else if (el.dataset.history) openHistory(el.dataset.history);
+  else if ('typeChip' in el.dataset) { state.drawingOnly = !state.drawingOnly; renderDocs(); }
+  else if ('topic' in el.dataset) { const v = el.dataset.topic; state.topic = state.topic === v ? '' : v; renderDocs(); }
+});
+$('reviewBtn').onclick = onReview;
+$('confirmOk').onclick = submitReview;
+$('uploadBtn').onclick = () => { if (state.scenario === 'select') { $('scenario').value = 'progress'; apply(); } };
+
+function refresh() { renderUpload(); renderDocs(); if (!$('resultOverlay').hidden) renderResult(); }
+function apply(fromHash) {
+  ['confirmOverlay', 'viewerOverlay', 'resultOverlay', 'historyOverlay', 'apiOverlay'].forEach(closeModal);
+  state.scenario = $('scenario').value; state.viewer = $('viewer').value; state.drawingOnly = false; state.topic = '';
+  $('demoDesc').textContent = DESC[state.scenario];
+  loadMode = state.scenario === 'loading' ? 'loading' : state.scenario === 'loaderror' ? 'error' : 'ok';
+  refresh();
+  if (['result', 'loading', 'loaderror'].includes(state.scenario)) openResult('doc-d1');
+  if (state.scenario === 'missing') openResult('doc-d3');
+  if (state.scenario === 'history') openHistory('doc-d2');
+  if (!fromHash) history.replaceState(null, '', `#${state.scenario}${state.viewer !== 'owner' ? '&' + state.viewer : ''}${document.body.classList.contains('show-anno') ? '' : '&noanno'}`);
+}
+function setAnno(on) { document.body.classList.toggle('show-anno', on); $('annoBtn').classList.toggle('on', on); $('annoBtn').setAttribute('aria-pressed', on); }
+$('scenario').onchange = () => apply();
+$('viewer').onchange = () => { state.viewer = $('viewer').value; refresh(); history.replaceState(null, '', `#${state.scenario}${state.viewer !== 'owner' ? '&' + state.viewer : ''}`); };
+$('annoBtn').onclick = () => setAnno(!document.body.classList.contains('show-anno'));
+$('apiBtn').onclick = () => openModal('apiOverlay');
+$('demoFold').onclick = () => { const c = document.querySelector('.demo').classList.toggle('collapsed'); $('demoFold').textContent = c ? '펼치기' : '접기'; };
+
+// API 요약표 채우기(화면 상수·가상 응답에서)
+$('errTable').innerHTML = Object.entries(DRAWING_ERROR_MESSAGES).map(([k, v]) => `<tr><td><code>${k}</code></td><td>${esc(v)}</td></tr>`).join('') + '<tr><td>그 밖</td><td>서버 <code>error</code> 문구 그대로</td></tr>';
+$('sampleJson').textContent = JSON.stringify((({ _kind, ...rest }) => ({ ...rest, can_review: true, dimensions: rest.dimensions.slice(0, 3) }))(R['doc-d1']), null, 1);
+
+(function initFromHash() {
+  const parts = location.hash.replace(/^#/, '').split('&').filter(Boolean);
+  const scen = parts.find((p) => DESC[p]);
+  if (scen) $('scenario').value = scen;
+  if (parts.includes('other')) $('viewer').value = 'other';
+  if (parts.includes('admin')) $('viewer').value = 'admin';
+  setAnno(!parts.includes('noanno'));
+  apply(true);
+})();
+</script>
+</body>
+</html>

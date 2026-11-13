@@ -56,7 +56,7 @@ class UserAuthResponse(BaseModel):
 
 def _get_user(user_id: str) -> Optional[dict]:
     settings = get_settings()
-    db = get_database_manager(settings.sqlite_db_path)
+    db = get_database_manager()
     rows = db.execute_query(
         """
         SELECT user_id, user_pwd, user_name, is_active, ui_type
@@ -81,7 +81,7 @@ def _get_user(user_id: str) -> Optional[dict]:
 # 2026.06.30(sooyeon.choi) 수정 - 동기화된 tb_users.department_name 사용
 def _get_account(user_id: str) -> Optional[dict]:
     settings = get_settings()
-    db = get_database_manager(settings.sqlite_db_path)
+    db = get_database_manager()
     rows = db.execute_query(
         """
         SELECT u.user_id, u.user_pwd, u.user_name, u.role, u.is_active, u.ui_type,
@@ -126,7 +126,7 @@ def _record_login_history(
     )
 
     settings = get_settings()
-    LoginHistoryRepository(settings.sqlite_db_path).record(
+    LoginHistoryRepository().record(
         attempted_user_id=attempted_user_id,
         user_id=account["user_id"] if account else None,
         user_role=account["role"] if account else None,
@@ -141,7 +141,7 @@ def _record_login_history(
 
 def _create_default_permission(user_id: str) -> None:
     settings = get_settings()
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
     permission = UserPermission(
         user_id=user_id,
         accessible_collections=[],   # 관리자가 명시적으로 권한을 부여해야 접근 가능
@@ -156,7 +156,7 @@ def _create_default_permission(user_id: str) -> None:
 async def register_user(body: UserRegisterRequest, _: dict = Depends(get_current_admin)):
     """일반 사용자 계정을 생성하고 즉시 로그인 토큰을 발급한다."""
     settings = get_settings()
-    db = get_database_manager(settings.sqlite_db_path)
+    db = get_database_manager()
     existing = _get_user(body.user_id)
     if existing:
         raise HTTPException(
@@ -254,7 +254,7 @@ async def login_user(body: UserLoginRequest, request: Request):
 
     # 2026.04.10(sooyeon.choi) 추가 - 권한 행이 없는 기존 사용자 보정 (회원가입 전 생성된 계정 대응)
     settings = get_settings()
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
     if not meta_repo.get_user_permissions(account["user_id"]):
         _create_default_permission(account["user_id"])
         logger.info("로그인 시 기본 권한 자동 생성: %s", account["user_id"])
@@ -311,7 +311,7 @@ async def get_me(current_user: dict = Depends(get_current_principal)):
         raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다.")
 
     settings = get_settings()
-    permissions = MetadataRepository(settings.sqlite_db_path).get_user_permissions(
+    permissions = MetadataRepository().get_user_permissions(
         current_user["user_id"]
     )
     return {
@@ -348,7 +348,7 @@ async def update_my_collections(
     # 2026.06.16(sooyeon.choi) 수정 - collection_name → display_name
     all_system = {
         c.qdrant_name
-        for c in CollectionRepository(settings.sqlite_db_path).get_all()
+        for c in CollectionRepository().get_all()
     }
     invalid = [c for c in body.accessible_collections if c not in all_system]
     if invalid:
@@ -357,7 +357,7 @@ async def update_my_collections(
             detail=f"존재하지 않는 컬렉션이 포함되어 있습니다: {invalid}",
         )
 
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
     permissions = meta_repo.get_user_permissions(current_user["user_id"])
 
     if permissions:

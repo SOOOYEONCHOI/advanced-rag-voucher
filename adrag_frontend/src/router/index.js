@@ -20,8 +20,8 @@ import EvalDashboardView from '../views/EvalDashboardView.vue';
 export const ADMIN_HOME_PATH = '/admin/users';
 
 const routes = [
-  { path: '/', redirect: '/chat' },
-  { path: '/chat', component: ChatView, meta: { public: true } },
+  { path: '/', redirect: '/login' },
+  { path: '/chat', component: ChatView, meta: { requiresUserAuth: true } },
   { path: '/statistics', component: StatisticsView, meta: { requiresUserAuth: true } },
   { path: '/settings/ui-integration', component: UiIntegrationSettingsView, meta: { requiresUserAuth: true } },
   { path: '/login', component: LoginView, meta: { public: true } },

@@ -9,7 +9,6 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 from app.utils.datetime import now_kst_iso
 
@@ -30,8 +29,8 @@ class UserLlmSetting:
 class UserLlmSettingsRepository:
     """tb_user_llm_settings CRUD Repository."""
 
-    def __init__(self, db_path: str = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
         logger.debug("UserLlmSettingsRepository initialized")
 
     def _row_to_setting(self, row) -> UserLlmSetting:
