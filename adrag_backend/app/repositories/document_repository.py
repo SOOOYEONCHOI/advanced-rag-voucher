@@ -8,7 +8,6 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import get_settings
 from app.models.data_models import DocumentEvent, DocumentMetadata, DocumentStatus
 from app.repositories.database import get_database_manager
 from app.utils.datetime import now_kst_iso
@@ -57,8 +56,8 @@ def _row_to_metadata(row) -> DocumentMetadata:
 class DocumentRepository:
     """tb_documents + tb_document_events CRUD Repository."""
 
-    def __init__(self, db_path: str = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
         logger.debug("DocumentRepository initialized")
 
     # ── tb_documents 생성 ────────────────────────────────────────────────────

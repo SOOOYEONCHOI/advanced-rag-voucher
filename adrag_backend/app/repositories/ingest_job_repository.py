@@ -3,13 +3,12 @@
 import json
 from typing import Any, Dict, Optional
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 
 
 class IngestJobRepository:
-    def __init__(self, db_path: str | None = None) -> None:
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self) -> None:
+        self.db = get_database_manager()
 
     # 2026.11.06(sooyeon.choi) 수정 - 작업 유형(ingest·restore)·대상 문서·멱등 키·요청 fingerprint 저장(설계 v1.1 5.4)
     def create(

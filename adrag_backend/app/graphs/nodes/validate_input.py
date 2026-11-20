@@ -18,7 +18,7 @@ from app.graphs.utils import timed_node
 from app.utils.log.log import LoggingLogger
 
 # 2026.05.22(sooyeon.choi) 추가 - 노드 출력 로깅
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -61,17 +61,20 @@ async def validate_input(state: PipelineState, deps: GraphDependencies | None = 
     # 파이프라인 State 초기화
     # 요청에서 넘어온 값은 유지, 없으면 config 기본값 적용
     # 파이프라인 내부 누적 필드는 항상 초기화 (이전 실행 잔류 방지)
-    # 2026.07.16(sooyeon.choi) 수정 - top_k 기본값 강제 주입 제거 (B4)
+    # 2026.07.16(sooyeon.choi) 수정 - top_k 기본값 강제 주입 제거
     #   기존: 요청에 top_k가 없어도 settings.top_k_results를 채워 넣어
     #   get_retrieval_config()가 항상 legacy(from_legacy_top_k) 경로를 타면서
     #   2026.07.08에 도입한 단계별(candidate/reranker/context) 설정이 무력화되어 있었음.
     #   변경: 요청 명시값만 유지하고 None이면 단계별 설정이 적용되도록 그대로 둔다.
     return {
         "error": None,
+        "error_message_type": None,  # 2026.11.11(sooyeon.choi) 추가 - 이전 실행 잔류 방지
         "outcome_code": "unknown",
+        "retrieval_status": "not_run",
+        "rerank_status": "not_run",
         "retry_count": 0,
         "top_k": state.get("top_k"),
-        # 2026.07.16(sooyeon.choi) 추가 - B4/B5 override 필드 초기화 (이전 실행 잔류 방지)
+        # 2026.07.16(sooyeon.choi) 추가 - override 필드 초기화 (이전 실행 잔류 방지)
         "retrieval_override": None,
         "threshold_override": None,
         "citation_limit": state.get("citation_limit") or settings.max_citation_results,

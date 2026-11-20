@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { adminApi } from '../api/adminApi';
 import { useAuthStore } from '../stores/authStore';
+import { PASSWORD_RULE_TEXT, PASSWORD_TOO_LONG_TEXT, isPasswordPolicyMet, isPasswordTooLong } from '../constants/passwordPolicy';
 
 const SECURITY_LABELS = {
   public: '공개',
@@ -48,6 +49,8 @@ export const useUserPermissions = ({ router }) => {
   const savingUsers = ref(new Set());
   const savedUsers = ref(new Set());
   const showAddModal = ref(false);
+  const showAddPrerequisiteModal = ref(false);
+  const resumeAddAfterDepartment = ref(false);
   const showPermissionModal = ref(false);
   const showDepartmentModal = ref(false);
   const showEditUserModal = ref(false);
@@ -91,8 +94,13 @@ export const useUserPermissions = ({ router }) => {
 
     if (!password) {
       errors.password = '비밀번호를 입력해주세요.';
-    } else if (password.length < 6) {
-      errors.password = '비밀번호는 6자 이상 입력해주세요.';
+    } else if (!isPasswordPolicyMet(password)) {
+      // 2026.11.13(woojin.jung) 수정 - 비밀번호 규칙 강화(6자 → 영문·숫자 포함 8자)
+      errors.password = `비밀번호는 ${PASSWORD_RULE_TEXT}으로 입력해주세요.`;
+    } else if (isPasswordTooLong(password)) {
+      errors.password = PASSWORD_TOO_LONG_TEXT;
+    } else if (password === userId) {
+      errors.password = '아이디와 같은 비밀번호는 사용할 수 없습니다.';
     }
 
     return errors;
@@ -165,7 +173,20 @@ export const useUserPermissions = ({ router }) => {
 
   const openAddModal = () => {
     resetAddModal();
+    if (departmentOptions.value.length === 0) {
+      showAddPrerequisiteModal.value = true;
+      return;
+    }
     showAddModal.value = true;
+  };
+
+  const closeAddPrerequisiteModal = () => {
+    showAddPrerequisiteModal.value = false;
+  };
+
+  const startDepartmentForUserAdd = () => {
+    showAddPrerequisiteModal.value = false;
+    openDepartmentModal(null, true);
   };
 
   const closeAddModal = () => {
@@ -229,7 +250,8 @@ export const useUserPermissions = ({ router }) => {
     return department.categories.filter((id) => !(user._selectedCollections || []).includes(id)).length;
   };
 
-  const openDepartmentModal = async (department = null) => {
+  const openDepartmentModal = async (department = null, shouldResumeUserAdd = false) => {
+    resumeAddAfterDepartment.value = shouldResumeUserAdd;
     departmentTarget.value = department;
     departmentModalError.value = '';
     departmentDraft.value = department
@@ -256,10 +278,11 @@ export const useUserPermissions = ({ router }) => {
     }
   };
 
-  const closeDepartmentModal = () => {
+  const closeDepartmentModal = ({ preserveUserAddFlow = false } = {}) => {
     showDepartmentModal.value = false;
     departmentTarget.value = null;
     departmentModalError.value = '';
+    if (!preserveUserAddFlow) resumeAddAfterDepartment.value = false;
   };
 
   const saveDepartmentDraft = async () => {
@@ -269,6 +292,7 @@ export const useUserPermissions = ({ router }) => {
       return showToast('이미 등록된 부서명입니다.', 'error');
     }
     const isEditing = Boolean(departmentTarget.value);
+    const shouldResumeUserAdd = !isEditing && resumeAddAfterDepartment.value;
     departmentSaving.value = true;
     try {
       const payload = { name, topic_names: [...departmentDraft.value.categories] };
@@ -278,9 +302,15 @@ export const useUserPermissions = ({ router }) => {
       } else {
         await adminApi.createDepartment(payload);
       }
-      closeDepartmentModal();
+      closeDepartmentModal({ preserveUserAddFlow: shouldResumeUserAdd });
       showToast(`부서가 ${isEditing ? '수정' : '추가'}되었습니다.`);
       await loadAll();
+      if (shouldResumeUserAdd) {
+        resetAddModal();
+        newUser.value.department = name;
+        showAddModal.value = true;
+        resumeAddAfterDepartment.value = false;
+      }
     } catch (err) {
       showToast(getErrorMessage(err, '부서 저장에 실패했습니다.'), 'error');
     } finally {
@@ -488,8 +518,11 @@ export const useUserPermissions = ({ router }) => {
     loadAll,
     saveUser,
     showAddModal,
+    showAddPrerequisiteModal,
     openAddModal,
     closeAddModal,
+    closeAddPrerequisiteModal,
+    startDepartmentForUserAdd,
     addLoading,
     addError,
     newUser,

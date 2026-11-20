@@ -1,7 +1,7 @@
 """
 공유 httpx.AsyncClient 모듈.
 
-2026.07.16(sooyeon.choi) 추가 - HTTP 커넥션 풀링 (리팩토링 B6)
+2026.07.16(sooyeon.choi) 추가 - HTTP 커넥션 풀링
   기존: 각 클라이언트가 요청마다 httpx.AsyncClient를 생성 → keep-alive 없이
         매 호출 TCP/TLS 핸드셰이크 발생 (질의 1건당 임베딩+리랭커+LLM 3~5회)
   변경: 프로세스 전역 공유 AsyncClient를 재사용하고,

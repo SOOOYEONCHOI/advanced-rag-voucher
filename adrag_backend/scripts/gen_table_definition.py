@@ -56,7 +56,7 @@ COMMON = {
 }
 C = {
  "tb_departments": {"department_id": "부서 ID", "department_name": "부서명(유일, 사용자·컬렉션에 동기화)", "allowed_topics": "허용 대화 주제명 배열", "is_active": "사용 여부"},
- "tb_users": {"user_id": "로그인 ID", "user_pwd": "비밀번호 bcrypt 해시", "user_name": "이름", "department_name": "현재 부서명(부서 테이블과 동기화)", "department_id": "소속 부서", "blocked_topics": "개인 차단 대화 주제명 배열(부서 허용 주제 안에서만 의미)", "role": "역할 admin/user", "ui_type": "UI 연동 방식 standalone/menu_linked/layout_linked, NULL=미선택(신규 계정)", "is_active": "사용 여부(FALSE면 로그인 차단)"},
+ "tb_users": {"user_id": "로그인 ID", "user_pwd": "비밀번호 bcrypt 해시", "user_name": "이름", "department_name": "현재 부서명(부서 테이블과 동기화)", "department_id": "소속 부서", "blocked_topics": "개인 차단 대화 주제명 배열(부서 허용 주제 안에서만 의미)", "role": "역할 admin/user", "ui_type": "UI 연동 방식 standalone/menu_linked/layout_linked, NULL=미선택(신규 계정)", "is_active": "사용 여부(FALSE면 로그인 차단)", "pwd_changed_at": "마지막 비밀번호 변경 시각(이전에 발급된 사용자 토큰 무효), NULL=변경 이력 없음"},
  "tb_login_history": {"login_history_id": "PK", "attempted_user_id": "입력한 로그인 ID", "user_id": "확인된 사용자(없으면 NULL)", "user_role": "로그인 시 역할", "department_snapshot": "로그인 시 부서명", "success": "성공 여부", "failure_reason": "실패 사유 코드", "ip_address": "접속 IP", "user_agent": "브라우저 정보", "auth_session_id": "인증 세션 ID"},
  "tb_user_collection_permissions": {"permission_id": "PK", "user_id": "사용자", "collection_id": "허용 대화 주제"},
  "tb_user_security_policies": {"user_id": "사용자(PK)", "max_security_level": "검색 가능한 최대 보안 등급", "allowed_doc_types": "허용 문서 유형 배열([]=전체)", "metadata_filters": "Qdrant payload 추가 필터(객체)"},

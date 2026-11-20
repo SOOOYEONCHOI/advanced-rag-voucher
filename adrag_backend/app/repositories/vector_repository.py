@@ -5,7 +5,7 @@ Qdrant 벡터 저장소 레포지토리.
 검색 방식: 벡터 유사도(semantic), 전문 키워드(BM25).
 """
 
-# 2026.07.16(sooyeon.choi) 수정 - os.getenv fallback 제거로 os import 불필요 (B15)
+# 2026.07.16(sooyeon.choi) 수정 - os.getenv fallback 제거로 os import 불필요
 from typing import Any, Dict, List, Optional, Tuple
 
 from qdrant_client import QdrantClient
@@ -39,7 +39,7 @@ from app.utils.kiwi_tokenizer import tokenize_corpus, tokenize_query_for_bm25
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -48,7 +48,7 @@ class VectorRepository:
     
     def __init__(
         self,
-        # 2026.07.16(sooyeon.choi) 수정 - os.getenv fallback 제거 (B15)
+        # 2026.07.16(sooyeon.choi) 수정 - os.getenv fallback 제거
         #   설정은 Settings 단일 소스에서 주입받는다. 모든 호출부(retrieve/ingest/
         #   collection_service/routes.collections)가 host/port를 명시 전달 중이며,
         #   환경변수 직접 참조는 설정 우선순위를 우회하므로 제거함.
@@ -222,7 +222,7 @@ class VectorRepository:
             "resource_ids": PayloadSchemaType.KEYWORD,
             "keywords": PayloadSchemaType.KEYWORD,
             "intent": PayloadSchemaType.KEYWORD,
-            # 2026.10.16 추가 - Phase 2(P2-2): 버전 전환·포인트 종류 필터·버전 무관 키
+            # 2026.10.16 추가 - Phase 2: 버전 전환·포인트 종류 필터·버전 무관 키
             "version_no": PayloadSchemaType.INTEGER,
             "point_type": PayloadSchemaType.KEYWORD,
             "source_key": PayloadSchemaType.KEYWORD,
@@ -581,8 +581,13 @@ class VectorRepository:
         dense_weight: float = 1.0,
         sparse_weight: float = 1.0,
         rrf_k: int = 60,
+        dense_weights: Optional[List[float]] = None,
     ) -> List[Tuple[str, float, Dict[str, Any]]]:
-        """Qdrant Query API에서 multi-query Dense+Kiwi BM25를 weighted RRF로 병합한다."""
+        """Qdrant Query API에서 multi-query Dense+Kiwi BM25를 weighted RRF로 병합한다.
+
+        2026.11.11(sooyeon.choi) 추가 - dense_weights: Dense 질의별 가중치(dense_vectors와 같은 길이).
+        없거나 길이가 다르면 기존처럼 dense_weight를 질의 수로 균등 배분한다.
+        """
         # 2026.07.07(sooyeon.choi) 수정 - scroll 후보 재계산 → 전체 sparse index 검색으로 대체
         collection = collection_name or self.collection_name
         # 2026.10.19(sooyeon.choi) 수정 - 활성 버전만 검색. 버전 조회 실패는 검색 실패로 올린다.
@@ -591,6 +596,10 @@ class VectorRepository:
             raise ValueError("Dense query vector가 없습니다.")
         # 2026.07.08(sooyeon.choi) 수정 - rewrite 수와 무관하게 Dense 채널 총가중치 유지
         per_dense_weight = dense_weight / len(dense_vectors)
+        if dense_weights is not None and len(dense_weights) == len(dense_vectors):
+            vector_weights = [float(w) for w in dense_weights]
+        else:
+            vector_weights = [per_dense_weight for _ in dense_vectors]
         try:
             response = self.client.query_points(
                 collection_name=collection,
@@ -615,7 +624,7 @@ class VectorRepository:
                     rrf=Rrf(
                         k=rrf_k,
                         weights=[
-                            *[per_dense_weight for _ in dense_vectors],
+                            *vector_weights,
                             sparse_weight,
                         ],
                     )

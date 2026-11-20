@@ -1,63 +1,28 @@
 import pytest
 
 
-def test_answer_correctness_settings_reject_invalid_selection():
-    from app.core.config import Settings
+def test_removed_answer_correctness_selection_settings():
+    # 2026.11.17(sooyeon.choi) 수정 - primary·fallback_chain·judge 설정과 RAGAS Judge 모듈 삭제
+    import importlib.util
+    from pathlib import Path
 
-    with pytest.raises(ValueError):
-        Settings.validate_answer_correctness_primary("highest")
-    with pytest.raises(ValueError):
-        Settings.validate_answer_correctness_fallback_chain(["v1", "v1"])
-    with pytest.raises(ValueError):
-        Settings.validate_answer_correctness_judge_backend("custom")
+    # 일부 기존 테스트가 수집 단계에서 sys.modules["app.core.config"]를 stub으로 바꿔 두므로 원본 파일을 직접 로드한다.
+    config_path = Path(__file__).resolve().parents[1] / "app" / "core" / "config.py"
+    spec = importlib.util.spec_from_file_location("_eval_config_check", config_path)
+    config_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
+    Settings = config_module.Settings
 
-
-def test_ragas_answer_accuracy_judge_maps_result(monkeypatch):
-    import asyncio
-    from types import SimpleNamespace
-
-    from app.evaluation.metrics import answer_correctness_judge as judge
-
-    class FakeScorer:
-        async def ascore(self, **kwargs):
-            assert kwargs == {
-                "user_input": "작업발판 폭 기준은?",
-                "response": "작업발판 폭은 40cm 이상이다.",
-                "reference": "작업발판의 폭은 40cm 이상이어야 한다.",
-            }
-            return SimpleNamespace(value=0.75, reason="대체로 일치")
-
-    monkeypatch.setattr(judge, "_build_answer_accuracy", lambda *args: FakeScorer())
-    monkeypatch.setattr(judge, "_ragas_version", lambda: "0.4.3")
-
-    result = asyncio.run(judge.evaluate_correctness_judge(
-        "작업발판 폭 기준은?",
-        "작업발판의 폭은 40cm 이상이어야 한다.",
-        "작업발판 폭은 40cm 이상이다.",
-        {"answer_correctness_judge": {"backend": "vllm", "temperature": 0.0}},
-    ))
-
-    assert result["value"] == pytest.approx(0.75)
-    assert result["status"] == "evaluated"
-    assert result["reason"] == "대체로 일치"
-    assert result["metadata"]["method"] == "ragas_answer_accuracy"
-    assert result["metadata"]["ragas_version"] == "0.4.3"
-
-
-def test_ragas_answer_accuracy_judge_excludes_missing_question():
-    import asyncio
-
-    from app.evaluation.metrics.answer_correctness_judge import evaluate_correctness_judge
-
-    result = asyncio.run(evaluate_correctness_judge(
-        "",
-        "정답",
-        "응답",
-        {"answer_correctness_judge": {}},
-    ))
-
-    assert result["status"] == "excluded"
-    assert result["reason"] == "missing_question"
+    for name in (
+        "answer_correctness_primary",
+        "answer_correctness_fallback_chain",
+        "answer_correctness_judge_backend",
+        "answer_correctness_judge_model",
+    ):
+        assert name not in Settings.model_fields
+    assert importlib.util.find_spec("app.evaluation.metrics.answer_correctness_judge") is None
+    # 2026.11.17(sooyeon.choi) 추가 - 평가 전용 인용 보정은 기본 끔(운영 답변 그대로 평가)
+    assert Settings.model_fields["eval_citation_repair_enabled"].default is False
 
 
 def test_answer_correctness_f2_weights_gold_coverage():
@@ -83,41 +48,35 @@ def test_answer_correctness_f2_weights_gold_coverage():
     assert result["value"] == pytest.approx(5 * 0.85 * 0.65 / (4 * 0.65 + 0.85))
     assert result["metadata"]["beta"] == pytest.approx(2.0)
 
-def test_full_metric_catalog_exposes_only_citation_completeness():
-    from app.evaluation.metric_catalog import metric_catalog
+def test_full_metric_catalog_follows_ai_plus_agreement():
+    # 2026.11.19(sooyeon.choi) 수정 - 주요 지표 = 합의서 시험 1~4, 나머지는 보조 지표
+    from app.evaluation.metric_catalog import metric_catalog, present_run_metrics
 
-    primary, _ = metric_catalog(
-        "full", {"retrieval_top_n": 10, "rerank_top_k": 5}
-    )
-    keys = [metric["key"] for metric in primary]
-
-    assert "answer.correctness" in keys
-    assert "answer.correctness_mean" not in keys
-    assert "citation.completeness" in keys
-    assert "citation.correctness" not in keys
-
-
-def test_answer_correctness_selects_configured_primary_and_fallback():
-    from app.evaluation.runner.e2e_evaluator import _aggregate_correctness
-
-    results = {
-        "v1": {"value": 0.6, "status": "evaluated", "reason": None, "metadata": {}},
-        "v2": {"value": 0.7, "status": "evaluated", "reason": None, "metadata": {}},
-        "f2": {"value": 0.8, "status": "evaluated", "reason": None, "metadata": {}},
-        "judge": {"value": None, "status": "error", "reason": "failed", "metadata": {}},
-    }
-    selected = _aggregate_correctness(
-        results,
-        {
-            "answer_correctness_primary": "judge",
-            "answer_correctness_fallback_chain": ["f2", "v2", "v1"],
-        },
-    )
-
-    assert selected["value"] == pytest.approx(0.8)
-    assert selected["metadata"]["configured_primary"] == "judge"
-    assert selected["metadata"]["selected_metric"] == "f2"
-    assert selected["metadata"]["fallback_used"] is True
+    primary, secondary = metric_catalog("full", {"retrieval_top_n": 10, "rerank_top_k": 5})
+    # 2026.11.19(sooyeon.choi) 수정 - 지표 4 판정 = 첫 토큰 반환 시간 평균 ≤ 5초, 전체 반환 시간은 함께 표시(보조)
+    assert [metric["key"] for metric in primary] == [
+        "retrieval.rrf.hit@10", "retrieval.rerank.ndcg@5", "answer.judge_accuracy", "answer.first_token_ms",
+    ]
+    assert [metric["target"] for metric in primary] == [0.80, 0.80, 0.80, 5000]
+    assert primary[3]["unit"] == "ms" and primary[3]["direction"] == "le"
+    assert primary[3]["companion_key"] == "answer.response_time_ms"
+    secondary_keys = [metric["key"] for metric in secondary]
+    assert secondary_keys == [
+        "retrieval.rrf.recall@10", "retrieval.rerank.hit@5", "retrieval.rerank.rr@5", "retrieval.rrf.ndcg@10",
+        "answer.correctness", "citation.completeness", "citation.correctness", "answer.response_time_ms",
+    ]
+    assert all(metric["target"] is None for metric in secondary)
+    # 검색·재정렬 평가는 시험 1·2만, 실행 설정 N·K가 다르면 보조 지표에 추가
+    primary, secondary = metric_catalog("retrieval", {"retrieval_top_n": 20, "rerank_top_k": 3})
+    assert [metric["key"] for metric in primary] == ["retrieval.rrf.hit@10", "retrieval.rerank.ndcg@5"]
+    assert {"retrieval.rrf.hit@20", "retrieval.rerank.ndcg@3"} <= {metric["key"] for metric in secondary}
+    # 심사 미구현 지표는 '미측정'으로 표시
+    presented = present_run_metrics("full", {}, [
+        {"metric_key": "retrieval.rrf.hit@10", "segment": "all", "metric_value": 0.9, "evaluated_count": 9, "total_count": 10},
+    ])
+    judge = [m for m in presented["primary_metrics"] if m["key"] == "answer.judge_accuracy"][0]
+    assert judge["status"] == "not_measured" and judge["value"] is None
+    assert [m["key"] for m in presented["primary_metrics"]] == ["retrieval.rrf.hit@10", "answer.judge_accuracy"]
 
 
 def test_metric_aggregate_separates_zero_excluded_and_error():
@@ -228,7 +187,8 @@ def test_answer_correctness_v2_ignores_markdown_format_and_caps_precision_candid
     assert result["value"] == pytest.approx(8 / 9)
 
 
-def test_answer_correctness_markdown_heading_preserves_body_and_v1_score(monkeypatch):
+# 2026.11.17(sooyeon.choi) 수정 - v1(전체 답변 cosine) 삭제, 문장 정렬(_evaluate_answer_alignment) 기준으로 변경
+def test_answer_alignment_markdown_heading_preserves_body(monkeypatch):
     import asyncio
     from app.evaluation.runner import e2e_evaluator as e2e
 
@@ -237,51 +197,36 @@ def test_answer_correctness_markdown_heading_preserves_body_and_v1_score(monkeyp
             return [[1.0, 0.0] for _ in texts]
 
     monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _SameEmbedder())
-    v1, v2 = asyncio.run(e2e._evaluate_answer_correctness_pair(
-        gold_answer="핵심 안전 기준입니다.",
-        system_answer="## 답변 제목\n핵심 안전 기준입니다. [1]",
+    result = asyncio.run(e2e._evaluate_answer_alignment(
+        gold_answer="핵심 안전 기준을 반드시 지켜야 합니다.",
+        system_answer="## 답변 제목\n핵심 안전 기준을 반드시 지켜야 합니다. [1]",
         expected_behavior="answer",
-        config={"metric_version": "rule-v1.1"},
+        config={},
     ))
 
-    assert v1["value"] == pytest.approx(1.0)
-    assert v1["reason"] is None
-    assert v2["value"] == pytest.approx(1.0)
-    assert v2["metadata"]["system_sentence_count"] == 1
+    assert result["value"] == pytest.approx(1.0)
+    assert result["reason"] is None
+    assert result["metadata"]["system_sentence_count"] == 1
 
 
-def test_answer_correctness_v2_empty_sentences_do_not_zero_v1(monkeypatch):
+def test_answer_alignment_empty_system_sentences_scores_zero(monkeypatch):
     import asyncio
     from app.evaluation.runner import e2e_evaluator as e2e
 
-    class _SameEmbedder:
+    class _FailIfCalledEmbedder:
         async def embed(self, texts):
-            return [[1.0, 0.0] for _ in texts]
+            raise AssertionError("문장이 없으면 임베딩하지 않는다")
 
-    monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _SameEmbedder())
-    v1, v2 = asyncio.run(e2e._evaluate_answer_correctness_pair(
-        gold_answer="골드 답변입니다.",
+    monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _FailIfCalledEmbedder())
+    result = asyncio.run(e2e._evaluate_answer_alignment(
+        gold_answer="골드 답변 문장은 충분히 길어야 합니다.",
         system_answer="## 제목만 있는 답변",
         expected_behavior="answer",
-        config={"metric_version": "rule-v1.1"},
+        config={},
     ))
 
-    assert v1["value"] == pytest.approx(1.0)
-    assert v1["reason"] is None
-    assert v2["value"] == 0.0
-    assert v2["reason"] == "empty_system_sentences"
-
-
-def test_citation_metrics_without_gold_are_excluded_not_perfect():
-    from app.evaluation.metrics.citation_metrics import citation_precision_recall
-
-    metrics = citation_precision_recall([], set(), prefix="doc")
-
-    assert metrics == {
-        "doc_precision": None,
-        "doc_recall": None,
-        "doc_f1": None,
-    }
+    assert result["value"] == 0.0
+    assert result["reason"] == "empty_system_sentences"
 
 
 def test_citation_diagnostics_include_validity_and_gold_differences():
@@ -302,7 +247,7 @@ def test_citation_diagnostics_include_validity_and_gold_differences():
 
     assert metrics["correctness"] == pytest.approx(1 / 3)
     assert metrics["completeness"] == pytest.approx(1 / 3)
-    assert metrics["citation_validity"] == pytest.approx(2 / 3)
+    assert "citation_validity" not in metrics
     assert metrics["valid_numbers"] == [1, 2]
     assert metrics["invalid_numbers"] == [9]
     assert metrics["matched_gold_chunk_ids"] == ["A"]
@@ -329,10 +274,9 @@ def test_citation_analysis_deduplicates_chunks_and_excludes_missing_document_gol
     assert metrics["cited_chunk_ids"] == ["A"]
     assert metrics["correctness"] == pytest.approx(0.5)
     assert metrics["completeness"] == pytest.approx(1.0)
-    assert metrics["document_correctness"] is None
-    assert metrics["document_completeness"] is None
-    assert metrics["doc_precision"] is None
-    assert metrics["doc_recall"] is None
+    # 2026.11.17(sooyeon.choi) 수정 - 문서 단위 지표·doc_* 별칭 삭제
+    for removed in ("document_correctness", "document_completeness", "doc_precision", "doc_recall"):
+        assert removed not in metrics
 
 
 def test_answer_correctness_reports_zero_norm_as_error(monkeypatch):
@@ -344,11 +288,11 @@ def test_answer_correctness_reports_zero_norm_as_error(monkeypatch):
             return [[0.0, 0.0] for _ in texts]
 
     monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _ZeroEmbedder())
-    result = asyncio.run(e2e._evaluate_answer_correctness(
-        gold_answer="골드 답변",
-        system_answer="시스템 답변 [1]",
+    result = asyncio.run(e2e._evaluate_answer_alignment(
+        gold_answer="골드 답변 문장은 충분히 길어야 합니다.",
+        system_answer="시스템 답변 문장도 충분히 길게 씁니다. [1]",
         expected_behavior="answer",
-        config={"metric_version": "rule-v1.1"},
+        config={},
     ))
 
     assert result["value"] is None
@@ -365,9 +309,9 @@ def test_answer_correctness_reports_embedding_failure_without_error_text(monkeyp
             raise RuntimeError("secret endpoint detail")
 
     monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _FailingEmbedder())
-    result = asyncio.run(e2e._evaluate_answer_correctness(
-        gold_answer="골드 답변",
-        system_answer="시스템 답변",
+    result = asyncio.run(e2e._evaluate_answer_alignment(
+        gold_answer="골드 답변 문장은 충분히 길어야 합니다.",
+        system_answer="시스템 답변 문장도 충분히 길게 씁니다.",
         expected_behavior="answer",
         config={},
     ))
@@ -377,28 +321,3 @@ def test_answer_correctness_reports_embedding_failure_without_error_text(monkeyp
     assert result["reason"] == "embedding_error"
     assert result["metadata"]["error_type"] == "RuntimeError"
     assert "secret" not in str(result)
-
-
-def test_answer_correctness_keeps_raw_cosine_as_diagnostic(monkeypatch):
-    import asyncio
-    from app.evaluation.runner import e2e_evaluator as e2e
-
-    class _MappedEmbedder:
-        async def embed(self, texts):
-            vectors = {
-                "정답": [1.0, 0.0],
-                "정답 [1]": [0.6, 0.8],
-            }
-            return [vectors[text] for text in texts]
-
-    monkeypatch.setattr(e2e, "EvalEmbedder", lambda: _MappedEmbedder())
-    result = asyncio.run(e2e._evaluate_answer_correctness(
-        gold_answer="정답",
-        system_answer="정답 [1]",
-        expected_behavior="answer",
-        config={"metric_version": "rule-v1.1"},
-    ))
-
-    assert result["value"] == pytest.approx(1.0)
-    assert result["metadata"]["raw_cosine"] == pytest.approx(0.6)
-    assert result["metadata"]["normalization_delta"] == pytest.approx(0.4)

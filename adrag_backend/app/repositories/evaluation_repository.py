@@ -92,6 +92,36 @@ class EvalRepository:
         )
         return _row_to_dict(rows[0]) if rows else None
 
+    def active_chunk_versions(self, collection_id: int) -> Dict[str, int]:
+        """2026.11.19(sooyeon.choi) 추가 - 컬렉션 활성 문서 버전의 청크 {포인트 ID: version_no}.
+
+        Qdrant에는 DB에서 지워진 문서의 포인트가 남을 수 있으므로(고아 포인트) 생성 대상은 이 목록으로 거른다.
+        """
+        rows = self._db.execute_query(
+            """SELECT ch.point_id::text AS point_id, ch.version_no
+               FROM tb_chunks ch
+               JOIN tb_documents d ON d.document_id = ch.document_id AND d.version_no = ch.version_no
+               WHERE d.collection_id = ? AND d.deleted_at IS NULL AND ch.point_type = 'text'""",
+            (collection_id,),
+        )
+        return {row["point_id"]: int(row["version_no"]) for row in rows}
+
+    def document_versions(self, document_ids: List[str]) -> Dict[str, Optional[int]]:
+        """2026.11.19(sooyeon.choi) 추가 - 문서별 현재 버전(삭제 문서는 None). 시험 데이터셋 버전 확인용."""
+        if not document_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in document_ids)
+        rows = self._db.execute_query(
+            f"""SELECT document_id, version_no, deleted_at FROM tb_documents
+                WHERE document_id IN ({placeholders})""",
+            tuple(document_ids),
+        )
+        found = {
+            row["document_id"]: (None if row["deleted_at"] is not None else int(row["version_no"] or 0))
+            for row in rows
+        }
+        return {doc_id: found.get(doc_id) for doc_id in document_ids}
+
     def update_dataset_status(
         self,
         dataset_id: int,
@@ -219,6 +249,31 @@ class EvalRepository:
         )
         return _row_to_dict(rows[0]) if rows else None
 
+    def replace_generated_qa(
+        self,
+        qa_id: int,
+        *,
+        question: str,
+        gold_answer: str,
+        self_valid_rank: Optional[int],
+        tags: List[str],
+        source_meta: Dict[str, Any],
+    ) -> None:
+        """2026.11.19(sooyeon.choi) 추가 - 같은 근거로 다시 생성한 질문·답변으로 교체하고 검수 대기로 되돌린다."""
+        self._db.execute_update(
+            """UPDATE tb_eval_qa_items
+               SET question = ?, gold_answer = ?, self_valid_rank = ?, tags = ?::jsonb,
+                   source_meta_json = ?::jsonb, review_status = 'pending',
+                   reviewed_by = NULL, reviewed_at = NULL
+               WHERE qa_id = ?""",
+            (
+                question, gold_answer, self_valid_rank,
+                json.dumps(tags or [], ensure_ascii=False),
+                json.dumps(source_meta or {}, ensure_ascii=False),
+                qa_id,
+            ),
+        )
+
     def update_qa_item(
         self,
         qa_id: int,
@@ -320,7 +375,7 @@ class EvalRepository:
         note: str = "",
         created_by: Optional[str] = None,
     ) -> int:
-        """수동 JSON 골드셋 직접 등록 (P2 검증용)."""
+        """수동 JSON 골드셋 직접 등록."""
         version_row = self._db.execute_query(
             "SELECT COALESCE(MAX(version), 0) + 1 AS v FROM tb_eval_goldsets WHERE dataset_id = ?",
             (dataset_id,),
@@ -338,8 +393,10 @@ class EvalRepository:
             return cur.fetchone()[0]  # 2026.10.16 Phase 1.5 - lastrowid → RETURNING
 
     def list_goldsets(self, dataset_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        # 2026.11.20(sooyeon.choi) 수정 - dataset_kind(합본 표시)
         sql = """SELECT g.goldset_id, g.dataset_id, g.version, g.item_count, g.note,
                         g.created_by, g.created_at, d.name AS dataset_name, d.collection_id,
+                        d.gen_config_json->>'dataset_kind' AS dataset_kind,
                         c.display_name AS collection_name, c.qdrant_name
                  FROM tb_eval_goldsets g
                  LEFT JOIN tb_eval_datasets d ON d.dataset_id = g.dataset_id
@@ -350,6 +407,65 @@ class EvalRepository:
             params = (dataset_id,)
         sql += " ORDER BY g.goldset_id DESC"
         return [dict(r) for r in self._db.execute_query(sql, params)]
+
+    def latest_goldset(self, dataset_id: int) -> Optional[Dict[str, Any]]:
+        """2026.11.20(sooyeon.choi) 수정 - 데이터셋의 최신 확정본(합본 원본으로 사용)."""
+        rows = self._db.execute_query(
+            """SELECT goldset_id FROM tb_eval_goldsets WHERE dataset_id = ?
+               ORDER BY version DESC LIMIT 1""",
+            (dataset_id,),
+        )
+        return self.get_goldset(rows[0]["goldset_id"]) if rows else None
+
+    def create_merged_dataset(
+        self,
+        name: str,
+        collection_id: int,
+        gen_config: Dict[str, Any],
+        items: List[Dict[str, Any]],
+        note: str = "",
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋·문항 복사 후 골드셋 v1까지 만든다.
+
+        collection_id는 NOT NULL 열을 채우는 값(첫 원본 컬렉션)이며, 검색은 문항별 source_meta_json.qdrant_name을 쓴다.
+        골드셋 생성이 실패하면 만든 데이터셋을 지운다.
+        """
+        with self._db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """INSERT INTO tb_eval_datasets
+                   (name, collection_id, status, gen_config_json, progress_done, progress_total, created_by)
+                   VALUES (?, ?, 'review', ?, ?, ?, ?) RETURNING dataset_id""",
+                (name, collection_id, json.dumps(gen_config, ensure_ascii=False), len(items), len(items), created_by),
+            )
+            dataset_id = cur.fetchone()[0]
+            cur.executemany(
+                """INSERT INTO tb_eval_qa_items
+                   (dataset_id, question, gold_answer, gold_chunk_ids, gold_document_ids, gold_chunk_texts,
+                    question_type, difficulty, self_valid_rank, expected_behavior, tags, review_status,
+                    reviewed_by, reviewed_at, source_meta_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), ?)""",
+                [
+                    (
+                        dataset_id, item["question"], item["gold_answer"],
+                        json.dumps(item["gold_chunk_ids"], ensure_ascii=False),
+                        json.dumps(item["gold_document_ids"], ensure_ascii=False),
+                        json.dumps(item["gold_chunk_texts"], ensure_ascii=False),
+                        item["question_type"], item["difficulty"], item["self_valid_rank"],
+                        item["expected_behavior"], json.dumps(item["tags"], ensure_ascii=False),
+                        item["review_status"], item.get("reviewed_by") or created_by,
+                        json.dumps(item["source_meta"], ensure_ascii=False),
+                    )
+                    for item in items
+                ],
+            )
+        try:
+            goldset_id = self.create_goldset(dataset_id, note=note, created_by=created_by)
+        except Exception:
+            self.delete_dataset(dataset_id)
+            raise
+        return {"dataset_id": dataset_id, "goldset_id": goldset_id, "item_count": len(items)}
 
     def get_goldset(self, goldset_id: int) -> Optional[Dict[str, Any]]:
         rows = self._db.execute_query(
@@ -384,8 +500,10 @@ class EvalRepository:
             return cur.fetchone()[0]  # 2026.10.16 Phase 1.5 - lastrowid → RETURNING
 
     def list_runs(self, goldset_id: Optional[int] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        # 2026.11.20(sooyeon.choi) 수정 - dataset_kind(합본 표시)
         sql = """SELECT r.*, g.version AS goldset_version, g.dataset_id,
-                        d.name AS dataset_name, c.display_name AS collection_name
+                        d.name AS dataset_name, c.display_name AS collection_name,
+                        d.gen_config_json->>'dataset_kind' AS dataset_kind
                  FROM tb_eval_runs r
                  LEFT JOIN tb_eval_goldsets g ON g.goldset_id = r.goldset_id
                  LEFT JOIN tb_eval_datasets d ON d.dataset_id = g.dataset_id
@@ -401,7 +519,8 @@ class EvalRepository:
     def get_run(self, run_id: int) -> Optional[Dict[str, Any]]:
         rows = self._db.execute_query(
             """SELECT r.*, g.version AS goldset_version, g.dataset_id,
-                      d.name AS dataset_name, c.display_name AS collection_name, c.qdrant_name
+                      d.name AS dataset_name, c.display_name AS collection_name, c.qdrant_name,
+                      d.gen_config_json->>'dataset_kind' AS dataset_kind
                FROM tb_eval_runs r
                LEFT JOIN tb_eval_goldsets g ON g.goldset_id = r.goldset_id
                LEFT JOIN tb_eval_datasets d ON d.dataset_id = g.dataset_id
@@ -485,6 +604,7 @@ class EvalRepository:
         question_type: Optional[str] = None,
         page: int = 1,
         page_size: int = 50,
+        law: Optional[str] = None,
     ) -> Dict[str, Any]:
         # question_type은 tb_eval_item_results 컬럼이 아니라 골드셋 스냅샷에서만
         # 확인 가능하므로, 스냅샷을 먼저 조인한 뒤 파이썬 레벨에서 페이징한다.
@@ -517,6 +637,16 @@ class EvalRepository:
 
         if question_type:
             items = [i for i in items if i.get("question_type") == question_type]
+        # 2026.11.20(sooyeon.choi) 수정 - 합본 실행 법령 필터(source_meta_json.law_label)
+        if law:
+            def _law_of(item: Dict[str, Any]) -> Any:
+                meta = item.get("source_meta_json")
+                try:
+                    meta = json.loads(meta) if isinstance(meta, str) and meta else (meta or {})
+                except json.JSONDecodeError:
+                    meta = {}
+                return meta.get("law_label") if isinstance(meta, dict) else None
+            items = [i for i in items if _law_of(i) == law]
 
         total = len(items)
         start = (page - 1) * page_size
@@ -538,11 +668,18 @@ class EvalRepository:
                 item["question"] = snapshot.get("question")
                 item["question_type"] = snapshot.get("question_type")
                 item["dataset_sequence"] = snapshot.get("dataset_sequence")
+                # 2026.11.20(sooyeon.choi) 수정 - 결과 Excel 정답 답변·질의ID·법령 열
+                item["gold_answer"] = snapshot.get("gold_answer")
+                item["source_meta_json"] = snapshot.get("source_meta_json")
         return sorted(
             items,
             key=lambda item: (item.get("dataset_sequence") is None,
                               item.get("dataset_sequence") or item.get("result_id") or 0),
         )
+
+    def qa_snapshot_items(self, run_id: int) -> List[Dict[str, Any]]:
+        """2026.11.20(sooyeon.choi) 수정 - run 골드셋 스냅샷 문항 전체(질의ID 계산용)."""
+        return list(self._get_qa_snapshot_map(run_id).values())
 
     def _get_qa_snapshot_map(self, run_id: int) -> Dict[int, Dict[str, Any]]:
         """run이 참조하는 골드셋 스냅샷을 qa_id → QA dict로 변환한다."""

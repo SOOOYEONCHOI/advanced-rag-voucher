@@ -8,7 +8,7 @@ vLLM LLMClient와 동일한 인터페이스를 제공하여 교체 가능합니�
 # 2026.05.27(sooyeon.choi) 스트리밍 기능 추가 - AsyncGenerator import 추가
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용 (B6)
+# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용
 from app.core.http import get_shared_async_client
 from app.utils.log.log import LoggingLogger
 
@@ -62,7 +62,7 @@ class OpenAILLMClient:
             "max_tokens": max_tokens or self.default_max_tokens,
         }
 
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         client = get_shared_async_client()
         resp = await client.post(
             f"{self.base_url}/v1/chat/completions",
@@ -104,7 +104,7 @@ class OpenAILLMClient:
             **kwargs,
         }
 
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         client = get_shared_async_client()
         async with client.stream(
             "POST",
@@ -121,7 +121,7 @@ class OpenAILLMClient:
     async def health_check(self) -> bool:
         """OpenAI API 상태 확인."""
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용 (B6)
+            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용
             resp = await get_shared_async_client().get(
                 f"{self.base_url}/v1/models",
                 headers=self._headers(),

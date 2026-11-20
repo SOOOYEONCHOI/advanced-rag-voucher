@@ -20,6 +20,7 @@ from app.clients.kiwi_bm25_encoder import KiwiBm25Encoder
 # 2026.04.20(sooyeon.choi) 옵션 추가 - sparse encoder 임포트
 from app.clients.sparse_encoder import SparseEncoder
 from app.core.config import get_settings
+from app.core.storage_paths import get_chunk_output_dir, get_file_storage_dir
 from app.parsers.config import ChunkingConfig
 from app.parsers.metadata_extractor import build_unified_payload
 from app.parsers.document_types import DocumentTypeMismatchError
@@ -41,15 +42,13 @@ from app.utils.log.log import LoggingLogger
 from app.utils.datetime import now_kst, now_kst_iso
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 # 2026.06.16(sooyeon.choi) 수정 - _INGEST_TABLE 상수 제거 (tb_ingest_documents → tb_documents 전환)
 _BATCH_SIZE = 100
 # 2026.05.04(sooyeon.choi) 수정 - 청크 결과 저장 경로를 instance/chunk 로 변경,
 #   컬렉션별/문서별 하위 폴더 구조로 저장
-_CHUNK_OUTPUT_DIR_NAME = "chunk"
-_FILE_STORAGE_DIR_NAME = "data"
 
 
 # 2026.04.10(sooyeon.choi) 추가 - 청크 결과 파일 저장 책임 분리
@@ -205,8 +204,7 @@ class FileStorageManager:
 
 # 2026.10.30(sooyeon.choi) 추가 - 원본 파일 저장소를 한 곳에서 만든다(등록·원본 열기 API가 같은 기준을 쓰도록)
 def get_original_file_storage(settings) -> FileStorageManager:
-    instance_dir = Path(settings.sqlite_db_path).parent.parent
-    return FileStorageManager(instance_dir / _FILE_STORAGE_DIR_NAME)
+    return FileStorageManager(get_file_storage_dir(settings))
 
 
 class IngestService:
@@ -229,9 +227,9 @@ class IngestService:
         self.kiwi_bm25_encoder = KiwiBm25Encoder(self.settings)
         # 2026.04.20(sooyeon.choi) 옵션 추가 - sparse encoder 초기화 (none이면 비활성)
         self.sparse_encoder = SparseEncoder(self.settings)
-        self.db = get_database_manager(self.settings.sqlite_db_path)
+        self.db = get_database_manager()
         # 2026.06.16(sooyeon.choi) 추가 - DocumentRepository 초기화
-        self.doc_repo = DocumentRepository(self.settings.sqlite_db_path)
+        self.doc_repo = DocumentRepository()
         self.collection_repo = collection_repo or CollectionRepository()
         self.vector_repo = vector_repo or VectorRepository(
             host=self.settings.qdrant_host,
@@ -239,8 +237,7 @@ class IngestService:
             sparse_encoder_type=self.settings.sparse_encoder_type,
             kiwi_bm25_vector_name=self.settings.kiwi_bm25_vector_name,
         )
-        _instance_dir = Path(self.settings.sqlite_db_path).parent.parent
-        self._chunk_writer = ChunkResultWriter(_instance_dir / _CHUNK_OUTPUT_DIR_NAME)
+        self._chunk_writer = ChunkResultWriter(get_chunk_output_dir(self.settings))
         # 2026.10.30(sooyeon.choi) 수정 - 저장소 생성을 get_original_file_storage()로 통일
         self._file_manager = get_original_file_storage(self.settings)
         # 2026.08.27(sooyeon.choi) 추가 - parser resource staging/commit/delete 연결
@@ -295,7 +292,6 @@ class IngestService:
         processor = DocumentChunkingProcessor(ChunkingConfig(**config_kwargs))
         parse_start = time.perf_counter()
         logger.info("[PARSE][step=process] 시작 filename=%s parser=%s", filename, parser_type)
-        # logger.info(f"[ingest] 파싱 시작: {filename} (parser={parser_type})")
         parse_result = processor.process(file_path, document_id=document_id)
 
         if not parse_result["chunks"]:
@@ -314,7 +310,6 @@ class IngestService:
             parse_result.get("doc_type"),
             time.perf_counter() - parse_start,
         )
-        # logger.info(f"[ingest] 청킹 완료: {len(parse_result['chunks'])}개")
         return parse_result
 
     # ── 임베딩 ────────────────────────────────────────────────────────────
@@ -329,7 +324,6 @@ class IngestService:
             sum(len(text) for text in texts),
             max((len(text) for text in texts), default=0),
         )
-        # logger.info(f"[ingest] 임베딩 요청: {len(texts)}개 청크")
         embeddings = await self.embedding_client.embed_texts(texts)
 
         if not embeddings:
@@ -345,7 +339,6 @@ class IngestService:
             len(embeddings[0]),
             time.perf_counter() - embed_start,
         )
-        # logger.info(f"[ingest] 임베딩 완료 (dim={len(embeddings[0])})")
         return embeddings
 
     # ── Sparse 인코딩 ─────────────────────────────────────────────────────
@@ -363,14 +356,12 @@ class IngestService:
                 len(texts),
                 self.settings.sparse_encoder_type,
             )
-            # logger.info(f"[ingest] sparse 인코딩 시작: {len(texts)}개 청크 ({self.settings.sparse_encoder_type})")
             result = await self.sparse_encoder.encode_batch(texts)
             logger.info(
                 "[INGEST][step=sparse_encoding] 완료 chunks=%s elapsed=%.2fs",
                 len(texts),
                 time.perf_counter() - sparse_start,
             )
-            # logger.info("[ingest] sparse 인코딩 완료")
             return result
         except Exception as e:
             logger.warning(f"[Ingest] sparse 인코딩 실패, 건너뜀: {e}")
@@ -395,7 +386,6 @@ class IngestService:
                 api_key=self.settings.vllm_api_key,
             )
             logger.info("[INGEST][step=semantic_enrichment] 시작 chunks=%s", len(texts))
-            # logger.info(f"[ingest] 시맨틱 보강 시작: {len(texts)}개 청크")
             _t0 = time.perf_counter()
             results = await enricher.extract_batch(texts)
             _elapsed = time.perf_counter() - _t0
@@ -443,7 +433,7 @@ class IngestService:
 
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             meta = chunk.metadata or {}
-            # 2026.10.16 수정 - Phase 2(P2-7): 파이프라인이 정한 결정적 포인트 ID(uuid5) 사용, 없으면 기존처럼 uuid4
+            # 2026.10.16 수정 - Phase 2: 파이프라인이 정한 결정적 포인트 ID(uuid5) 사용, 없으면 기존처럼 uuid4
             chunk_id = str(meta.get("point_id") or uuid4())
             payload = build_unified_payload(
                 document_id=document_id,
@@ -462,7 +452,7 @@ class IngestService:
                 requested_document_type=parse_result.get("requested_doc_type", "auto"),
                 document_type_source=parse_result.get("doc_type_source"),
             )
-            # 2026.10.16 추가 - Phase 2(P2-2): 버전·포인트 종류·버전 무관 키(검색 필터·개정 전환·재매핑용)
+            # 2026.10.16 추가 - Phase 2: 버전·포인트 종류·버전 무관 키(검색 필터·개정 전환·재매핑용)
             payload["version_no"] = meta.get("version_no", 1)
             # 2026.11.06(sooyeon.choi) 수정 - 버전 제외 필터용 고정 키 "document_id:version_no"(설계 v1.1 7.3 C안).
             #   버전마다 값이 고정이라 최신본 전환·복원 때 Qdrant를 다시 쓰지 않는다
@@ -512,7 +502,6 @@ class IngestService:
             len(points),
             time.perf_counter() - store_start,
         )
-        # logger.info(f"[ingest] Qdrant 적재 완료: {len(points)}개 → '{collection_name}'")
 
     # ── 이력 저장 ─────────────────────────────────────────────────────────
 
@@ -598,7 +587,7 @@ class IngestService:
         resume_from: Optional[str] = None,
         # 2026.10.16 추가 - Phase 1: 확인용 md 폴더 이름({md_save_dir}/excel/{doc_key}/{job_id})
         job_id: Optional[str] = None,
-        # 2026.10.16 추가 - Phase 2(P2-11): 제품 모델(선택)
+        # 2026.10.16 추가 - Phase 2: 제품 모델(선택)
         product_model: Optional[str] = None,
         # 2026.10.19 추가 - 최신본 변경: 기존 문서의 다음 버전으로 적재
         target_document_id: Optional[str] = None,
@@ -619,7 +608,13 @@ class IngestService:
         """
         from app.services.ingest_pipeline import IngestPipeline
 
-        return await IngestPipeline().run(
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 변환·추출·이미지 저장까지만 하는 파이프라인으로 보낸다
+        pipeline = IngestPipeline()
+        if document_type == "drawing":
+            from app.services.drawing_pipeline import DrawingIngestPipeline
+
+            pipeline = DrawingIngestPipeline()
+        return await pipeline.run(
             self,
             {
                 "file_path": file_path,

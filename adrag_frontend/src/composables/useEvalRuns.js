@@ -7,16 +7,13 @@ import { useAuthStore } from '../stores/authStore';
 
 const POLL_INTERVAL_MS = 3000;
 
-const PRIMARY_THRESHOLDS = Object.freeze({
-  retrieverRecall: 0.80,
-  rerankedNdcg: 0.80,
-  answerCorrectness: 0.80,
-  citationCompleteness: 0.80,
-});
-
 const QUESTION_TYPE_LABELS = {
   factual: '사실형', procedural: '절차형', comparative: '비교형', multihop: '멀티홉',
+  // 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성 문항
+  law: '법령', general: '일반',
 };
+// 2026.11.19(sooyeon.choi) 추가 - 항목별 결과 '문제 항목' 판정용 지표 4 목표(첫 토큰 반환 시간, ms)
+const FIRST_TOKEN_TARGET_MS = 5000;
 
 const STATUS_LABELS = {
   pending: '대기', running: '실행 중', completed: '완료', failed: '실패', cancelled: '취소됨',
@@ -48,6 +45,7 @@ export const useEvalRuns = () => {
   const downloadingRunId = ref(null);
 
   const resultsTypeFilter = ref('');
+  const resultsLawFilter = ref(''); // 2026.11.20(sooyeon.choi) 수정 - 합본 실행 법령 필터
   const resultsFailedOnly = ref(false);
   const resultsSortBy = ref('worst'); // 'worst'(낮은 점수부터) | 'dataset_sequence'(번호순)
 
@@ -70,6 +68,19 @@ export const useEvalRuns = () => {
 
   const isRunning = computed(() => ['pending', 'running'].includes(selectedRun.value?.status));
   const isFullRun = computed(() => (selectedRun.value?.scope || selectedRun.value?.run_type) === 'full');
+  // 2026.11.20(sooyeon.choi) 수정 - 합본 실행: 법령별 값(같은 실행 항목을 법령으로 나눈 참고 값)·법령 열
+  const isMergedRun = computed(() => selectedRun.value?.dataset_kind === 'merged');
+  const lawMetrics = computed(() => selectedRun.value?.law_metrics || []);
+  const lawOptions = computed(() => lawMetrics.value.map((row) => row.law));
+  const lawShortLabel = (law) => law || ''; // 법령 이름 그대로(축약 시 혼동 방지)
+  const lawBreakdown = (kpi) => lawMetrics.value
+    .map((row) => {
+      const value = row.metrics?.[kpi.key];
+      if (!value) return null;
+      return `${lawShortLabel(row.law)} ${formatMetricState({ ...kpi, ...value, status: value.value == null ? 'excluded' : 'evaluated' })}`;
+    })
+    .filter(Boolean)
+    .join(' · ');
   const progressPercent = computed(() => {
     const run = selectedRun.value;
     if (!run || !run.progress_total) return 0;
@@ -91,37 +102,33 @@ export const useEvalRuns = () => {
   });
 
   const _catalogKpi = (metric) => {
-    const targetByKey = {
-      'answer.correctness': PRIMARY_THRESHOLDS.answerCorrectness,
-      'answer.correctness.v1': PRIMARY_THRESHOLDS.answerCorrectness,
-      'answer.correctness.v2': PRIMARY_THRESHOLDS.answerCorrectness,
-      'answer.correctness.judge': PRIMARY_THRESHOLDS.answerCorrectness,
-      'answer.correctness.f2': PRIMARY_THRESHOLDS.answerCorrectness,
-      // 하위 호환 — 이전 평가 run 표시용
-      'answer.correctness_v2_shadow': PRIMARY_THRESHOLDS.answerCorrectness,
-      'answer.correctness_v2_f2_shadow': PRIMARY_THRESHOLDS.answerCorrectness,
-      'citation.completeness': PRIMARY_THRESHOLDS.citationCompleteness,
-    };
-    const target = metric.key.startsWith('retrieval.rrf.recall@')
-      ? PRIMARY_THRESHOLDS.retrieverRecall
-      : metric.key.startsWith('retrieval.rerank.ndcg@')
-        ? PRIMARY_THRESHOLDS.rerankedNdcg : targetByKey[metric.key];
+    // 인증 목표는 서버 카탈로그에 정의된 공식 지표에만 적용한다.
+    const target = metric.target ?? null;
+    const invert = metric.direction === 'le';
+    const notMeasured = metric.status === 'not_measured';
     return {
       ...metric,
-      status: metric.evaluated_count > 0
+      status: metric.status === 'incomplete' ? 'incomplete' : notMeasured ? 'not_measured' : metric.evaluated_count > 0
         ? 'evaluated' : metric.error_count > 0 ? 'error' : 'excluded',
       target,
-      invert: false,
-      pass: metric.value == null || target == null ? null : metric.value >= target,
-      desc: `${metric.evaluated_count}/${metric.total_count}건 평가 · 제외 ${metric.excluded_count}건 · 오류 ${metric.error_count}건`,
+      invert,
+      pass: metric.value == null || target == null ? null : invert ? metric.value <= target : metric.value >= target,
+      desc: notMeasured
+        ? `미측정 · ${metric.not_measured_reason || ''}`
+        : `${metric.evaluated_count}/${metric.total_count}건 평가 · 제외 ${metric.excluded_count}건 · 오류 ${metric.error_count}건`,
     };
   };
 
   const primaryKpis = computed(() => (selectedRun.value?.primary_metrics || []).map(_catalogKpi));
-  const searchKpis = computed(() => primaryKpis.value.filter((metric) => metric.key.startsWith('retrieval.')));
+  // 2026.11.19(sooyeon.choi) 수정 - 서버 카탈로그 group(search/answer) 기준으로 나눔
+  const searchKpis = computed(() => primaryKpis.value.filter(
+    (metric) => (metric.group ? metric.group === 'search' : metric.key.startsWith('retrieval.')),
+  ));
   const hasSearchKpis = computed(() => searchKpis.value.length > 0);
 
-  const secondaryKpis = computed(() => (selectedRun.value?.secondary_metrics || []).map(_catalogKpi));
+  const secondaryKpis = computed(() => (selectedRun.value?.secondary_metrics || []).map(
+    (metric) => _catalogKpi({ ...metric, target: null }),
+  ));
 
   // 답변 및 인용 주요 지표는 전체 RAG 평가에서만 노출한다.
   const answerKpis = computed(() => {
@@ -129,7 +136,14 @@ export const useEvalRuns = () => {
       'answer.correctness',
       'citation.completeness',
     ]);
-    return primaryKpis.value.filter((metric) => visibleKeys.has(metric.key));
+    // 2026.11.19(sooyeon.choi) 수정 - 지표 4 카드에 함께 볼 지표(companion_key, 예: 전체 반환 시간)를 붙인다
+    return primaryKpis.value
+      .filter((metric) => (metric.group ? metric.group === 'answer' : visibleKeys.has(metric.key)))
+      .map((metric) => {
+        const companion = metric.companion_key
+          && secondaryKpis.value.find((item) => item.key === metric.companion_key);
+        return companion ? { ...metric, companion } : metric;
+      });
   });
   const hasAnswerKpis = computed(() => answerKpis.value.length > 0);
 
@@ -261,6 +275,7 @@ export const useEvalRuns = () => {
     try {
       const { data } = await evalApi.listRunResults(selectedRun.value.run_id, {
         type: resultsTypeFilter.value || undefined,
+        law: resultsLawFilter.value || undefined,
         page: resultsPage.value,
         pageSize: resultsPageSize.value,
       });
@@ -283,6 +298,14 @@ export const useEvalRuns = () => {
         const correctnessV2F2Metric = correctnessF2Metric;
         const citationCompletenessMetric = metrics['citation.completeness']
           || legacyMetric(citation?.completeness);
+        // 2026.11.19(sooyeon.choi) 추가 - 항목별 결과는 주요 지표만: 지표 1 Recall@10(적중 여부), 지표 2 NDCG@5,
+        //   지표 4 첫 토큰 반환 시간(전체 반환 시간 함께). 컷오프는 합의서 고정값 10·5
+        const hit10Metric = metrics['retrieval.rrf.hit@10'] || legacyMetric(retrieval?.rrf?.['hit@10']);
+        const ndcg5Metric = metrics['retrieval.rerank.ndcg@5'] || legacyMetric(retrieval?.rerank?.['ndcg@5']);
+        const timing = safeParse(item.timing_json, {}) || {};
+        const firstTokenMs = typeof timing.first_token_ms === 'number' ? timing.first_token_ms : null;
+        const primaryIssue = hit10Metric?.value === 0 || ndcg5Metric?.value === 0
+          || (firstTokenMs != null && firstTokenMs > FIRST_TOKEN_TARGET_MS);
         const recallN = recallMetric?.value ?? null;
         const rerankedNdcg = rerankedNdcgMetric?.value ?? null;
         const citationCompleteness = citationCompletenessMetric?.value ?? null;
@@ -310,9 +333,8 @@ export const useEvalRuns = () => {
           ([key, metric]) => key !== 'answer.correctness_v2_f2_shadow' && metric?.status === 'error',
         );
         const diagnosticIssue = citationIssues.length > 0;
-        const vals = [
-          recallN, rerankedNdcg, correctness, citationCompleteness,
-        ].filter((v) => v != null);
+        // 2026.11.19(sooyeon.choi) 수정 - '낮은 점수부터' 정렬도 주요 지표(지표 1·2) 기준
+        const vals = [hit10Metric?.value, ndcg5Metric?.value].filter((v) => typeof v === 'number');
         return {
           ...item,
           retrieval, metrics, citation, citationDiagnostics, citationIssues,
@@ -326,14 +348,11 @@ export const useEvalRuns = () => {
           recallMetric, rerankedNdcgMetric, correctnessMetric,
           correctnessV2F2Metric,
           citationCompletenessMetric, citationCompleteness,
-          _failed: item.status !== 'ok' || metricError || diagnosticIssue || [
-            [recallN, PRIMARY_THRESHOLDS.retrieverRecall],
-            [rerankedNdcg, PRIMARY_THRESHOLDS.rerankedNdcg],
-            [correctness, PRIMARY_THRESHOLDS.answerCorrectness],
-            [citationCompleteness, PRIMARY_THRESHOLDS.citationCompleteness],
-          ].some(([value, threshold]) => value != null && value < threshold),
-          _issueType: item.status !== 'ok' || metricError
-            ? 'metric_error' : diagnosticIssue ? 'diagnostic_issue' : null,
+          hit10Metric, ndcg5Metric, firstTokenMs,
+          // 2026.11.19(sooyeon.choi) 수정 - '문제 항목' = 평가·지표 오류 또는 주요 지표 미달
+          //   (Recall@10 미적중, 재랭킹 상위 5 밖, 첫 토큰 5초 초과). 인용 진단은 항목 목록에서 제외
+          _failed: item.status !== 'ok' || metricError || primaryIssue,
+          _issueType: item.status !== 'ok' || metricError ? 'metric_error' : null,
           _worst: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 1,
         };
       });
@@ -502,27 +521,40 @@ export const useEvalRuns = () => {
   const formatMetric = (value) => (typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '-');
   const formatMetricState = (metric) => {
     if (!metric) return '-';
+    if (metric.status === 'not_measured') return '미측정'; // 2026.11.19(sooyeon.choi) 추가
+    if (metric.status === 'incomplete') return '측정 미완료';
     if (metric.status === 'excluded') return '제외';
     if (metric.status === 'error') return '오류';
+    // 2026.11.19(sooyeon.choi) 추가 - ms 단위(반환 시간)는 초로 표시
+    if (metric.unit === 'ms') return typeof metric.value === 'number' ? `${(metric.value / 1000).toFixed(2)}초` : '-';
     return formatMetric(metric.value);
   };
+  // 2026.11.19(sooyeon.choi) 추가 - 목표·표준편차 표시(비율 %, ms는 초)
+  const formatKpiTarget = (kpi) => {
+    if (kpi.target == null) return '';
+    const value = kpi.unit === 'ms' ? `${(kpi.target / 1000).toFixed(0)}초` : `${(kpi.target * 100).toFixed(0)}%`;
+    return `목표 ${kpi.invert ? '≤' : '≥'} ${value}`;
+  };
+  const formatKpiStd = (kpi) => (kpi.unit === 'ms'
+    ? `표준편차 ± ${(kpi.std / 1000).toFixed(2)}초`
+    : `표준편차 ± ${(kpi.std * 100).toFixed(1)}%p`);
   const formatPct = (value) => (typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '-');
   const formatLatency = (value) => (typeof value === 'number' ? `${(value / 1000).toFixed(1)}s` : '-');
+  // 2026.11.19(sooyeon.choi) 추가 - 항목별 Recall@10 적중 여부, 초 단위 시간
+  const formatHit = (metric) => {
+    if (!metric) return '-';
+    if (metric.status === 'excluded') return '제외';
+    if (metric.status === 'error') return '오류';
+    return metric.value === 1 ? '적중' : metric.value === 0 ? '미적중' : '-';
+  };
+  const formatSeconds = (ms) => (typeof ms === 'number' ? `${(ms / 1000).toFixed(2)}초` : '-');
   const questionTypeLabel = (type) => QUESTION_TYPE_LABELS[type] || type || '-';
   const statusLabel = (status) => STATUS_LABELS[status] || status;
   const runTypeLabel = (t) => RUN_TYPE_LABELS[t] || t;
   // 저장 형식 '2026-07-23T10:24:43+09:00'(KST) → '2026-07-23 10:24:43'
   const formatDate = (v, len = 19) => (v || '').slice(0, len).replace('T', ' ');
-  const badgeClass = (value) => {
-    if (typeof value !== 'number') return 'na';
-    return value >= 0.8 ? 'good' : value >= 0.6 ? 'warn' : 'bad';
-  };
-  const metricBadgeClass = (value, threshold) => {
-    if (typeof value !== 'number') return 'na';
-    return value >= threshold ? 'good' : 'bad';
-  };
-
   watch(resultsTypeFilter, () => { resultsPage.value = 1; loadRunResults(); });
+  watch(resultsLawFilter, () => { resultsPage.value = 1; loadRunResults(); });
   onBeforeUnmount(() => {
     stopPolling();
     if (toastTimer) clearTimeout(toastTimer);
@@ -534,16 +566,16 @@ export const useEvalRuns = () => {
     resultsPage, resultsPageSize, resultsTotalPages, detailItem,
     deleteRunId, isDeletingRun, downloadingRunId,
     resultsTypeFilter, resultsFailedOnly, resultsSortBy,
+    resultsLawFilter, isMergedRun, lawMetrics, lawOptions, lawShortLabel, lawBreakdown,
     runForm, isRunning, isFullRun, progressPercent, runCutoffs,
     searchKpis, hasSearchKpis, secondaryKpis,
     answerKpis, hasAnswerKpis,
     loadGoldsets, loadRuns, startRun, selectRun, loadRunResults, goToResultsPage,
     cancelRun, downloadRunExcel, deleteRun, closeDeleteRunModal, confirmDeleteRun,
     showDetail, closeDetail, logout,
-    formatMetric, formatPct, formatLatency, questionTypeLabel,
-    statusLabel, runTypeLabel, formatDate, badgeClass, metricBadgeClass,
-    PRIMARY_THRESHOLDS,
+    formatMetric, formatPct, formatLatency, formatHit, formatSeconds, questionTypeLabel,
+    statusLabel, runTypeLabel, formatDate,
     // 상세 모달
-    channelLabel, goldRefs, systemRefs, openDocument, prettyJson, formatMetricState,
+    channelLabel, goldRefs, systemRefs, openDocument, prettyJson, formatMetricState, formatKpiTarget, formatKpiStd,
   };
 };

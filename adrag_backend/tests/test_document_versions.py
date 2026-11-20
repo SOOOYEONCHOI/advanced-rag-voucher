@@ -77,7 +77,7 @@ def env(tmp_path, monkeypatch):
     principal = dict(user_id="owner", is_admin=False)
     permissions = {"owner": ["documents"], "other": ["documents"]}
     monkeypatch.setattr(ingest, "get_settings", lambda: SimpleNamespace(
-        sqlite_db_path=str(tmp_path / "instance" / "db" / "unused.db"), excel_parse_mode="docling",
+        uploaded_files_base_dir=str(tmp_path / "instance" / "data"), excel_parse_mode="docling",
         document_version_replace_enabled=True,
     ))
     monkeypatch.setattr(ingest, "MetadataRepository", lambda *_: SimpleNamespace(

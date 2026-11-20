@@ -50,22 +50,44 @@ export const adminApi = {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/versions`, authConfig({ timeout: 15000 }));
   },
 
-  // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 접수(관리자 전용, 202 + job_id). 본문: 예상 현재 버전·적용 순번·멱등 키
-  restoreDocumentVersion(documentId, versionNo, body) {
+  // 2026.11.09(woojin.jung) 추가 - 이전 버전 복원 접수(202 job_id). 본문 expected_current_version_no·expected_activation_revision·idempotency_key
+  restoreDocumentVersion(documentId, versionNo, payload) {
     return http.post(
       `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/restore`,
-      body,
+      payload,
       authConfig({ timeout: 15000 }),
     );
   },
 
-  // 2026.11.06(sooyeon.choi) 수정 - 적용 이력 조회(최신순, before_activation_id 커서)
+  // 2026.11.09(woojin.jung) 추가 - 적용 이력 조회(최신순, limit·before_activation_id 커서)
   documentActivations(documentId, params = {}) {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/activations`, authConfig({ params, timeout: 15000 }));
   },
 
   documentFile(documentId) {
     return http.get(`/ingest/documents/${encodeURIComponent(documentId)}/file`, authConfig({ responseType: 'blob' }));
+  },
+
+  drawingResult(documentId, versionNo, config = {}) {
+    return http.get(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-result`,
+      authConfig({ timeout: 30000, ...config }),
+    );
+  },
+
+  completeDrawingReview(documentId, versionNo, payload = {}, config = {}) {
+    return http.post(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-review`,
+      payload,
+      authConfig({ timeout: 15000, ...config }),
+    );
+  },
+
+  cancelDrawingReview(documentId, versionNo, config = {}) {
+    return http.delete(
+      `/ingest/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNo)}/drawing-review`,
+      authConfig({ timeout: 15000, ...config }),
+    );
   },
 
   summary() {

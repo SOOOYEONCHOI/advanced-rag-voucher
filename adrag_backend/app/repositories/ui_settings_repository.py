@@ -3,7 +3,6 @@
 
 from typing import Optional
 
-from app.core.config import get_settings
 from app.repositories.database import DatabaseManager, get_database_manager
 
 
@@ -13,9 +12,8 @@ class UiSettingsRepository:
     def __init__(
         self,
         db: Optional[DatabaseManager] = None,
-        db_path: Optional[str] = None,
     ) -> None:
-        self.db = db or get_database_manager(db_path or get_settings().sqlite_db_path)
+        self.db = db or get_database_manager()
 
     def get_ui_type(self, user_id: str) -> tuple[bool, Optional[str]]:
         rows = self.db.execute_query(

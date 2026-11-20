@@ -28,7 +28,14 @@
       <div v-if="authUser.user_id" class="auth-user">
         <div class="auth-name">{{ authUser.user_id || authUser.user_name }}</div>
         <div class="auth-sub">{{ authUser.token_type === 'admin_access' ? '관리자 세션' : '로그인됨' }}</div>
-        <button class="auth-btn secondary" @click="$emit('logout')">로그아웃</button>
+        <!-- 2026.11.13(woojin.jung) 수정 - 로그아웃 옆에 비밀번호 변경(일반 사용자만) -->
+        <div class="auth-actions">
+          <button v-if="authUser.token_type !== 'admin_access'" class="auth-btn secondary" type="button" @click="passwordDialogOpen = true">
+            <i class="fa-solid fa-key"></i>
+            비밀번호 변경
+          </button>
+          <button class="auth-btn secondary" @click="$emit('logout')">로그아웃</button>
+        </div>
       </div>
       <div v-else class="auth-form">
         <router-link to="/login?redirect=/chat" class="auth-btn auth-btn-link">
@@ -46,10 +53,16 @@
       </router-link>
     </div>
   </aside>
+
+  <ChangePasswordDialog :open="passwordDialogOpen" :userId="authUser.user_id || ''" @close="passwordDialogOpen = false" />
 </template>
 
 <script setup>
-import sidebarLogo from '../assets/brand/werag-logo-dark.png';
+import { ref } from 'vue';
+import sidebarLogo from '../assets/brand/logo-rag-w.png';
+import ChangePasswordDialog from './ChangePasswordDialog.vue';
+
+const passwordDialogOpen = ref(false);
 
 defineProps({
   isOpen: {
@@ -91,7 +104,10 @@ defineEmits(['close', 'selectCollection', 'logout']);
   flex-direction: column;
   padding: 1rem;
   flex-shrink: 0;
-  transition: transform 0.25s ease, margin-left 0.25s ease, visibility 0.25s;
+  transition:
+    transform 0.25s ease,
+    margin-left 0.25s ease,
+    visibility 0.25s;
   box-sizing: border-box;
 }
 .sidebar-top {
@@ -104,15 +120,17 @@ defineEmits(['close', 'selectCollection', 'logout']);
 .logo-area {
   display: flex;
   align-items: center;
+  flex: 1;
   min-width: 0;
 }
 .sidebar-brand-logo {
   display: block;
-  width: 75%;
+  width: 140px;
   max-width: 100%;
   height: auto;
   object-fit: contain;
-  mix-blend-mode: lighten;
+  object-position: left center;
+  image-rendering: auto;
 }
 /* 2026.11.04(woojin.jung) 수정 - 넓은 화면에서도 닫기(접기) 버튼 표시 */
 .sidebar.collapsed {
@@ -202,6 +220,20 @@ defineEmits(['close', 'selectCollection', 'logout']);
 }
 .auth-btn.secondary {
   background: #334155;
+}
+/* 2026.11.13(woojin.jung) 추가 - 비밀번호 변경·로그아웃 버튼 나란히 */
+.auth-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.auth-actions .auth-btn {
+  white-space: nowrap;
+}
+.auth-actions .auth-btn i {
+  margin-right: 4px;
+}
+.auth-btn.secondary:hover {
+  background: #475569;
 }
 .auth-btn-link {
   flex: none;

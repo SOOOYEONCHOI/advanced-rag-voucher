@@ -35,7 +35,7 @@ from app.services.llm_service import get_local_llm_service
 from app.utils.log.log import LoggingLogger
 from app.prompts.pipeline import GUARDRAIL_CLASSIFIER_PROMPT as _CLASSIFIER_PROMPT
 
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 _CONFIG_PATH = os.path.join(
@@ -178,16 +178,13 @@ async def guardrail(state: PipelineState, deps: GraphDependencies | None = None)
 
     if rule_result is not None:
         intent, reason = rule_result
-        # logger.info(f"가드레일 Rule-based 판별: intent={intent!r}, reason={reason!r}")
     elif settings.guardrail_llm_fallback:
         # ── 2차: LLM Classifier ───────────────────────────
         intent, reason = await _llm_classify(
             query, deps.container.local_llm if deps else None
         )
-        # logger.info(f"가드레일 LLM 판별: intent={intent!r}, reason={reason!r}")
     else:
         intent, reason = "rag_query", "LLM fallback 비활성화"
-        # logger.info("가드레일 LLM fallback 비활성화 — rag_query로 처리")
 
     should_retrieve = intent == "rag_query"
     response_type = "rag" if should_retrieve else "guardrail"
@@ -219,9 +216,7 @@ async def guardrail(state: PipelineState, deps: GraphDependencies | None = None)
         result["generated_answer"] = answer
         # 2026.06.19(sooyeon.choi) 추가 - 가드레일 종료 결과 코드 기록
         result["outcome_code"] = "guardrail_blocked"
-        # logger.info(f"가드레일 차단: intent={intent!r}, query={query[:60]!r}")
     else:
-        # logger.info(f"가드레일 통과: RAG 파이프라인 진행 (intent={intent!r})")
         pass
 
     return result

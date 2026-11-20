@@ -22,7 +22,7 @@ from ..config import DEFAULT_CONFIG
 
 from app.utils.log.log import LoggingLogger
 
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -198,11 +198,6 @@ def split_manual_markdown(
     sections = _split_into_menu_sections(full_text)
     has_menu_paths = any(menu_line is not None for menu_line, _ in sections)
 
-    # logger.info(
-    #     f"매뉴얼 청킹 시작 - 총 {len(docs)}페이지 | "
-    #     f"섹션 {len(sections)}개 | 메뉴경로 {'있음' if has_menu_paths else '없음(폴백)'}"
-    # )
-
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -286,7 +281,6 @@ def split_manual_markdown(
                 meta["char_end_offset"] = chunk_pos + len(sub)
             out.append(LCDocument(page_content=content, metadata=meta))
 
-    # logger.info(f"매뉴얼 청킹 완료 - 총 {len(out)}개 청크")
     return out
 
 
@@ -297,7 +291,6 @@ def _fallback_split(
     docs: List[LCDocument],
 ) -> List[LCDocument]:
     """메뉴 경로가 없는 매뉴얼 문서 폴백: RecursiveCharacterTextSplitter 단순 분할."""
-    # logger.info("매뉴얼 폴백 청킹 - 메뉴 경로 없음, RecursiveCharacterTextSplitter 사용")
     out: List[LCDocument] = []
     text_chunks = splitter.split_text(full_text)
 

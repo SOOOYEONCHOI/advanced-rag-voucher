@@ -188,6 +188,34 @@
       </section>
     </main>
 
+    <div v-if="showAddPrerequisiteModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-user-prerequisite-title">
+      <section class="modal prerequisite-modal">
+        <div class="modal-head">
+          <div>
+            <h2 id="add-user-prerequisite-title">먼저 부서를 등록해주세요</h2>
+            <p>사용자를 추가하려면 소속으로 지정할 활성 부서가 필요합니다.</p>
+          </div>
+          <button class="close" type="button" aria-label="닫기" @click="closeAddPrerequisiteModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="prerequisite-message">
+            <span class="prerequisite-icon"><i class="fa-solid fa-building-circle-exclamation"></i></span>
+            <div>
+              <strong>등록된 활성 부서가 없습니다.</strong>
+              <p>부서를 등록하면 생성된 부서를 자동으로 선택한 사용자 추가 화면으로 이어집니다.</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" @click="closeAddPrerequisiteModal">취소</button>
+          <button class="btn btn-primary" type="button" @click="startDepartmentForUserAdd">
+            <i class="fa-solid fa-building"></i>
+            부서 등록하기
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="showAddModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-user-title">
       <section class="modal">
         <div class="modal-head">
@@ -238,7 +266,7 @@
               <input
                 v-model="newUser.password"
                 type="password"
-                placeholder="6자 이상"
+                placeholder="영문·숫자 포함 8자 이상"
                 :disabled="addLoading"
                 :class="{ invalid: addTouched.password && addFieldErrors.password }"
                 @input="touchAddField('password')"
@@ -293,7 +321,7 @@
           </div>
 
           <div class="form-grid compact">
-            <div class="field">
+            <!-- <div class="field">
               <label>보안등급</label>
               <select v-model="permissionDraft.securityLevel">
                 <option value="public">공개</option>
@@ -305,7 +333,7 @@
             <div class="field">
               <label>문서유형</label>
               <input v-model="permissionDraft.docTypes" type="text" placeholder="예: law,manual" />
-            </div>
+            </div> -->
           </div>
         </div>
         <div class="modal-actions">
@@ -987,6 +1015,41 @@ button:disabled {
 
 .modal-body {
   padding: 20px 22px;
+}
+
+.prerequisite-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.prerequisite-icon {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.prerequisite-message strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.prerequisite-message p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .form-grid {

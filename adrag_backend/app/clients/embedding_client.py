@@ -16,7 +16,7 @@ import httpx
 import numpy as np
 
 from app.core.config import Settings
-# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용 (B6)
+# 2026.07.16(sooyeon.choi) 수정 - 요청마다 AsyncClient 생성 → 공유 클라이언트 재사용
 from app.core.http import get_shared_async_client
 from app.utils.log.log import LoggingLogger
 
@@ -34,7 +34,7 @@ class EmbeddingClient:
         self.batch_size = settings.embedding_batch_size
         self.dim = settings.embedding_dim
         self.instruct_template = settings.embedding_instruct_template
-        # 2026.07.16(sooyeon.choi) 수정 - 서버측 truncation 도입 (B3)
+        # 2026.07.16(sooyeon.choi) 수정 - 서버측 truncation 도입
         #   기존: 문자 수 × 3 근사만으로 잘라 한국어 장문에서 토큰 한도 초과
         #   → vLLM 400 오류(임베딩/인제스트 실패) 가능성이 있었음.
         #   변경: truncate_prompt_tokens를 vLLM에 전달해 토큰 기준으로 안전하게
@@ -74,12 +74,12 @@ class EmbeddingClient:
             "model": self.model,
             "input": texts,
         }
-        # 2026.07.16(sooyeon.choi) 추가 - 서버측 토큰 truncation (B3)
+        # 2026.07.16(sooyeon.choi) 추가 - 서버측 토큰 truncation
         #   0이면 미전송(미지원 서버 호환), -1이면 모델 최대 길이 기준
         if self.truncate_prompt_tokens != 0:
             payload["truncate_prompt_tokens"] = self.truncate_prompt_tokens
 
-        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+        # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
         client = get_shared_async_client()
         resp = await client.post(
             f"{self.base_url}/v1/embeddings",
@@ -187,7 +187,7 @@ class EmbeddingClient:
     async def health_check(self) -> bool:
         """vLLM Embedding 서버 상태 확인."""
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용 (B6)
+            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient 재사용
             resp = await get_shared_async_client().get(
                 f"{self.base_url}/v1/models",
                 headers=self._headers(),

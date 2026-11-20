@@ -127,7 +127,7 @@ def run_excel_ingest(
         if file_extension(filename) == LEGACY_XLS_EXTENSION:
             source = convert_xls_to_xlsx(path, work_dir, timeout=convert_timeout)
         try:
-            # 2026.10.16 수정 - Phase 2(P2-11): 제품 모델(비면 청크 머리말에 넣지 않음)
+            # 2026.10.16 수정 - Phase 2: 제품 모델(비면 청크 머리말에 넣지 않음)
             result = parse_workbook(source, doc_key=doc_key, model=model or None)
         except ExcelIngestError:
             raise

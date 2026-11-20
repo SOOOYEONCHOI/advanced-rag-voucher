@@ -18,6 +18,8 @@ class QueryRecord:
     collection_id: Optional[int] = None
     collection_name: Optional[str] = None
     model_id: str = "local"
+    # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로(text·voice·recommended·popular)
+    input_mode: str = "text"
 
 
 class QueryRecorder:
@@ -64,6 +66,7 @@ class QueryRecorder:
             cost_usd=cost,
             extracted_keywords=(state.get("preprocess_result") or {}).get("extracted_keywords"),
             collection_name_snapshot=request.collection_name,
+            input_mode=request.input_mode,  # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로
         )
         if log_id and citations:
             rows = [

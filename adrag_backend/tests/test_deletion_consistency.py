@@ -247,9 +247,9 @@ def make_collection_service(db_path, vector_repo):
     service.settings = SimpleNamespace(
         max_collections=5,
         embedding_dim=3,
-        sqlite_db_path="", instance_dir=str(db_path),
+        instance_dir=str(db_path),
     )
-    service.collection_repo = CollectionRepository(str(db_path))
+    service.collection_repo = CollectionRepository()
     service.vector_repo = vector_repo
     return service
 
@@ -266,7 +266,7 @@ def insert_user(repo, user_id="user01"):
 
 def test_collection_delete_verifies_qdrant_absence_before_rdb_delete(tmp_path):
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -300,7 +300,7 @@ def test_collection_delete_with_eval_dataset_returns_409_before_qdrant_change(
     from app.routes import collections as collections_route
 
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -320,7 +320,7 @@ def test_collection_delete_with_eval_dataset_returns_409_before_qdrant_change(
     monkeypatch.setattr(
         collections_route,
         "get_settings",
-        lambda: SimpleNamespace(sqlite_db_path="", instance_dir=str(db_path)),
+        lambda: SimpleNamespace(instance_dir=str(db_path)),
     )
     monkeypatch.setattr(collections_route, "CollectionService", lambda: service)
 
@@ -355,7 +355,7 @@ def test_collection_delete_with_active_ingest_job_returns_409_before_changes(
     from app.routes import collections as collections_route
 
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -380,7 +380,7 @@ def test_collection_delete_with_active_ingest_job_returns_409_before_changes(
     monkeypatch.setattr(
         collections_route,
         "get_settings",
-        lambda: SimpleNamespace(sqlite_db_path="", instance_dir=str(db_path)),
+        lambda: SimpleNamespace(instance_dir=str(db_path)),
     )
     monkeypatch.setattr(collections_route, "CollectionService", lambda: service)
 
@@ -410,7 +410,7 @@ def test_collection_delete_with_generating_dataset_returns_409_before_changes(
     from app.routes import collections as collections_route
 
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -430,7 +430,7 @@ def test_collection_delete_with_generating_dataset_returns_409_before_changes(
     monkeypatch.setattr(
         collections_route,
         "get_settings",
-        lambda: SimpleNamespace(sqlite_db_path="", instance_dir=str(db_path)),
+        lambda: SimpleNamespace(instance_dir=str(db_path)),
     )
     monkeypatch.setattr(collections_route, "CollectionService", lambda: service)
 
@@ -460,7 +460,7 @@ def test_collection_delete_with_active_eval_run_returns_409_before_changes(
     from app.routes import collections as collections_route
 
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -504,7 +504,7 @@ def test_collection_delete_with_active_eval_run_returns_409_before_changes(
     monkeypatch.setattr(
         collections_route,
         "get_settings",
-        lambda: SimpleNamespace(sqlite_db_path="", instance_dir=str(db_path)),
+        lambda: SimpleNamespace(instance_dir=str(db_path)),
     )
     monkeypatch.setattr(collections_route, "CollectionService", lambda: service)
 
@@ -530,7 +530,7 @@ def test_collection_delete_rolls_back_rdb_changes_on_metadata_delete_failure(
     tmp_path, monkeypatch
 ):
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -567,7 +567,7 @@ def test_collection_delete_reconciles_when_qdrant_collection_is_already_absent(
     tmp_path,
 ):
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -587,7 +587,7 @@ def test_collection_delete_route_returns_verified_result(tmp_path, monkeypatch):
     from app.routes import collections as collections_route
 
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     insert_user(repo)
     collection = repo.create(
         "Manual",
@@ -608,7 +608,7 @@ def test_collection_delete_route_returns_verified_result(tmp_path, monkeypatch):
     monkeypatch.setattr(
         collections_route,
         "get_settings",
-        lambda: SimpleNamespace(sqlite_db_path="", instance_dir=str(db_path)),
+        lambda: SimpleNamespace(instance_dir=str(db_path)),
     )
     monkeypatch.setattr(collections_route, "CollectionService", lambda: service)
 

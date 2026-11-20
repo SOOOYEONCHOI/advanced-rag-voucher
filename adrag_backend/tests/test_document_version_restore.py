@@ -24,7 +24,7 @@ KEY2 = "restore-key-0002"
 def restore_env(env, monkeypatch):
     """env(test_document_versions)에 보존·복원 설정을 켠다. 모든 모듈이 같은 설정 객체를 본다(같은 임베딩 프로필)."""
     cfg = SimpleNamespace(
-        sqlite_db_path=str(env.tmp / "instance" / "db" / "unused.db"), excel_parse_mode="docling",
+        uploaded_files_base_dir=str(env.tmp / "instance" / "data"), excel_parse_mode="docling",
         document_version_replace_enabled=True, md_save_dir="", excel_md_keep_last=5, excel_xls_convert_timeout=120,
         resource_delivery="pull", max_chunk_size=800,
         document_version_vector_retention_enabled=True, document_version_restore_enabled=True,

@@ -21,6 +21,8 @@ from app.repositories.collection_repository import CollectionRepository
 from app.repositories.metadata_repository import MetadataRepository
 from app.repositories.user_llm_settings_repository import UserLlmSettingsRepository
 from app.services.rag_service import RAGService
+# 2026.11.12(woojin.jung) 추가 - 채팅 시작 화면 질문(추천 질문·많이 찾는 질문) 조회
+from app.services.start_question_service import StartQuestionService
 from app.utils.encryption import decrypt_api_key
 from app.utils.security import decode_optional_token
 
@@ -44,6 +46,8 @@ class QueryRequestBody(BaseModel):
     llm_model: Optional[str] = None      # 예: "gpt-4.1", "gpt-4o-mini"
     openai_api_key: Optional[str] = None
     enable_metadata_filtering: Optional[bool] = None  # None이면 config 설정 따름
+    # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로(직접 입력·음성·시작 화면 추천/많이 찾는 질문), tb_query_logs.input_mode에 기록
+    input_mode: Literal["text", "voice", "recommended", "popular"] = "text"
 
 
 def _extract_principal(request: Request) -> dict:
@@ -67,7 +71,7 @@ def _get_accessible_collections(user_id: str) -> List[str]:
     settings = get_settings()
     active_collections = {
         collection.qdrant_name
-        for collection in CollectionRepository(settings.sqlite_db_path).get_all()
+        for collection in CollectionRepository().get_all()
     }
 
     if user_id == "anonymous":
@@ -77,7 +81,7 @@ def _get_accessible_collections(user_id: str) -> List[str]:
             anon_collections = set()
         return sorted(active_collections & anon_collections)
 
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
     permissions = meta_repo.get_user_permissions(user_id)
     if not permissions or not permissions.accessible_collections:
         return []
@@ -91,7 +95,7 @@ async def get_query_collections(request: Request):
     if principal.get("is_admin"):
         qdrant_names = sorted(
             collection.qdrant_name
-            for collection in CollectionRepository(get_settings().sqlite_db_path).get_all()
+            for collection in CollectionRepository().get_all()
         )
     else:
         qdrant_names = _get_accessible_collections(principal["user_id"])
@@ -100,7 +104,7 @@ async def get_query_collections(request: Request):
     settings = get_settings()
     all_cols = {
         c.qdrant_name: c.display_name
-        for c in CollectionRepository(settings.sqlite_db_path).get_all()
+        for c in CollectionRepository().get_all()
     }
     return {
         "collections": [
@@ -114,6 +118,64 @@ async def get_query_collections(request: Request):
     }
 
 
+# 2026.11.09(sooyeon.choi) 추가 - rag_query·rag_query_stream 공통 처리(권한 확인·API 키 조회·서비스 인자)
+def _authorize_query_collection(principal: dict, body: QueryRequestBody) -> None:
+    """비관리자가 접근 권한 없는 대화 주제로 질의하면 403."""
+    if body.collection_name and not principal.get("is_admin"):
+        accessible = _get_accessible_collections(principal["user_id"])
+        if body.collection_name not in accessible:
+            raise HTTPException(
+                status_code=403,
+                detail=f"'{body.collection_name}' 컬렉션에 접근 권한이 없습니다.",
+            )
+
+
+def _resolve_openai_api_key(user_id: str, body: QueryRequestBody) -> Optional[str]:
+    """openai_api_key가 요청에 없으면 DB에서 사용자 저장 키를 조회한다(없거나 복호화 실패면 None)."""
+    # 2026.06.16(sooyeon.choi) 수정 - UserLlmSettingsRepository.get(user_id, collection_id:int)
+    resolved_api_key = body.openai_api_key
+    if not resolved_api_key and body.llm_provider == "openai" and body.collection_name:
+        col = CollectionRepository().get_by_qdrant_name(body.collection_name)
+        if col:
+            saved = UserLlmSettingsRepository().get(user_id, col.collection_id)
+            if saved and saved.api_key_enc:
+                try:
+                    resolved_api_key = decrypt_api_key(saved.api_key_enc)
+                except Exception:
+                    logger.warning("저장된 API 키 복호화 실패: user=%s", user_id)
+    return resolved_api_key
+
+
+def _service_kwargs(user_id: str, body: QueryRequestBody) -> dict:
+    """RAGService.query / query_stream 공통 인자."""
+    return dict(
+        query=body.query,
+        user_id=user_id,
+        collection_filters=body.collection_filters,
+        collection_name=body.collection_name,
+        top_k=body.top_k,
+        llm_provider=body.llm_provider,
+        llm_model=body.llm_model,
+        openai_api_key=_resolve_openai_api_key(user_id, body),
+        enable_metadata_filtering=body.enable_metadata_filtering,
+        # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로 기록
+        input_mode=body.input_mode,
+    )
+
+
+# 2026.11.12(woojin.jung) 추가 - 채팅 시작 화면: 대화 주제의 추천 질문 + 많이 찾는 질문
+@router.get("/start-questions")
+async def get_start_questions(request: Request, collection_name: str):
+    """채팅 시작 화면에 보여 줄 추천 질문과 많이 찾는 질문을 반환한다."""
+    principal = _extract_principal(request)
+    if not principal.get("is_admin") and collection_name not in _get_accessible_collections(principal["user_id"]):
+        raise HTTPException(status_code=403, detail=f"'{collection_name}' 컬렉션에 접근 권한이 없습니다.")
+    collection = CollectionRepository().get_by_qdrant_name(collection_name)
+    if collection is None:
+        raise HTTPException(status_code=404, detail="대화 주제를 찾을 수 없습니다.")
+    return StartQuestionService().get_start_questions(collection.collection_id)
+
+
 @router.post("/")
 async def rag_query(request: Request, body: QueryRequestBody):
     """RAG 질의를 실행한다."""
@@ -122,40 +184,12 @@ async def rag_query(request: Request, body: QueryRequestBody):
     # 2026.05.07(sooyeon.choi) 추가 - session_id 제거, 서버가 (user_id, collection_name)으로 세션 직접 관리
     logger.info("쿼리 요청 user_id=%s, collection=%s", user_id, body.collection_name)
 
-    if body.collection_name and not principal.get("is_admin"):
-        accessible = _get_accessible_collections(user_id)
-        if body.collection_name not in accessible:
-            raise HTTPException(
-                status_code=403,
-                detail=f"'{body.collection_name}' 컬렉션에 접근 권한이 없습니다.",
-            )
-
-    # openai_api_key가 요청에 없으면 DB에서 사용자 저장 키를 조회한다
-    # 2026.06.16(sooyeon.choi) 수정 - UserLlmSettingsRepository.get(user_id, collection_id:int)
-    resolved_api_key = body.openai_api_key
-    if not resolved_api_key and body.llm_provider == "openai" and body.collection_name:
-        settings = get_settings()
-        col = CollectionRepository(settings.sqlite_db_path).get_by_qdrant_name(body.collection_name)
-        if col:
-            saved = UserLlmSettingsRepository().get(user_id, col.collection_id)
-            if saved and saved.api_key_enc:
-                try:
-                    resolved_api_key = decrypt_api_key(saved.api_key_enc)
-                except Exception:
-                    logger.warning("저장된 API 키 복호화 실패: user=%s", user_id)
+    # 2026.11.09(sooyeon.choi) 수정 - 공통 처리 함수 사용
+    _authorize_query_collection(principal, body)
+    kwargs = _service_kwargs(user_id, body)
 
     try:
-        response = await _rag_service.query(
-            query=body.query,
-            user_id=user_id,
-            collection_filters=body.collection_filters,
-            collection_name=body.collection_name,
-            top_k=body.top_k,
-            llm_provider=body.llm_provider,
-            llm_model=body.llm_model,
-            openai_api_key=resolved_api_key,
-            enable_metadata_filtering=body.enable_metadata_filtering,
-        )
+        response = await _rag_service.query(**kwargs)
         return asdict(response)
     except Exception as e:
         logger.error("RAG 쿼리 처리 중 오류 발생: %s", e, exc_info=True)
@@ -173,38 +207,11 @@ async def rag_query_stream(request: Request, body: QueryRequestBody):
     user_id = principal["user_id"]
     logger.info("스트리밍 쿼리 요청 user_id=%s, collection=%s", user_id, body.collection_name)
 
-    if body.collection_name and not principal.get("is_admin"):
-        accessible = _get_accessible_collections(user_id)
-        if body.collection_name not in accessible:
-            raise HTTPException(
-                status_code=403,
-                detail=f"'{body.collection_name}' 컬렉션에 접근 권한이 없습니다.",
-            )
-
-    # 2026.06.16(sooyeon.choi) 수정 - UserLlmSettingsRepository.get(user_id, collection_id:int)
-    resolved_api_key = body.openai_api_key
-    if not resolved_api_key and body.llm_provider == "openai" and body.collection_name:
-        _col = CollectionRepository(get_settings().sqlite_db_path).get_by_qdrant_name(body.collection_name)
-        if _col:
-            saved = UserLlmSettingsRepository().get(user_id, _col.collection_id)
-            if saved and saved.api_key_enc:
-                try:
-                    resolved_api_key = decrypt_api_key(saved.api_key_enc)
-                except Exception:
-                    logger.warning("저장된 API 키 복호화 실패: user=%s", user_id)
+    # 2026.11.09(sooyeon.choi) 수정 - 공통 처리 함수 사용
+    _authorize_query_collection(principal, body)
 
     return StreamingResponse(
-        _rag_service.query_stream(
-            query=body.query,
-            user_id=user_id,
-            collection_filters=body.collection_filters,
-            collection_name=body.collection_name,
-            top_k=body.top_k,
-            llm_provider=body.llm_provider,
-            llm_model=body.llm_model,
-            openai_api_key=resolved_api_key,
-            enable_metadata_filtering=body.enable_metadata_filtering,
-        ),
+        _rag_service.query_stream(**_service_kwargs(user_id, body)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -220,7 +227,7 @@ async def get_chat_history(request: Request, collection_name: str):
     principal = _extract_principal(request)
     user_id = principal["user_id"]
     settings = get_settings()
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
 
     context = meta_repo.get_session_by_collection(user_id, collection_name)
     if not context:
@@ -287,7 +294,7 @@ async def reset_chat_history(request: Request, body: ResetRequest):
     principal = _extract_principal(request)
     user_id = principal["user_id"]
     settings = get_settings()
-    meta_repo = MetadataRepository(settings.sqlite_db_path)
+    meta_repo = MetadataRepository()
 
     success = meta_repo.reset_session_by_collection(user_id, body.collection_name)
     return {"success": success, "collection_name": body.collection_name}
@@ -325,7 +332,7 @@ async def submit_query_feedback(log_id: int, body: FeedbackRequest, request: Req
     if invalid:
         raise HTTPException(status_code=422, detail=f"허용되지 않는 피드백 사유입니다: {', '.join(invalid)}")
     value = {"like": 1, "dislike": 0, None: None}[body.feedback]
-    meta_repo = MetadataRepository(get_settings().sqlite_db_path)
+    meta_repo = MetadataRepository()
     ok = meta_repo.set_query_feedback(log_id, user_id, value, reasons, comment)
     if not ok:
         raise HTTPException(status_code=404, detail="대상 로그를 찾을 수 없거나 접근 권한이 없습니다.")

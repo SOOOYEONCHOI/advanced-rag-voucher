@@ -20,9 +20,10 @@ from urllib.parse import quote
 import json
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+# 2026.11.09(sooyeon.choi) 삭제 - pydantic import(스키마 분리로 미사용)
 
 from app.core.config import get_settings
+from app.core.storage_paths import get_ingest_queue_dir
 from app.repositories.database import get_database_manager
 from app.repositories.metadata_repository import MetadataRepository
 from app.repositories.document_repository import DocumentRepository
@@ -31,17 +32,30 @@ from app.services.ingest_service import IngestService, get_original_file_storage
 from app.services.ingest_jobs import get_ingest_job_manager
 from app.repositories.ingest_job_repository import IngestJobRepository
 from app.services.manual_display_service import ManualDisplayService
+# 2026.10.28(woojin.jung) 추가 - LibreOffice UNO 기반 단일 Excel 시트 PDF 미리보기 서비스
+from app.services.sheet_preview_service import (
+    SheetPreviewError,
+    SheetPreviewSheetNotFoundError,
+    SheetPreviewTimeoutError,
+    SheetPreviewValidationError,
+    create_sheet_preview,
+)
 # 2026.10.16 추가 - Phase 1 엑셀 전용 처리기 파일 판별
 from app.ingest.file_router import (
+    DRAWING_INGEST_EXTENSIONS,
     EXCEL_INGEST_EXTENSIONS,
     LEGACY_XLS_EXTENSION,
+    ROUTE_DRAWING_INGEST,
     ExcelFileRejected,
+    is_drawing_ingest_upload,
     is_excel_ingest_extension,
     resolve_parse_route,
 )
-# 2026.07.16(sooyeon.choi) 수정 - 중복 정의 제거, 공통 모듈의 보안등급 계층 사용 (B10)
-from app.utils.security import SECURITY_HIERARCHY as _SECURITY_HIERARCHY
-from app.utils.security import get_current_principal
+from app.ingest.drawing.common import DrawingError  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+from app.ingest.drawing.detect import detect_drawing
+# 2026.07.16(sooyeon.choi) 수정 - 중복 정의 제거, 공통 모듈의 보안등급 계층 사용
+# 2026.11.09(sooyeon.choi) 수정 - 열람 범위는 공통 함수로 판정
+from app.utils.security import document_scope, get_current_principal, in_document_scope
 from app.utils.datetime import format_kst_datetime
 # 2026.10.19(sooyeon.choi) 추가 - 모델명(product_model) 기본값·검증
 from app.ingest.model_name import resolve_upload_model_name, validate_model_name
@@ -70,20 +84,16 @@ def _get_user_accessible(principal: dict) -> Optional[Tuple[Set[str], Set[str]]]
     if principal.get("is_admin"):
         return None
     settings = get_settings()
-    permissions = MetadataRepository(settings.sqlite_db_path).get_user_permissions(
+    permissions = MetadataRepository().get_user_permissions(
         principal["user_id"]
     )
-    if not permissions:
-        return (set(), set())
-    accessible = set(permissions.accessible_collections or [])
-    allowed = set(
-        _SECURITY_HIERARCHY.get(permissions.max_security_level or "public", ["public"])
-    )
-    return (accessible, allowed)
+    # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 계산을 document_scope로
+    return document_scope(permissions)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
+_sheet_preview_semaphore = asyncio.Semaphore(get_settings().sheet_preview_max_concurrency)
 
 # 2026.08.27(sooyeon.choi) 수정 - Excel OOXML 지원 확장자와 .xls 거부 정책 통일
 from app.parsers.spreadsheet_contract import (
@@ -99,170 +109,24 @@ SUPPORTED_EXTENSIONS = {
 
 
 # ── Response Schemas ──────────────────────────────────────────────────────────
-
-class IngestJobResponse(BaseModel):
-    job_id: str
-    status: str
-    current_step: str
-    result: Optional[dict] = None
-    error: Optional[str] = None
-    error_code: Optional[str] = None
-    # 2026.11.06(sooyeon.choi) 수정 - 작업 유형(upload·replace·restore)과 대상 문서·버전(복원 진행·결과 화면)
-    operation_type: Optional[str] = None
-    document_id: Optional[str] = None
-    from_version_no: Optional[int] = None
-    target_version_no: Optional[int] = None
-
-
-class CollectionsResponse(BaseModel):
-    collections: List[str]
-
-
-class DocumentItem(BaseModel):
-    document_id: str
-    filename: str
-    collection_name: str
-    doc_type: Optional[str] = None
-    requested_doc_type: Optional[str] = None
-    doc_type_source: Optional[str] = None
-    total_pages: Optional[int] = None
-    chunk_count: Optional[int] = None
-    parser_type: Optional[str] = None
-    upload_timestamp: Optional[str] = None
-    # 2026.06.30(sooyeon.choi) 추가 - 실제 업로더와 개별 삭제 권한 응답
-    uploaded_by: Optional[str] = None
-    can_delete: bool = False
-    # 2026.10.19(sooyeon.choi) 추가 - 모델명·현재 버전·최근 변경일, 모델명 수정 가능 여부(삭제와 같은 규칙)
-    product_model: Optional[str] = None
-    version_no: Optional[int] = None
-    updated_at: Optional[str] = None
-    can_edit: bool = False
-    # 2026.10.19 추가(sooyeon.choi) - 최신본 변경 처리 중인 버전(없으면 None) — 화면 상태 표시·폴링 복원용
-    pending_version_no: Optional[int] = None
-    pending_job_id: Optional[str] = None
-    # 2026.11.06(sooyeon.choi) 수정 - 적용 순번·진행 중 변경 작업(최신본 변경·복원 공통, queued/running일 때만).
-    #   기존 pending_job_id·pending_version_no는 최신본 변경 전용으로 유지(기존 화면 호환)
-    activation_revision: Optional[int] = None
-    pending_operation: Optional[dict] = None
-
-
-class VersionJobResponse(BaseModel):
-    """2026.10.19 추가 - 최신본 변경 접수 응답(작업 상태는 GET /ingest/jobs/{job_id}로 확인)."""
-    job_id: str
-    status: str
-    current_step: str
-    document_id: str
-    version_no: int
-
-
-class DocumentVersionItem(BaseModel):
-    version_no: int
-    status: str
-    is_active: bool
-    original_filename: Optional[str] = None
-    file_size: Optional[int] = None
-    file_format: Optional[str] = None
-    parser_type: Optional[str] = None
-    processing_engine: Optional[str] = None
-    total_pages: Optional[int] = None
-    chunk_count: Optional[int] = None
-    uploaded_by: Optional[str] = None
-    created_at: Optional[str] = None
-    activated_at: Optional[str] = None
-    retired_at: Optional[str] = None
-    job_id: Optional[str] = None
-    job_status: Optional[str] = None
-    error: Optional[str] = None
-    # 2026.11.06(sooyeon.choi) 수정 - 등록자 이름·행별 복원 가능 여부(서버 판정)
-    uploaded_by_name: Optional[str] = None
-    can_restore: bool = False
-    restore_block_code: Optional[str] = None
-    restore_block_reason: Optional[str] = None
-
-
-class DocumentVersionsResponse(BaseModel):
-    document_id: str
-    product_model: Optional[str] = None
-    current_version_no: int
-    versions: List[DocumentVersionItem]
-    restore_supported: bool = False
-    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 화면(명세 v1.1 4절)
-    collection_name: Optional[str] = None
-    collection_display_name: Optional[str] = None
-    current_original_filename: Optional[str] = None
-    activation_revision: int = 1
-    total_versions: int = 0
-    next_version_no: int = 1
-    can_restore: bool = False
-    restore_block_code: Optional[str] = None
-    restore_block_reason: Optional[str] = None
-    pending_operation: Optional[dict] = None
-
-
-# 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 접수 본문·응답, 적용 이력(명세 v1.1 5·7절)
-class RestoreVersionRequest(BaseModel):
-    expected_current_version_no: int = Field(ge=1)
-    expected_activation_revision: int = Field(ge=1)
-    idempotency_key: str = Field(min_length=8, max_length=128)
-
-
-class RestoreJobResponse(BaseModel):
-    job_id: str
-    operation_type: str = "restore"
-    status: str
-    current_step: str
-    document_id: str
-    from_version_no: Optional[int] = None
-    target_version_no: int
-
-
-class ActivationItem(BaseModel):
-    activation_id: int
-    operation_type: str
-    from_version_no: Optional[int] = None
-    to_version_no: int
-    activation_revision: int
-    activated_by: Optional[str] = None
-    activated_by_name: Optional[str] = None
-    activated_at: Optional[str] = None
-
-
-class ActivationsResponse(BaseModel):
-    document_id: str
-    activations: List[ActivationItem]
-    next_before_activation_id: Optional[int] = None
-
-
-class ModelNameUpdateRequest(BaseModel):
-    product_model: str
-
-
-class ModelNameUpdateResponse(BaseModel):
-    document_id: str
-    product_model: str
-    version_no: Optional[int] = None
-    updated_at: Optional[str] = None
-
-
-class DocumentsResponse(BaseModel):
-    documents: List[DocumentItem]
-    total: int
-
-
-# 2026.04.02(sooyeon.choi) - 문서 삭제 기능 추가
-class ManualDisplayResolveResponse(BaseModel):
-    mapped: bool
-    display_filename: str
-    display_page: int
-
-
-class DeleteDocumentResponse(BaseModel):
-    status: str
-    document_id: str
-    deleted_vector_count: int
-    remaining_vector_count: int
-    reconciled: bool
-    message: str
+# 2026.11.09(sooyeon.choi) 수정 - 스키마를 app/models/ingest_models.py로 분리(기존 이름으로 계속 import 가능)
+from app.models.ingest_models import (  # noqa: F401  (라우트 응답 모델·테스트 참조)
+    IngestJobResponse,
+    CollectionsResponse,
+    DocumentItem,
+    VersionJobResponse,
+    DocumentVersionItem,
+    DocumentVersionsResponse,
+    RestoreVersionRequest,
+    RestoreJobResponse,
+    ActivationItem,
+    ActivationsResponse,
+    ModelNameUpdateRequest,
+    ModelNameUpdateResponse,
+    DocumentsResponse,
+    ManualDisplayResolveResponse,
+    DeleteDocumentResponse,
+)
 
 
 # ── 업로드 공통 (2026.10.19 업로드·최신본 변경 공용으로 분리) ─────────────────────
@@ -275,6 +139,9 @@ def _validate_upload_options(filename: Optional[str], parser_type: str, document
     excel_ingest_upload = (
         settings_obj.excel_parse_mode == "backend" and is_excel_ingest_extension(filename or "")
     )
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 문서 유형·파서 선택과 관계없이 도면 처리기로 처리한다
+    if is_drawing_ingest_upload(filename or "", getattr(settings_obj, "drawing_parse_mode", "off")):
+        return ext, False, "drawing"
     # 2026.08.27(sooyeon.choi) 추가 - 변환 방법을 안내하는 레거시 Excel 오류
     if ext == "xls" and not excel_ingest_upload:
         raise HTTPException(status_code=400, detail=LEGACY_XLS_UPLOAD_MESSAGE)
@@ -304,11 +171,23 @@ def _validate_upload_options(filename: Optional[str], parser_type: str, document
 
 async def _store_upload_tmp(file: UploadFile, job_id: str, ext: str, excel_ingest_upload: bool, settings_obj) -> str:
     """업로드 파일을 작업 대기 폴더에 저장한다. 엑셀 위장·암호 파일은 지우고 400."""
-    queue_dir = Path(settings_obj.sqlite_db_path).parent / "ingest_jobs"
+    queue_dir = get_ingest_queue_dir(settings_obj)
     queue_dir.mkdir(parents=True, exist_ok=True)
     tmp_path = str(queue_dir / f"{job_id}.{ext}")
     with open(tmp_path, "wb") as target:
         await asyncio.to_thread(shutil.copyfileobj, file.file, target)
+
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 크기 상한·파일 서명 확인(위장·빈 파일·지원하지 않는 버전 거부)
+    if is_drawing_ingest_upload(file.filename or "", getattr(settings_obj, "drawing_parse_mode", "off")):
+        max_mb = int(getattr(settings_obj, "drawing_max_upload_mb", 100))
+        if Path(tmp_path).stat().st_size > max_mb * 1024 * 1024:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise HTTPException(status_code=413, detail=f"도면 파일은 {max_mb} MiB 이하여야 합니다.")
+        try:
+            await asyncio.to_thread(detect_drawing, tmp_path, file.filename)
+        except DrawingError as exc:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=f"도면 파일 rejected({exc.error_code}): {exc}") from exc
 
     # 2026.10.16(sooyeon.choi) 추가 - 엑셀 위장·암호 파일은 거부, 임시 파일을 지운다
     if excel_ingest_upload:
@@ -350,7 +229,7 @@ async def upload_document(
     """
     # 2026.06.04(sooyeon.choi) 수정 - security_level을 업로드 사용자의 max_security_level에서 자동 결정
     settings_obj = get_settings()
-    meta_repo = MetadataRepository(settings_obj.sqlite_db_path)
+    meta_repo = MetadataRepository()
     user_perm = meta_repo.get_user_permissions(principal["user_id"])
     security_level = user_perm.max_security_level if user_perm else "public"
 
@@ -388,14 +267,15 @@ async def upload_document(
             file_path=tmp_path,
             filename=file.filename,
             collection_name=collection_name,
-            parser_type=parser_type,
+            # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 처리기 이름을 파서로 기록
+            parser_type=ROUTE_DRAWING_INGEST if document_type == "drawing" else parser_type,
             document_type=document_type,
             chunk_size=chunk_size,
             uploaded_by=principal["user_id"],
             security_level=security_level,
             product_model=product_model,
         )
-        repository = IngestJobRepository(settings_obj.sqlite_db_path)
+        repository = IngestJobRepository()
         await asyncio.to_thread(repository.create, job_id, request, principal["user_id"])
         await get_ingest_job_manager().enqueue(job_id)
         return IngestJobResponse(job_id=job_id, status="queued", current_step="queued")
@@ -424,6 +304,12 @@ async def get_ingest_options(principal: dict = Depends(get_current_principal)):
         ),
         # 2026.10.19(sooyeon.choi) 추가 - 문서 목록 [최신본 변경] 사용 여부
         "version_replace_enabled": bool(getattr(get_settings(), "document_version_replace_enabled", True)),
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 사용 여부·확장자·크기 상한(off면 빈 목록)
+        "drawing_parse_mode": getattr(get_settings(), "drawing_parse_mode", "off"),
+        "drawing_ingest_extensions": (
+            sorted(DRAWING_INGEST_EXTENSIONS) if getattr(get_settings(), "drawing_parse_mode", "off") == "backend" else []
+        ),
+        "drawing_max_upload_mb": int(getattr(get_settings(), "drawing_max_upload_mb", 100)),
     }
 
 
@@ -479,6 +365,78 @@ async def list_collections(principal: dict = Depends(get_current_principal)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# 2026.11.09(sooyeon.choi) 추가 - 문서 행 → DocumentItem 변환
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 현재 버전 summary_json.drawing에서 목록 표시 값만 고른다
+def _drawing_summaries(document_ids: List[str]) -> dict:
+    ids = [doc_id for doc_id in document_ids if doc_id]
+    if not ids:
+        return {}
+    placeholders = ", ".join("?" for _ in ids)
+    rows = get_database_manager().execute_query(
+        f"SELECT v.document_id, v.summary_json FROM tb_documents d "
+        f"JOIN tb_document_versions v ON v.document_id = d.document_id AND v.version_no = d.version_no "
+        f"WHERE d.document_id IN ({placeholders})",
+        tuple(ids),
+    )
+    out = {}
+    for row in rows:
+        summary = row["summary_json"]
+        summary = json.loads(summary) if isinstance(summary, str) else (summary or {})
+        drawing = summary.get("drawing")
+        if not drawing:
+            continue
+        out[row["document_id"]] = {
+            "part_no": drawing.get("part_no"),
+            "part_name": drawing.get("part_name"),
+            "rev": drawing.get("rev"),
+            "sheet_size": drawing.get("sheet_size"),
+            "warn_count": drawing.get("warn_count", 0),
+            "needs_review": bool(drawing.get("needs_review")),
+            "review_status": (drawing.get("review") or {}).get("status", "pending"),
+            "search_status": drawing.get("search_status", "not_indexed"),
+        }
+    return out
+
+
+def _to_document_item(d: dict, principal: dict, pending: dict, states: dict) -> DocumentItem:
+    document_id = d.get("document_id")
+    # 2026.06.30(sooyeon.choi) 추가 - 관리자는 전체, 사용자는 본인 문서만 개별 삭제 가능(수정 가능 여부도 같은 규칙)
+    can_manage = bool(principal.get("is_admin") or d.get("uploaded_by") == principal["user_id"])
+    pending_version_no, pending_job_id = pending.get(document_id, (None, None))
+    state = states.get(document_id, {})
+    return DocumentItem(
+        document_id=d.get("document_id", ""),
+        filename=(
+            d.get("filename")
+            or d.get("original_filename")
+            or d.get("title")
+            or os.path.basename(d.get("source_path", ""))
+        ),
+        collection_name=d.get("collection_name") or d.get("source_collection", ""),
+        doc_type=d.get("doc_type") or d.get("document_type"),
+        requested_doc_type=d.get("requested_doc_type") or "auto",
+        doc_type_source=d.get("doc_type_source"),
+        total_pages=d.get("total_pages"),
+        chunk_count=d.get("chunk_count"),
+        parser_type=d.get("parser_type"),
+        # 2026.06.16(sooyeon.choi) 수정 - upload_timestamp → created_at (v4 필드명)
+        upload_timestamp=format_kst_datetime(
+            d.get("upload_timestamp") or d.get("created_at")
+        ),
+        uploaded_by=d.get("uploaded_by"),
+        can_delete=can_manage,
+        # 2026.10.19(sooyeon.choi) 추가 - 모델명·현재 버전(version_no)·최근 변경일(updated_at, KST)
+        product_model=d.get("product_model"),
+        version_no=d.get("version_no"),
+        updated_at=format_kst_datetime(d.get("updated_at") or d.get("created_at")),
+        can_edit=can_manage,
+        pending_version_no=pending_version_no,
+        pending_job_id=pending_job_id,
+        activation_revision=state.get("activation_revision"),
+        pending_operation=state.get("pending_operation"),
+    )
+
+
 @router.get("/documents", response_model=DocumentsResponse)
 async def list_documents(
     collection_name: Optional[str] = None,
@@ -492,56 +450,27 @@ async def list_documents(
         # 비관리자: accessible_collections + security_level 계층 필터 적용
         user_filter = _get_user_accessible(principal)
         if user_filter is not None:
-            accessible, allowed_levels = user_filter
+            # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 공통 함수 사용
             raw_docs = [
                 d for d in raw_docs
-                if d.get("source_collection", d.get("collection_name", "")) in accessible
-                and d.get("security_level", "public") in allowed_levels
+                if in_document_scope(
+                    user_filter,
+                    d.get("source_collection", d.get("collection_name", "")),
+                    d.get("security_level", "public"),
+                )
             ]
         # 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중인 버전(문서별 최대 1개)
         pending = await asyncio.to_thread(_pending_versions, [d.get("document_id") for d in raw_docs])
         # 2026.11.06(sooyeon.choi) 수정 - 적용 순번·진행 중 변경 작업(복원 포함)
         states = await asyncio.to_thread(_document_states, [d.get("document_id") for d in raw_docs])
-        docs = []
-        for d in raw_docs:
-            docs.append(DocumentItem(
-                document_id=d.get("document_id", ""),
-                filename=(
-                    d.get("filename")
-                    or d.get("original_filename")
-                    or d.get("title")
-                    or os.path.basename(d.get("source_path", ""))
-                ),
-                collection_name=d.get("collection_name") or d.get("source_collection", ""),
-                doc_type=d.get("doc_type") or d.get("document_type"),
-                requested_doc_type=d.get("requested_doc_type") or "auto",
-                doc_type_source=d.get("doc_type_source"),
-                total_pages=d.get("total_pages"),
-                chunk_count=d.get("chunk_count"),
-                parser_type=d.get("parser_type"),
-                # 2026.06.16(sooyeon.choi) 수정 - upload_timestamp → created_at (v4 필드명)
-                upload_timestamp=format_kst_datetime(
-                    d.get("upload_timestamp") or d.get("created_at")
-                ),
-                # 2026.06.30(sooyeon.choi) 추가 - 관리자는 전체, 사용자는 본인 문서만 개별 삭제 가능
-                uploaded_by=d.get("uploaded_by"),
-                can_delete=bool(
-                    principal.get("is_admin")
-                    or d.get("uploaded_by") == principal["user_id"]
-                ),
-                # 2026.10.19(sooyeon.choi) 추가 - 모델명·현재 버전(version_no)·최근 변경일(updated_at, KST)
-                product_model=d.get("product_model"),
-                version_no=d.get("version_no"),
-                updated_at=format_kst_datetime(d.get("updated_at") or d.get("created_at")),
-                can_edit=bool(
-                    principal.get("is_admin")
-                    or d.get("uploaded_by") == principal["user_id"]
-                ),
-                pending_version_no=pending.get(d.get("document_id"), (None, None))[0],
-                pending_job_id=pending.get(d.get("document_id"), (None, None))[1],
-                activation_revision=states.get(d.get("document_id"), {}).get("activation_revision"),
-                pending_operation=states.get(d.get("document_id"), {}).get("pending_operation"),
-            ))
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서의 품번·Rev·경고 수·검수 상태(현재 버전 기준)
+        drawings = await asyncio.to_thread(
+            _drawing_summaries, [d.get("document_id") for d in raw_docs if d.get("doc_type") == "drawing"]
+        )
+        # 2026.11.09(sooyeon.choi) 수정 - 응답 항목 변환을 _to_document_item으로 분리
+        docs = [_to_document_item(d, principal, pending, states) for d in raw_docs]
+        for item in docs:
+            item.drawing = drawings.get(item.document_id)
         return DocumentsResponse(documents=docs, total=len(docs))
     except Exception as e:
         logger.error(f"문서 목록 조회 실패: {e}")
@@ -556,28 +485,9 @@ async def update_document_model_name(
     body: ModelNameUpdateRequest,
     principal: dict = Depends(get_current_principal),
 ):
-    db = get_database_manager()
-    doc_rows = await asyncio.to_thread(
-        db.execute_query,
-        """
-        SELECT d.uploaded_by, d.security_level, c.qdrant_name AS source_collection
-        FROM tb_documents d
-        LEFT JOIN tb_collections c ON c.collection_id = d.collection_id
-        WHERE d.document_id = ? AND d.deleted_at IS NULL
-        """,
-        (document_id,),
-    )
-    if not doc_rows:
-        raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
-    doc_info = dict(doc_rows[0])
-    user_filter = _get_user_accessible(principal)
-    if user_filter is not None:
-        accessible, allowed_levels = user_filter
-        if (
-            doc_info.get("source_collection") not in accessible
-            or (doc_info.get("security_level") or "public") not in allowed_levels
-        ):
-            raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
+    # 2026.11.09(sooyeon.choi) 수정 - 문서 조회·열람 판정을 _load_visible_document로 통일
+    #   (없음·삭제·열람 불가는 404, 권한 조회는 스레드에서 실행)
+    doc_info = await asyncio.to_thread(_load_visible_document, document_id, principal)
     if not principal.get("is_admin") and doc_info.get("uploaded_by") != principal["user_id"]:
         raise HTTPException(status_code=403, detail="본인이 업로드한 문서만 모델명을 수정할 수 있습니다.")
     try:
@@ -674,13 +584,11 @@ def _load_visible_document(document_id: str, principal: dict) -> dict:
         raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
     doc = dict(rows[0])
     user_filter = _get_user_accessible(principal)
-    if user_filter is not None:
-        accessible, allowed_levels = user_filter
-        if (
-            doc.get("source_collection") not in accessible
-            or (doc.get("security_level") or "public") not in allowed_levels
-        ):
-            raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
+    # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 공통 함수 사용
+    if user_filter is not None and not in_document_scope(
+        user_filter, doc.get("source_collection"), doc.get("security_level") or "public"
+    ):
+        raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
     return doc
 
 
@@ -702,13 +610,13 @@ def _register_version_job(document_id: str, job_id: str, request: dict, created_
         current = repo.in_progress_version(document_id)
         if current:
             raise _VersionConflict(
-                f"JOB_IN_PROGRESS: 이 문서는 v{current['version_no']} 최신본 변경을 처리 중입니다. 완료 후 다시 시도하세요."
+                f"JOB_IN_PROGRESS: 이 문서는 v{current['version_no']} 새 버전 등록을 처리 중입니다. 완료 후 다시 시도하세요."
             )
-        # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 문서를 점유 중이면 거부(공통 점유 표식, B-01)
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 문서를 점유 중이면 거부(공통 점유 표식)
         if repo.pending_job_id(document_id):
             raise _VersionConflict("JOB_IN_PROGRESS: 이 문서는 다른 변경 작업을 처리 중입니다. 완료 후 다시 시도하세요.")
         if file_sha256 and file_sha256 == repo.active_version_sha(document_id):
-            raise _VersionConflict("DUPLICATE_FILE: 현재 최신본과 같은 파일입니다.")
+            raise _VersionConflict("DUPLICATE_FILE: 현재 적용 중인 버전과 같은 파일입니다.")
         version_no = repo.next_version_no(document_id)
         request["version_no"] = version_no
         IngestJobRepository().create(job_id, request, created_by)
@@ -731,13 +639,22 @@ async def replace_document_version(
     settings_obj = get_settings()
     try:
         if not getattr(settings_obj, "document_version_replace_enabled", True):
-            raise HTTPException(status_code=403, detail="최신본 변경 기능이 꺼져 있습니다.")
+            raise HTTPException(status_code=403, detail="새 버전 등록 기능이 꺼져 있습니다.")
         doc = await asyncio.to_thread(_load_visible_document, document_id, principal)
         if not principal.get("is_admin") and doc.get("uploaded_by") != principal["user_id"]:
             raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
 
         # 파서·문서 유형은 기존 문서 설정을 따르되, 새 파일 형식에 맞지 않으면 기본값(docling·자동)
         ext_guess = (file.filename or "").rsplit(".", 1)[-1].lower()
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서에는 도면 파일만, 도면이 아닌 문서에는 도면 파일을 받지 않는다
+        drawing_doc = doc.get("parser_type") == ROUTE_DRAWING_INGEST
+        drawing_file = ext_guess in DRAWING_INGEST_EXTENSIONS
+        if drawing_doc != drawing_file:
+            raise HTTPException(
+                status_code=400,
+                detail=("도면 문서에는 DWG·DXF 파일만 새 버전으로 등록할 수 있습니다." if drawing_doc
+                        else "도면 파일은 도면 문서의 새 버전으로만 등록할 수 있습니다. 새 문서로 올려 주세요."),
+            )
         parser_type = doc.get("parser_type") if doc.get("parser_type") == "pdfplumber" and ext_guess == "pdf" else "docling"
         document_type = doc.get("requested_doc_type") or "auto"
         try:
@@ -756,7 +673,8 @@ async def replace_document_version(
             file_path=tmp_path,
             filename=file.filename,
             collection_name=doc.get("source_collection"),
-            parser_type=parser_type,
+            # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서의 새 버전도 도면 처리기
+            parser_type=ROUTE_DRAWING_INGEST if document_type == "drawing" else parser_type,
             document_type=document_type,
             chunk_size=None,
             uploaded_by=principal["user_id"],
@@ -789,7 +707,7 @@ async def replace_document_version(
         raise
     except Exception as e:
         logger.error(f"최신본 변경 접수 실패: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"최신본 변경 접수 중 오류가 발생했습니다: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"새 버전 등록 접수 중 오류가 발생했습니다: {str(e)}")
     finally:
         await file.close()
 
@@ -809,6 +727,9 @@ async def list_document_versions(document_id: str, principal: dict = Depends(get
         settings=settings_obj, principal=principal,
         pending_job=pending_operation or (extra["in_progress"] or None),
     )
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서는 모든 이전 버전에 같은 사유를 보여 준다
+    if doc.get("parser_type") == ROUTE_DRAWING_INGEST:
+        doc_code = "DRAWING_NOT_SUPPORTED"
     verdicts = evaluate_versions(
         rows, doc_code=doc_code, profile_id=extra["profile_id"], pending_busy=bool(pending_operation),
     )
@@ -844,7 +765,8 @@ async def list_document_versions(document_id: str, principal: dict = Depends(get
         current_version_no=doc.get("version_no") or 1,
         versions=items,
         # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원 화면 값
-        restore_supported=restore_enabled(settings_obj),
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서는 버전 적용 화면을 숨긴다(버전 행 사유는 DRAWING_NOT_SUPPORTED)
+        restore_supported=restore_enabled(settings_obj) and doc.get("parser_type") != ROUTE_DRAWING_INGEST,
         collection_name=doc.get("source_collection"),
         collection_display_name=extra["collection_display_name"],
         current_original_filename=doc.get("original_filename"),
@@ -992,14 +914,11 @@ async def open_manual_display_file(
     )
 
 
-@router.get("/documents/{document_id}/file")
-async def open_original_document(
-    document_id: str,
-    principal: dict = Depends(get_current_principal),
-):
-    """원본 문서 파일을 브라우저에서 열 수 있도록 반환한다."""
+# 2026.10.28(woojin.jung) 추가 - 원본 다운로드와 시트 미리보기에 공통 적용할 문서 권한·경로 검증
+def _resolve_accessible_document_file(document_id: str, principal: dict) -> tuple[dict, Path]:
+    """문서 권한과 저장 경로를 검증해 메타데이터와 원본 파일 경로를 반환한다."""
     settings = get_settings()
-    db = get_database_manager(settings.sqlite_db_path)
+    db = get_database_manager()
     doc_rows = db.execute_query(
         """
         SELECT d.document_id, d.source_path, d.original_filename, d.security_level,
@@ -1016,13 +935,11 @@ async def open_original_document(
 
     doc_info = dict(doc_rows[0])
     user_filter = _get_user_accessible(principal)
-    if user_filter is not None:
-        accessible, allowed_levels = user_filter
-        if (
-            doc_info.get("source_collection") not in accessible
-            or doc_info.get("security_level", "public") not in allowed_levels
-        ):
-            raise HTTPException(status_code=403, detail="해당 문서에 접근 권한이 없습니다.")
+    # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 공통 함수 사용(이 API는 404가 아니라 403)
+    if user_filter is not None and not in_document_scope(
+        user_filter, doc_info.get("source_collection"), doc_info.get("security_level", "public")
+    ):
+        raise HTTPException(status_code=403, detail="해당 문서에 접근 권한이 없습니다.")
 
     # 2026.10.30(sooyeon.choi) 수정 - 백엔드 소스 폴더 기준 → 저장할 때와 같은 저장 폴더 기준으로 경로를 푼다.
     #   운영은 소스(/app)와 데이터(/data)가 따로 마운트되어 소스 기준으로는 파일을 찾지 못했다("원본 문서를 열 수 없습니다").
@@ -1034,6 +951,17 @@ async def open_original_document(
     if not file_path.is_file():
         logger.warning(f"[Ingest] 원본 파일 없음: document_id={document_id}, path={file_path}")
         raise HTTPException(status_code=404, detail="원본 파일을 찾을 수 없습니다.")
+    return doc_info, file_path
+
+
+@router.get("/documents/{document_id}/file")
+async def open_original_document(
+    document_id: str,
+    principal: dict = Depends(get_current_principal),
+):
+    """원본 문서 파일을 브라우저에서 열 수 있도록 반환한다."""
+    # 2026.10.28(woojin.jung) 수정 - 원본 파일과 시트 미리보기가 동일한 문서 권한·경로 검사를 공통 사용
+    doc_info, file_path = _resolve_accessible_document_file(document_id, principal)
 
     filename = doc_info.get("original_filename") or file_path.name
     media_type = "application/pdf" if file_path.suffix.lower() == ".pdf" else "application/octet-stream"
@@ -1042,6 +970,67 @@ async def open_original_document(
         media_type=media_type,
         headers={
             "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}",
+        },
+    )
+
+
+# 2026.10.28(woojin.jung) 추가 - 인용 시트 하나를 근거 범위 강조 PDF로 반환
+@router.get("/documents/{document_id}/sheet-preview")
+async def open_spreadsheet_sheet_preview(
+    document_id: str,
+    sheet_name: str = Query(min_length=1, max_length=255),
+    source_range: str = Query(
+        min_length=2,
+        max_length=64,
+        pattern=r"^(?:[A-Za-z]{1,3}[1-9][0-9]*(?::[A-Za-z]{1,3}[1-9][0-9]*)?|[1-9][0-9]*:[1-9][0-9]*)$",
+    ),
+    principal: dict = Depends(get_current_principal),
+):
+    """답변 근거 범위를 강조한 단일 Excel 시트 PDF를 반환한다."""
+    doc_info, file_path = _resolve_accessible_document_file(document_id, principal)
+    if file_path.suffix.lower() not in {".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"}:
+        raise HTTPException(status_code=422, detail="Excel 문서만 시트 미리보기를 생성할 수 있습니다.")
+
+    settings = get_settings()
+    try:
+        # 2026.10.28(woojin.jung) 추가 - 동시 변환 수를 제한하고 UNO Worker를 이벤트 루프 밖에서 실행
+        async with _sheet_preview_semaphore:
+            pdf_bytes = await asyncio.to_thread(
+                create_sheet_preview,
+                file_path,
+                sheet_name.strip(),
+                source_range.strip(),
+                work_root=Path(settings.sheet_preview_work_root),
+                python_executable=settings.sheet_preview_python,
+                soffice_executable=settings.sheet_preview_soffice,
+                timeout_seconds=settings.sheet_preview_timeout_seconds,
+                cache_enabled=settings.sheet_preview_cache_enabled,
+                cache_ttl_hours=settings.sheet_preview_cache_ttl_hours,
+                cache_max_bytes=settings.sheet_preview_cache_max_bytes,
+            )
+    except SheetPreviewSheetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SheetPreviewValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SheetPreviewTimeoutError as exc:
+        logger.error("시트 미리보기 변환 시간 초과 document_id=%s: %s", document_id, exc)
+        raise HTTPException(status_code=504, detail="시트 미리보기 생성 시간이 초과되었습니다.") from exc
+    except SheetPreviewError as exc:
+        logger.exception("시트 미리보기 생성 실패 document_id=%s", document_id)
+        raise HTTPException(status_code=500, detail="시트 미리보기를 생성할 수 없습니다.") from exc
+    except Exception as exc:
+        logger.exception("시트 미리보기 처리 중 예기치 않은 오류 document_id=%s", document_id)
+        raise HTTPException(status_code=500, detail="시트 미리보기를 생성할 수 없습니다.") from exc
+
+    filename = doc_info.get("original_filename") or file_path.name
+    preview_filename = f"{Path(filename).stem}_{sheet_name.strip()}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(preview_filename)}",
+            # 2026.10.28(woojin.jung) 수정 - 범위·강조 방식 변경 후 이전 PDF가 재사용되지 않도록 캐시 방지
+            "Cache-Control": "private, no-store, max-age=0",
         },
     )
 
@@ -1057,7 +1046,7 @@ async def delete_document(
     """문서를 삭제한다 (Qdrant 포인트 + tb_documents Soft Delete)."""
     # 삭제 전 문서 정보 조회 (권한 검증 + 이력 기록용)
     settings = get_settings()
-    db = get_database_manager(settings.sqlite_db_path)
+    db = get_database_manager()
     doc_rows = db.execute_query(
         """
         SELECT d.document_id, d.uploaded_by, d.original_filename, d.security_level,
@@ -1093,12 +1082,12 @@ async def delete_document(
             detail="본인이 업로드한 문서만 개별 삭제할 수 있습니다.",
         )
     # 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중에는 삭제하지 않는다(처리 완료·실패 후 삭제)
-    # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 점유 중이어도 삭제하지 않는다(B-02)
+    # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 점유 중이어도 삭제하지 않는다
     if not doc_info.get("deleted_at") and (
         await asyncio.to_thread(_pending_versions, [document_id])
         or (await asyncio.to_thread(_document_states, [document_id])).get(document_id, {}).get("pending_operation")
     ):
-        raise HTTPException(status_code=409, detail="최신본 변경을 처리 중인 문서는 삭제할 수 없습니다. 처리가 끝난 뒤 다시 시도하세요.")
+        raise HTTPException(status_code=409, detail="새 버전 등록을 처리 중인 문서는 삭제할 수 없습니다. 처리가 끝난 뒤 다시 시도하세요.")
     try:
         service = IngestService()
         result = service.delete_document(

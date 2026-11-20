@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>도면 업로드 목업 v0.6</title>
+<!--
+  UI-12 문서 관리 — 도면 업로드(Phase 6 1단계: 파싱·저장·검수) 목업 v0.6 (2026-11-12)
+  기준: docs/design/drawing/도면업로드_화면설계_현행기준_v1.0.md, 현행 AdminView.vue(2026-11-11 작업 폴더)
+  v0.5(mockups/admin_UI-12_문서관리_도면처리_목업_20261109_v0.5.html, 읽기 전용)와의 차이
+    - 현행 화면 배치: 대화 주제 칩 필터, "현재 버전"·"새 버전 등록" 문구, 대화상자 Esc 닫기·바깥 클릭 무시
+    - 처리기별 단계 칸(도면 5칸), 목록 3줄째 품번·Rev, 상태 칩, 유형 칩 "도면 N"
+    - 같은 품번: 선택 상자 → 안내(D-01), 필수 항목 누락: 입력 → 확인 창 후 검수 완료
+    - 풍선·하위 도면·치수 탭, [다시 처리] 제외
+  도면 이미지·품번·품명은 모두 합성(가상) 값이다. 실제 샘플 도면·추출값을 넣지 않는다(CLAUDE.md 절대 규칙 3).
+-->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+<style>
+:root{--blue:#2563eb;--line:#e2e8f0;--muted:#64748b;--ink:#1e293b;--new:#f97316}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;background:#f1f5f9;color:#374151;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+.admin-layout{display:flex;min-height:100vh}
+.sidebar{width:260px;flex:none;background:#1e293b;color:#e2e8f0;padding:1.25rem 1rem}
+.logo{font-weight:800;font-size:1.15rem;color:#fff;margin:0 .5rem 1.5rem;letter-spacing:.5px}
+.nav-section-title{color:#64748b;font-size:.75rem;margin:1rem .5rem .4rem}
+.nav-item{display:flex;gap:.6rem;align-items:center;padding:.6rem .75rem;border-radius:8px;color:#cbd5e1;font-size:.88rem}
+.nav-item.active{background:#334155;color:#fff}
+.admin-main{flex:1;min-width:0}
+.admin-header{background:#fff;border-bottom:1px solid var(--line);padding:1.25rem 2rem;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.admin-header h1{font-size:1.25rem;color:#0f172a;margin:0 0 .25rem}
+.admin-header p{font-size:.85rem;color:var(--muted);margin:0}
+.collections-badge{display:flex;gap:6px;align-items:center;background:#eff6ff;color:#1d4ed8;padding:.4rem .8rem;border-radius:999px;font-size:.8rem}
+.admin-content{padding:1.5rem 2rem 6rem;display:flex;flex-direction:column;gap:1.25rem}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.5rem}
+.card-title{font-size:.95rem;color:var(--ink);font-weight:700;display:flex;gap:8px;align-items:center;margin-bottom:1rem}
+.drop-zone{border:2px dashed #cbd5e1;border-radius:10px;padding:2rem;text-align:center;color:#94a3b8}
+.drop-zone.has-file{border-color:#22c55e;background:#f0fdf4;border-style:solid}
+.drop-icon{font-size:2rem;margin-bottom:.5rem;color:#94a3b8}
+.drop-placeholder p{margin:.25rem 0;color:#475569}
+.batch-selection{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-top:.6rem}
+.btn-text{border:none;background:none;color:#475569;font-size:.8rem;padding:.2rem .4rem;border-radius:6px}
+.btn-text:hover{background:#f1f5f9}
+.btn-text.danger{color:#dc2626}
+.btn-text.primary{color:var(--blue);font-weight:600}
+.upload-form{margin-top:1rem}
+.form-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:.82rem;color:#374151;font-weight:600}
+.required{color:#ef4444}
+.form-group select{border:1px solid #d1d5db;border-radius:8px;padding:.6rem .75rem;font-size:.88rem;color:#374151;background:#fff}
+.form-group select:disabled{background:#f3f4f6;color:#6b7280}
+.form-hint{color:var(--muted);font-size:.78rem;line-height:1.45}
+.btn-upload{width:100%;margin-top:1rem;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:.8rem 1.5rem;font-size:.9rem;font-weight:600}
+.btn-upload:disabled{background:#94a3b8}
+.batch-progress{padding-top:1.25rem;margin-top:1.25rem;border-top:1px solid var(--line);font-size:.875rem}
+.batch-progress-header{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.6rem}
+.batch-progress-title{font-size:.9rem;margin:0 .4rem 0 0;color:var(--ink)}
+.summary-chip{border-radius:999px;padding:.15rem .6rem;font-size:.78rem;background:#f1f5f9;color:#475569}
+.summary-chip.running{background:#dbeafe;color:var(--blue)}
+.summary-chip.failed,.summary-chip.unknown{background:#fee2e2;color:#dc2626}
+.summary-chip.review{background:#ffedd5;color:#c2410c}
+.overall-progress{height:6px;border-radius:999px;background:#e2e8f0;display:flex;overflow:hidden;margin-bottom:.8rem}
+.overall-progress span.completed{background:#22c55e}.overall-progress span.failed{background:#ef4444}.overall-progress span.running{background:#3b82f6}
+.upload-file-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px}
+.upload-file-head{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,2fr) 90px;gap:1rem;padding:.5rem 1rem;background:#f8fafc;color:var(--muted);font-size:.78rem;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.upload-file{padding:.75rem 1rem;border-bottom:1px solid var(--line)}
+.upload-file:last-child{border-bottom:none}
+.upload-file.failed{background:#fffafa}
+.upload-file-main{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,2fr) 90px;gap:1rem;align-items:center}
+.upload-file-name{display:flex;gap:.5rem;align-items:center;min-width:0}
+.upload-file-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.86rem;color:var(--ink)}
+.upload-file-size{color:#94a3b8;font-size:.75rem;white-space:nowrap}
+.ico-drawing{color:#0f766e}
+.model-input{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:.35rem .5rem;font-size:.82rem}
+.model-locked{font-size:.82rem;color:#334155}
+.model-locked-label{color:#94a3b8;font-size:.72rem;margin-right:.35rem}
+.upload-file-status{display:flex;flex-direction:column;gap:4px}
+.upload-state{align-self:flex-start;border-radius:20px;padding:.2rem .6rem;font-size:.78rem;background:#f1f5f9;color:#475569}
+.upload-state.running{background:#dbeafe;color:var(--blue)}
+.upload-state.completed{background:#dcfce7;color:#15803d}
+.upload-state.review{background:#ffedd5;color:#c2410c}
+.upload-state.failed{background:#fee2e2;color:#dc2626}
+.upload-steps{display:flex;gap:4px;padding:0;margin:0;list-style:none}
+.upload-steps li{flex:1;height:5px;border-radius:999px;background:#e2e8f0}
+.upload-steps li.done{background:#22c55e}.upload-steps li.active{background:#3b82f6}.upload-steps li.error{background:#ef4444}
+.upload-step-label{color:var(--muted);font-size:.78rem}
+.upload-file-message{margin:.5rem 0 0;font-size:.8rem;color:#475569;display:flex;gap:.4rem;align-items:flex-start;line-height:1.45}
+.upload-file-message.error{color:#dc2626}
+.upload-file-message.info{color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:.45rem .6rem}
+.batch-result{margin-top:.55rem;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:.45rem .7rem;font-size:.8rem}
+.batch-result summary{cursor:pointer;color:#334155}
+.batch-result dl{display:grid;grid-template-columns:110px 1fr;gap:.25rem .75rem;margin:.6rem 0 .3rem}
+.batch-result dt{color:var(--muted)}.batch-result dd{margin:0;color:var(--ink)}
+.card-title-row{display:flex;justify-content:space-between;align-items:center}
+.btn-refresh{border:1px solid var(--line);background:#fff;border-radius:8px;width:34px;height:34px;color:#475569}
+.topic-filter-bar{display:flex;flex-wrap:wrap;gap:.5rem;margin:-.25rem 0 1rem}
+.topic-chip{display:inline-flex;gap:.4rem;align-items:center;padding:.3rem .45rem .3rem .75rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:#475569;font-size:.82rem}
+.topic-chip.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.topic-chip-count{padding:0 .4rem;border-radius:999px;background:#f1f5f9;color:var(--muted);font-size:.74rem;font-weight:600}
+.topic-chip.active .topic-chip-count{background:rgba(255,255,255,.22);color:#fff}
+.topic-sep{width:1px;background:var(--line);margin:0 .25rem}
+.topic-chip.type i{color:#0f766e}.topic-chip.type.active i{color:#fff}
+.table-scroll{overflow-x:auto}
+.doc-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:1240px}
+.doc-table th{background:#f8fafc;padding:.6rem .75rem;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
+.doc-table td{padding:.7rem .75rem;border-bottom:1px solid #f1f5f9;color:#374151;vertical-align:top}
+.doc-table tr:last-child td{border-bottom:none}
+.model-name{font-weight:600;color:var(--ink);display:block}
+.filename-cell-content{display:flex;gap:.4rem;align-items:center;margin-top:3px}
+.filename-link{border:none;background:none;padding:0;color:var(--blue);font-size:.8rem;text-decoration:underline;text-underline-offset:2px}
+.drawing-meta{margin-top:3px;font-size:.76rem;color:#0f766e;font-family:Consolas,monospace}
+.badge{display:inline-block;white-space:nowrap;padding:.15rem .55rem;border-radius:999px;font-size:.75rem;font-weight:600}
+.badge.spreadsheet{background:#dcfce7;color:#166534}.badge.manual{background:#ede9fe;color:#5b21b6}
+.badge.drawing{background:#ccfbf1;color:#0f766e}
+.state-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.state-chip{font-size:.7rem;padding:.05rem .4rem;border-radius:4px;background:#f1f5f9;color:var(--muted);white-space:nowrap}
+.state-chip.pending{background:#fff7ed;color:#c2410c}
+.state-chip.reviewed{background:#dcfce7;color:#15803d}
+.state-chip.warn{background:#fee2e2;color:#dc2626}
+.topic-link{white-space:nowrap;border:none;background:none;padding:.1rem .4rem;border-radius:4px;color:#334155;font-size:.84rem}
+.version-badge{background:#eff6ff;color:#1d4ed8;border-radius:6px;padding:.1rem .45rem;font-size:.76rem;font-weight:700}
+.document-actions{display:flex;gap:.35rem;flex-wrap:nowrap}
+.btn-doc-action{display:inline-flex;gap:.3rem;align-items:center;border:1px solid var(--line);background:#fff;border-radius:6px;padding:.3rem .55rem;font-size:.76rem;color:#334155;white-space:nowrap}
+.btn-doc-action.result{border-color:#99f6e4;color:#0f766e;background:#f0fdfa}
+.btn-delete-doc{border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:6px;width:30px}
+.btn-doc-action:disabled,.btn-delete-doc:disabled{opacity:.45}
+/* 대화상자 */
+.dialog-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.dialog-overlay[hidden]{display:none}
+.dialog-box{background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.25);width:min(1040px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column}
+.dialog-box.small{width:min(460px,100%);padding:1.4rem}
+.dialog-head{display:flex;justify-content:space-between;align-items:flex-start;padding:1.2rem 1.4rem .6rem}
+.dialog-title{font-size:1.02rem;font-weight:700;color:var(--ink);display:flex;gap:.5rem;align-items:center}
+.dialog-sub{font-size:.8rem;color:var(--muted);margin-top:.3rem}
+.dialog-close{border:none;background:none;font-size:1.3rem;color:#94a3b8;line-height:1}
+.dialog-banner{margin:0 1.4rem .6rem;padding:.6rem .8rem;border-radius:8px;font-size:.82rem;display:flex;gap:.5rem;align-items:flex-start;line-height:1.5}
+.dialog-banner.warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.dialog-banner.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.tabs{display:flex;gap:.2rem;padding:0 1.4rem;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{border:none;background:none;padding:.6rem .8rem;font-size:.84rem;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:700}
+.tab .cnt{font-size:.72rem;background:#fee2e2;color:#dc2626;border-radius:999px;padding:0 .35rem;margin-left:.2rem}
+.tab-body{padding:1.1rem 1.4rem;overflow:auto;flex:1}
+.summary-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1.25rem}
+.thumb-main{border:1px solid var(--line);border-radius:10px;background:#fff;cursor:zoom-in;display:block;width:100%;padding:0}
+.thumb-main svg{display:block;width:100%;height:auto}
+.thumb-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.5rem}
+.thumb-crop{border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px;cursor:zoom-in;text-align:left}
+.thumb-crop svg{display:block;width:100%;height:70px}
+.thumb-crop span{display:block;font-size:.72rem;color:var(--muted);margin-top:2px}
+.kv{width:100%;border-collapse:collapse;font-size:.82rem}
+.kv th{width:110px;text-align:left;color:var(--muted);font-weight:500;padding:.38rem .5rem;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.kv td{padding:.38rem .5rem;border-bottom:1px solid #f1f5f9;color:var(--ink)}
+.kv td.missing{color:#dc2626;font-weight:600}
+.kv td.mono{font-family:Consolas,monospace}
+.sec-title{font-size:.82rem;font-weight:700;color:#334155;margin:1rem 0 .4rem}
+.grid-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.grid-table th{background:#f8fafc;text-align:left;padding:.45rem .55rem;border:1px solid var(--line);color:#475569;font-weight:600;white-space:nowrap}
+.grid-table td{padding:.45rem .55rem;border:1px solid var(--line)}
+.empty-note{color:var(--muted);font-size:.84rem;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem;text-align:center}
+.warn-group{border:1px solid var(--line);border-radius:10px;margin-bottom:.8rem;overflow:hidden}
+.warn-group h4{margin:0;padding:.55rem .8rem;font-size:.82rem;background:#f8fafc;border-bottom:1px solid var(--line)}
+.warn-item{display:grid;grid-template-columns:170px 1fr 60px;gap:.75rem;padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-size:.8rem}
+.warn-item:last-child{border-bottom:none}
+.warn-item code{font-size:.74rem;color:#475569}
+.dialog-actions{display:flex;justify-content:flex-end;gap:.5rem;padding:.9rem 1.4rem;border-top:1px solid var(--line);flex-wrap:wrap}
+.btn-cancel{border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:.55rem 1rem;font-size:.84rem;color:#374151}
+.btn-primary{border:none;background:var(--blue);color:#fff;border-radius:8px;padding:.55rem 1rem;font-size:.84rem;font-weight:600}
+.btn-primary.green{background:#16a34a}
+.btn-ghost-disabled{border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;border-radius:8px;padding:.55rem 1rem;font-size:.84rem}
+.btn-ghost-disabled small{font-size:.7rem;margin-left:.3rem}
+.dialog-hint{color:var(--muted);font-size:.82rem;line-height:1.55}
+.viewer{background:#0f172a;padding:1rem;border-radius:0 0 14px 14px;flex:1;overflow:auto}
+.viewer svg{display:block;margin:0 auto;background:#fff;max-width:100%;height:auto}
+/* 버전 이력 */
+.version-row{display:flex;justify-content:space-between;gap:1rem;border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;margin-bottom:.5rem;font-size:.84rem}
+.version-row.current{border-color:#93c5fd;background:#eff6ff}
+.version-reason{margin:.35rem 0 0;font-size:.78rem;color:var(--muted)}
+/* 데모 패널 */
+.demo{position:fixed;right:16px;bottom:16px;z-index:80;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:.8rem 1rem;width:330px;font-size:.8rem;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.demo strong{display:block;margin-bottom:.5rem;color:#fff}
+.demo label{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.4rem}
+.demo select{width:200px;font-size:.78rem;padding:.25rem;border-radius:6px}
+.demo p{margin:.5rem 0 0;color:#cbd5e1;line-height:1.5}
+.demo .demo-toggle{display:flex;justify-content:flex-start;gap:.4rem}
+.demo-fold{position:absolute;top:.55rem;right:.6rem;border:none;background:#334155;color:#e2e8f0;border-radius:6px;font-size:.72rem;padding:.15rem .45rem}
+.demo.collapsed{width:auto}.demo.collapsed>*:not(strong):not(.demo-fold){display:none}.demo.collapsed strong{margin:0 4rem 0 0}
+/* 변경점 표시 */
+body.show-new .nw{outline:2px dashed var(--new);outline-offset:2px;position:relative}
+body.show-new .nw::after{content:attr(data-new);position:absolute;top:-10px;right:-4px;transform:translateY(-100%);background:var(--new);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;white-space:nowrap;z-index:5;pointer-events:none}
+@media (max-width:900px){
+  .sidebar{display:none}
+  .admin-header,.admin-content{padding-left:16px;padding-right:16px}
+  .form-row,.summary-grid{grid-template-columns:1fr}
+  .upload-file-head{display:none}
+  .upload-file-main{grid-template-columns:1fr}
+  .demo{left:16px;right:16px;width:auto}
+  .demo select{width:60%}
+  .warn-item{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body class="show-new">
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="logo">We.RAG</div>
+    <div class="nav-section-title">관리</div>
+    <div class="nav-item active"><i class="fa-solid fa-file-arrow-up"></i>문서 관리</div>
+    <div class="nav-item"><i class="fa-solid fa-database"></i>대화 주제 설정</div>
+    <div class="nav-item"><i class="fa-solid fa-chart-bar"></i>내 활동 현황</div>
+    <div class="nav-item"><i class="fa-solid fa-puzzle-piece"></i>챗봇 연동 설정</div>
+    <div class="nav-item"><i class="fa-solid fa-user-lock"></i>사용자 권한</div>
+    <div class="nav-item"><i class="fa-solid fa-chart-bar"></i>통계 대시보드</div>
+  </aside>
+
+  <div class="admin-main">
+    <header class="admin-header">
+      <div>
+        <h1>문서 관리</h1>
+        <p>문서를 업로드하면 파싱 → 청킹 → 임베딩 → Vector DB 저장까지 자동으로 처리됩니다.</p>
+      </div>
+      <div class="collections-badge"><i class="fa-solid fa-database"></i> 대화 주제 2개</div>
+    </header>
+
+    <div class="admin-content">
+      <!-- 업로드 카드 -->
+      <div class="card">
+        <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> 문서 업로드</div>
+        <div id="dropZone" class="drop-zone">
+          <div class="drop-placeholder">
+            <i class="fa-solid fa-file-circle-plus drop-icon"></i>
+            <p>파일을 드래그하거나 클릭하여 선택 · 최대 10개</p>
+            <span class="nw" data-new="도면 확장자 안내">PDF · DOCX · PPTX · XLSX · 이미지 · 도면(DWG·DXF)</span>
+          </div>
+        </div>
+        <div id="batchSelection" class="batch-selection" hidden></div>
+
+        <div class="upload-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>대화 주제</label>
+              <select id="topicSelect"><option>조립 작업표준</option><option>설비 매뉴얼</option></select>
+            </div>
+            <div class="form-group">
+              <label>문서 유형 <span class="required">*</span></label>
+              <select id="docTypeSelect"></select>
+              <div id="docTypeHint" class="form-hint"></div>
+            </div>
+            <div class="form-group">
+              <label>파서 선택</label>
+              <select id="parserSelect"><option>Docling API (PDF·DOCX·PPTX·이미지)</option><option>pdfplumber (PDF 전용, 빠름)</option></select>
+              <div id="parserHint" class="form-hint"></div>
+            </div>
+          </div>
+          <button id="uploadBtn" class="btn-upload"></button>
+        </div>
+
+        <section id="batchProgress" class="batch-progress" hidden>
+          <div class="batch-progress-header">
+            <h2 class="batch-progress-title">처리 현황</h2>
+            <strong id="batchCount"></strong>
+            <span id="batchChips"></span>
+          </div>
+          <div id="overall" class="overall-progress"></div>
+          <ul class="upload-file-list">
+            <li class="upload-file-head"><span>파일</span><span>모델명</span><span>상태</span><span></span></li>
+          </ul>
+          <ul id="fileList" class="upload-file-list" style="border-top:none;border-radius:0 0 10px 10px;margin-top:-1px"></ul>
+        </section>
+      </div>
+
+      <!-- 문서 목록 -->
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title"><i class="fa-solid fa-list"></i> 업로드된 문서</div>
+          <button class="btn-refresh" title="새로고침"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+        <div id="topicBar" class="topic-filter-bar" role="group" aria-label="대화 주제로 거르기"></div>
+        <div class="table-scroll">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>모델명 · 파일(현재 버전)</th><th>문서 유형</th><th>총 페이지</th><th>대화주제</th><th>업로더</th><th>파서</th><th>현재 버전</th><th>최근 변경일</th><th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="docRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 처리 결과 대화상자 -->
+<div id="resultOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1">
+    <div class="dialog-head">
+      <div>
+        <div id="resultTitle" class="dialog-title"><i class="fa-solid fa-compass-drafting" style="color:#0f766e"></i>도면 처리 결과</div>
+        <div id="resultSub" class="dialog-sub"></div>
+      </div>
+      <button class="dialog-close" aria-label="닫기" data-close="resultOverlay">×</button>
+    </div>
+    <div id="resultBanner"></div>
+    <div id="resultTabs" class="tabs" role="tablist"></div>
+    <div id="resultBody" class="tab-body"></div>
+    <div class="dialog-actions">
+      <button class="btn-ghost-disabled nw" data-new="최종 단계" disabled title="검수한 도면은 다음 단계에서 검색에 적용됩니다."><i class="fa-solid fa-magnifying-glass"></i> 검색 적용<small>다음 단계</small></button>
+      <span style="flex:1"></span>
+      <button id="reviewBtn" class="btn-primary green"></button>
+      <button class="btn-cancel" data-close="resultOverlay">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 검수 확인 (필수 항목 누락) -->
+<div id="confirmOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box small" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" tabindex="-1">
+    <div id="confirmTitle" class="dialog-title"><i class="fa-solid fa-triangle-exclamation" style="color:#f97316"></i>필수 항목 확인</div>
+    <p id="confirmText" class="dialog-hint"></p>
+    <div class="dialog-actions" style="padding:.6rem 0 0;border-top:none">
+      <button class="btn-cancel" data-close="confirmOverlay">취소</button>
+      <button id="confirmOk" class="btn-primary green">원본 확인함 · 검수 완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 확대 -->
+<div id="viewerOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="viewerTitle" tabindex="-1">
+    <div class="dialog-head" style="padding-bottom:.8rem"><div id="viewerTitle" class="dialog-title"></div><button class="dialog-close" aria-label="닫기" data-close="viewerOverlay">×</button></div>
+    <div id="viewerBody" class="viewer"></div>
+  </div>
+</div>
+
+<!-- 버전 이력 -->
+<div id="historyOverlay" class="dialog-overlay" hidden>
+  <div class="dialog-box" style="width:min(640px,100%)" role="dialog" aria-modal="true" aria-labelledby="historyTitle" tabindex="-1">
+    <div class="dialog-head">
+      <div><div id="historyTitle" class="dialog-title"><i class="fa-solid fa-clock-rotate-left" style="color:#2563eb"></i>버전 이력</div><div id="historySub" class="dialog-sub"></div></div>
+      <button class="dialog-close" aria-label="닫기" data-close="historyOverlay">×</button>
+    </div>
+    <div class="tab-body">
+      <p class="dialog-banner warn nw" data-new="도면: 적용 불가" style="margin:0 0 .8rem"><i class="fa-solid fa-circle-info"></i><span>도면은 아직 검색에 쓰이지 않아 이전 버전 적용 대상이 아닙니다. 버전별 원본과 처리 결과만 확인할 수 있습니다.</span></p>
+      <div id="historyList"></div>
+    </div>
+    <div class="dialog-actions"><button class="btn-cancel" data-close="historyOverlay">닫기</button></div>
+  </div>
+</div>
+
+<aside class="demo" aria-label="목업 시나리오">
+  <strong>목업 미리보기 · 도면 업로드 v0.6</strong><button type="button" class="demo-fold" id="demoFold">접기</button>
+  <label>화면
+    <select id="scenario">
+      <option value="select">① 파일 선택(도면+엑셀)</option>
+      <option value="progress">② 처리 진행 중</option>
+      <option value="done" selected>③ 처리 완료 · 목록</option>
+      <option value="result">④ 처리 결과 · 검수</option>
+      <option value="missing">⑤ 필수 항목 누락</option>
+      <option value="dup">⑥ 같은 품번 안내</option>
+      <option value="fail">⑦ 변환 실패</option>
+      <option value="history">⑧ 버전 이력(도면)</option>
+      <option value="off">⑨ 도면 처리 꺼짐(off)</option>
+    </select>
+  </label>
+  <label>보는 사람
+    <select id="viewer">
+      <option value="owner">업로드한 본인</option>
+      <option value="other">다른 일반 사용자</option>
+      <option value="admin">관리자</option>
+    </select>
+  </label>
+  <label class="demo-toggle"><input id="showNew" type="checkbox" checked /> 변경점 표시(주황 점선)</label>
+  <p id="demoDesc"></p>
+</aside>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/* ── 합성 도면(SVG) — A3 420×297, 영역 크롭은 viewBox로 ── */
+const REGIONS = {
+  full: '0 0 420 297', title_block: '262 238 152 53', bom: '262 168 152 66', revision: '262 6 152 28', notes: '10 236 160 55',
+};
+function drawingSvg(d, region = 'full', extraAttr = '') {
+  const t = d.title;
+  const cell = (x, y, w, label, value) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="12" fill="none" stroke="#111" stroke-width=".4"/>` +
+    `<text x="${x + 1.5}" y="${y + 3.6}" font-size="2.6" fill="#555">${esc(label)}</text>` +
+    `<text x="${x + 1.5}" y="${y + 9.6}" font-size="3.6" fill="#111">${esc(value || '')}</text>`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${REGIONS[region]}" ${extraAttr} font-family="Noto Sans KR, sans-serif" role="img" aria-label="합성 도면 ${esc(region)}">`;
+  svg += `<rect x="0" y="0" width="420" height="297" fill="#fff"/><rect x="8" y="6" width="406" height="285" fill="none" stroke="#111" stroke-width=".8"/>`;
+  // 형상(합성): 조립도는 프레임·롤러, 가공품은 축
+  if (d.kind === 'assembly') {
+    svg += `<g stroke="#1f2937" stroke-width=".7" fill="none">
+      <rect x="40" y="60" width="180" height="70" rx="2"/><rect x="48" y="68" width="164" height="54"/>
+      <circle cx="70" cy="95" r="16"/><circle cx="70" cy="95" r="5"/><circle cx="190" cy="95" r="16"/><circle cx="190" cy="95" r="5"/>
+      <line x1="70" y1="79" x2="190" y2="79"/><line x1="70" y1="111" x2="190" y2="111"/>
+      <rect x="40" y="160" width="180" height="40"/><line x1="60" y1="160" x2="60" y2="200"/><line x1="200" y1="160" x2="200" y2="200"/>
+      <rect x="230" y="60" width="22" height="140"/></g>
+      <g stroke="#2563eb" stroke-width=".35" stroke-dasharray="4 1.5 1 1.5"><line x1="30" y1="95" x2="230" y2="95"/><line x1="130" y1="50" x2="130" y2="210"/></g>
+      <g font-size="4" fill="#111" stroke="#111" stroke-width=".35"><circle cx="72" cy="45" r="4" fill="#fff"/><text x="70.6" y="46.4" stroke="none">1</text><line x1="74" y1="48" x2="78" y2="62"/>
+      <circle cx="150" cy="40" r="4" fill="#fff"/><text x="148.6" y="41.4" stroke="none">2</text><line x1="151" y1="44" x2="160" y2="68"/>
+      <circle cx="245" cy="45" r="4" fill="#fff"/><text x="243.6" y="46.4" stroke="none">3</text><line x1="244" y1="49" x2="241" y2="60"/></g>`;
+  } else {
+    svg += `<g stroke="#1f2937" stroke-width=".7" fill="none">
+      <rect x="50" y="90" width="40" height="40"/><rect x="90" y="96" width="120" height="28"/><rect x="210" y="102" width="30" height="16"/>
+      <circle cx="300" cy="110" r="20"/><circle cx="300" cy="110" r="8"/></g>
+      <g stroke="#2563eb" stroke-width=".35" stroke-dasharray="4 1.5 1 1.5"><line x1="40" y1="110" x2="250" y2="110"/><line x1="270" y1="110" x2="330" y2="110"/><line x1="300" y1="80" x2="300" y2="140"/></g>
+      <g stroke="#111" stroke-width=".3" font-size="3.6" fill="#111"><line x1="50" y1="145" x2="240" y2="145"/><text x="135" y="143" stroke="none">190</text>
+      <line x1="90" y1="80" x2="210" y2="80"/><text x="140" y="78" stroke="none">120</text><text x="312" y="88" stroke="none">Ø40</text></g>`;
+  }
+  // 개정이력(위 오른쪽, 헤더 아래)
+  svg += `<g font-size="3" fill="#111"><rect x="264" y="8" width="148" height="24" fill="none" stroke="#111" stroke-width=".4"/>`;
+  d.revisions.forEach((r, i) => { svg += `<text x="266" y="${14 + i * 6}">${esc(r.rev)}  ${esc(r.desc)}  ${esc(r.date)}</text>`; });
+  svg += `<line x1="264" y1="26" x2="412" y2="26" stroke="#111" stroke-width=".3"/><text x="266" y="30.4" fill="#555">REV  DESCRIPTION  DATE  DRAWN</text></g>`;
+  // BOM(헤더 위)
+  if (d.bom.length) {
+    svg += `<g font-size="2.8" fill="#111"><rect x="264" y="170" width="148" height="${8 + d.bom.length * 6}" fill="none" stroke="#111" stroke-width=".4"/>
+      <text x="266" y="175" fill="#555">NO  PART NUMBER   PART NAME            Q'TY  MATERIAL</text><line x1="264" y1="177" x2="412" y2="177" stroke="#111" stroke-width=".3"/>`;
+    d.bom.forEach((b, i) => { svg += `<text x="266" y="${182 + i * 6}">${esc(b.no)}   ${esc(b.part_no)}   ${esc(b.name)}   ${esc(b.qty)}   ${esc(b.material)}</text>`; });
+    svg += `</g>`;
+  }
+  // 주기
+  svg += `<g font-size="3.2" fill="#111"><text x="14" y="244" font-weight="700">Notes</text>`;
+  d.notes.forEach((n, i) => { svg += `<text x="14" y="${251 + i * 6}">${i + 1}. ${esc(n)}</text>`; });
+  svg += `</g>`;
+  // 표제란(값은 라벨 아래)
+  svg += `<g>${cell(264, 240, 74, 'PART NUMBER', t.part_no)}${cell(338, 240, 74, 'REVISION', t.rev)}${cell(264, 252, 148, 'PART NAME', t.part_name)}${cell(264, 264, 37, 'SCALE', t.scale)}${cell(301, 264, 37, 'DATE', t.date)}${cell(338, 264, 74, 'MATERIAL', t.material)}${cell(264, 276, 49, 'DRAWN', t.drawn)}${cell(313, 276, 49, 'CHECKED', t.checked)}${cell(362, 276, 50, 'APPROVED', t.approved)}</g>`;
+  svg += `<text x="12" y="12" font-size="3" fill="#94a3b8">SYNTHETIC SAMPLE — 목업용 합성 도면</text></svg>`;
+  return svg;
+}
+
+/* ── 합성 데이터 (실제 샘플 값 아님) ── */
+const ASSY = {
+  kind: 'assembly',
+  title: { part_no: 'DW-100200', part_name: 'ASSY_CONVEYOR MODULE(SAMPLE)', rev: 'B.2', rev_major: 'B', rev_iter: 2, date: '2026-10-28', scale: '1:10', material: 'NONE', material_group: 'ASSY', after_treatment: 'NONE', part_spec: 'ASSY', drawn: '설계자A', checked: '검토자B', approved: '승인자C', sheet: 'A3', units: 'mm' },
+  bom: [
+    { no: '1', rev: 'A', part_no: 'DW-100201', name: 'FRAME_MAIN', qty: '1', material: 'SS400', group: 'STEEL', spec: '-', treat: '도장' },
+    { no: '2', rev: 'B', part_no: 'DW-100231', name: 'SHAFT_DRIVE', qty: '2', material: 'S45C', group: 'STEEL', spec: 'Ø40', treat: '흑착색' },
+    { no: '3', rev: 'A', part_no: 'DW-100244', name: 'COVER_SIDE', qty: '1', material: 'AL5052', group: 'ALUMINUM', spec: 't2.0', treat: '아노다이징' },
+    { no: '4', rev: '-', part_no: 'BRG-6205ZZ', name: 'BEARING', qty: '4', material: '-', group: '구매품', spec: '6205ZZ', treat: '-' },
+    { no: '5', rev: '-', part_no: 'BLT-M8X20', name: 'BOLT_HEX', qty: '12', material: 'SCM435', group: '구매품', spec: 'M8×20', treat: '-' },
+  ],
+  revisions: [ { rev: 'B', desc: '커버 고정 볼트 수량 변경', date: '2026-10-28', drawn: '설계자A', checked: '검토자B' }, { rev: 'A', desc: '최초 작성', date: '2026-09-02', drawn: '설계자A', checked: '검토자B' } ],
+  notes: ['일반 공차는 KS B ISO 2768-m 을 따른다.', '날카로운 모서리는 C0.5 모따기.', '도장 색상은 사내 표준 회색.'],
+  warnings: [
+    { level: 'warn', code: 'W_RENDER_SKIPPED', text: '도면 범위 밖·경계 오류 해칭을 그리지 않았습니다. 이미지에서 일부 해칭이 빠질 수 있습니다.', count: '12건' },
+  ],
+  infos: [
+    { level: 'info', code: 'W_SANITIZED', text: '변환 결과의 잘못된 참조 항목을 자동으로 고쳤습니다.', count: '4건' },
+    { level: 'info', code: 'W_FONT_FALLBACK', text: '도면 글꼴이 서버에 없어 한글 대체 글꼴로 그렸습니다.', count: '2종' },
+  ],
+  proc: { converter: 'LibreDWG 0.13.3', ezdxf: '1.4.x', template: 'yest_a3_v1', steps: [['형식 판별', '0.01 s'], ['DWG→DXF 변환', '0.4 s'], ['DXF 보정', '0.1 s'], ['항목 추출', '2.8 s'], ['도면 이미지', '21.0 s'], ['저장', '0.2 s']], size: '3.1 MB → 13.8 MB(DXF)', md: 'instance/parsed_md/drawing/DW-100200/{job_id}/' },
+};
+const PART = {
+  kind: 'part',
+  title: { part_no: 'DW-100231', part_name: 'SHAFT_DRIVE', rev: 'B.1', rev_major: 'B', rev_iter: 1, date: '2026-10-20', scale: '1:2', material: 'S45C', material_group: 'STEEL', after_treatment: '흑착색', part_spec: 'Ø40', drawn: '설계자A', checked: '검토자B', approved: '승인자C', sheet: 'A3', units: 'mm' },
+  bom: [], revisions: [{ rev: 'B', desc: '키홈 길이 수정', date: '2026-10-20', drawn: '설계자A', checked: '검토자B' }],
+  notes: ['일반 공차는 KS B ISO 2768-m 을 따른다.', '열처리 HRC 28~32.'], warnings: [], infos: [{ level: 'info', code: 'W_SANITIZED', text: '변환 결과의 잘못된 참조 항목을 자동으로 고쳤습니다.', count: '4건' }],
+  proc: { converter: 'LibreDWG 0.13.3', ezdxf: '1.4.x', template: 'yest_a3_v1', steps: [['형식 판별', '0.01 s'], ['DWG→DXF 변환', '0.02 s'], ['DXF 보정', '0.01 s'], ['항목 추출', '0.1 s'], ['도면 이미지', '1.1 s'], ['저장', '0.1 s']], size: '142 KB → 510 KB(DXF)', md: 'instance/parsed_md/drawing/DW-100231/{job_id}/' },
+};
+const MISSING = JSON.parse(JSON.stringify(ASSY));
+Object.assign(MISSING.title, { part_no: 'DW-100300', part_name: 'ASSY_LIFT UNIT(SAMPLE)', rev: '' });
+MISSING.warnings = [{ level: 'warn', code: 'W_TITLE_MISSING', text: '표제란 필수 항목(개정)을 찾지 못했습니다. 원본 도면을 확인해 주세요.', count: '1건' }, { level: 'warn', code: 'W_TEMPLATE_MISMATCH', text: '등록된 표제란 양식과 일치율이 낮아 라벨 주변 방식으로 읽었습니다.', count: '일치 38%' }];
+
+let state = { scenario: 'done', viewer: 'owner', typeFilter: false, topic: '', reviewed: { d1: false, d2: true, d3: false }, tab: 'summary', current: null };
+
+const DOCS = () => [
+  { id: 'd1', model: 'conveyor_module_assy', file: 'conveyor_module_assy.dwg', type: 'drawing', pages: '1매 · A3', topic: '조립 작업표준', uploader: 'sooyeon.choi', parser: '도면 처리기', ver: 1, updated: '2026-11-12 10:21', d: ASSY, owner: true },
+  { id: 'd2', model: 'shaft_drive', file: 'shaft_drive.dwg', type: 'drawing', pages: '1매 · A3', topic: '조립 작업표준', uploader: 'woojin.jung', parser: '도면 처리기', ver: 2, updated: '2026-11-11 16:02', d: PART, owner: false },
+  ...(state.scenario === 'missing' ? [{ id: 'd3', model: 'lift_unit_assy', file: 'lift_unit_assy.dwg', type: 'drawing', pages: '1매 · A3', topic: '조립 작업표준', uploader: 'sooyeon.choi', parser: '도면 처리기', ver: 1, updated: '2026-11-12 10:40', d: MISSING, owner: true }] : []),
+  { id: 'x1', model: '라인A 조립 SOP', file: 'lineA_assembly_sop.xlsx', type: 'spreadsheet', pages: '12', topic: '조립 작업표준', uploader: 'sooyeon.choi', parser: 'excel_ingest', ver: 3, updated: '2026-11-10 09:12', owner: true },
+  { id: 'p1', model: '컨베이어 설비 매뉴얼', file: 'conveyor_manual.pdf', type: 'manual', pages: '48', topic: '설비 매뉴얼', uploader: 'woojin.jung', parser: 'docling', ver: 1, updated: '2026-11-05 14:30', owner: false },
+];
+
+const DESC = {
+  select: '도면 2개와 엑셀 1개를 함께 고른 상태. 도면이 섞여 있으면 문서 유형은 도면이 아닌 파일에만 적용되고, 파서 선택 아래에 도면 처리기 안내가 나온다.',
+  progress: '처리기별 단계 칸: 도면은 파일 준비 → 변환·보정 → 항목 추출 → 도면 이미지 → 저장(5칸), 엑셀은 기존 4칸.',
+  done: '완료 행에 품번·Rev·경고 요약과 [처리 결과 보기]. 목록에는 3줄째 품번·Rev, 검색 미적용·미검수·경고 칩, [처리 결과] 버튼. 유형 칩 "도면 N"으로 거를 수 있다.',
+  result: '처리 결과 대화상자: 요약·부품표·개정이력·주기·경고·정보·처리 정보. 썸네일을 누르면 확대. 검수는 업로드한 본인·관리자만(보는 사람을 바꿔 확인).',
+  missing: '표제란 필수 항목(개정)을 못 찾은 도면: 처리 현황 "완료 · 확인 필요", 대화상자 위 경고, [검수 완료]를 누르면 확인 창(값 입력 없음).',
+  dup: '같은 품번 문서가 이미 있으면 안내만 한다(D-01). 자동 교체·선택 상자 없음 — 개정본은 해당 문서의 [새 버전 등록].',
+  fail: 'DWG 변환 실패: 오류 코드를 한국어 안내로 보여 주고 기존 [재시도] 버튼 사용.',
+  history: '도면 문서의 버전 이력: 버전 목록은 보이고, 서버가 restore_supported=false를 줘서 [선택 버전 적용]이 숨겨진다(화면 코드 변경 없음).',
+  off: 'DRAWING_PARSE_MODE=off(기본): 도면 확장자 안내·유형 칩·도면 행이 없고 .dwg는 선택할 수 없다. 기존 화면과 같다.',
+};
+
+/* ── 업로드 카드 ── */
+const STEPS = {
+  drawing: ['파일 준비', '변환·보정', '항목 추출', '도면 이미지', '저장'],
+  default: ['파일 준비', '파싱·청킹', '임베딩', '저장'],
+};
+function uploadItems() {
+  const s = state.scenario;
+  const a = { name: 'conveyor_module_assy.dwg', size: '3.1 MB', kind: 'drawing', model: 'conveyor_module_assy' };
+  const b = { name: 'shaft_drive_rev_b.dwg', size: '142 KB', kind: 'drawing', model: 'shaft_drive_rev_b' };
+  const x = { name: 'lineB_assembly_sop.xlsx', size: '2.4 MB', kind: 'default', model: 'lineB_assembly_sop' };
+  if (s === 'select') return [{ ...a, status: 'selected' }, { ...b, status: 'selected' }, { ...x, status: 'selected' }];
+  if (s === 'progress') return [{ ...a, status: 'running', step: 3, label: '도면 이미지 만드는 중' }, { ...b, status: 'queued', label: '대기 중' }, { ...x, status: 'running', step: 1, label: '파싱·청킹 중' }];
+  if (s === 'done' || s === 'result' || s === 'history') return [{ ...a, status: 'completed', result: ASSY }, { ...x, status: 'completed', result: 'excel' }];
+  if (s === 'missing') return [{ ...a, name: 'lift_unit_assy.dwg', model: 'lift_unit_assy', status: 'review', result: MISSING }];
+  if (s === 'dup') return [{ ...b, status: 'completed', result: PART, dup: true }];
+  if (s === 'fail') return [{ ...a, name: 'old_layout_r14.dwg', model: 'old_layout_r14', size: '880 KB', status: 'failed', step: 1, code: 'E_CONVERT_FAILED' }];
+  return [];
+}
+const ERR = {
+  E_CONVERT_FAILED: 'DWG를 DXF로 변환하지 못했습니다(E_CONVERT_FAILED). 원본을 CAD 프로그램에서 다시 저장(AutoCAD 2000~2018 형식)한 뒤 올려 주세요.',
+};
+function renderUpload() {
+  const items = uploadItems();
+  const off = state.scenario === 'off';
+  const hasDrawing = items.some((i) => i.kind === 'drawing');
+  const allDrawing = items.length > 0 && items.every((i) => i.kind === 'drawing');
+  const selecting = items.some((i) => i.status === 'selected');
+  document.querySelector('.drop-placeholder span').textContent = off ? 'PDF · DOCX · PPTX · XLSX · 이미지' : 'PDF · DOCX · PPTX · XLSX · 이미지 · 도면(DWG·DXF)';
+  document.querySelector('.drop-placeholder span').classList.toggle('nw', !off);
+  $('dropZone').classList.toggle('has-file', items.length > 0);
+  $('batchSelection').hidden = !items.length;
+  $('batchSelection').innerHTML = items.length ? `<span>선택 ${items.length}/10개</span><button class="btn-text"><i class="fa-solid fa-trash-can"></i> 목록 비우기</button>` : '';
+
+  const dt = $('docTypeSelect');
+  dt.innerHTML = allDrawing && selecting ? '<option>도면(자동)</option>' : '<option>자동</option><option>일반 문서</option><option>매뉴얼</option><option>법령</option><option>스프레드시트</option>';
+  dt.disabled = allDrawing && selecting;
+  dt.parentElement.classList.toggle('nw', hasDrawing && selecting);
+  dt.parentElement.dataset.new = allDrawing ? '도면만: 유형 고정' : '섞임: 도면 외 파일에만 적용';
+  $('docTypeHint').innerHTML = hasDrawing && selecting
+    ? '<i class="fa-solid fa-circle-info"></i> 도면은 전용 처리기로 처리됩니다. 처리 후 검수하며, 검색에는 아직 쓰이지 않습니다.' + (allDrawing ? '' : ' 문서 유형은 도면이 아닌 파일에만 적용됩니다.')
+    : '파일 형식과 문서 구조를 분석하여 적절한 청킹 방식을 자동 적용합니다.';
+  $('parserSelect').disabled = items.length > 0 && selecting && items.every((i) => i.kind === 'drawing' || i.name.endsWith('.xlsx'));
+  $('parserHint').innerHTML = (hasDrawing && selecting ? '<span class="nw" data-new="도면 안내"><i class="fa-solid fa-circle-info"></i> 도면은 도면 처리기로 처리됩니다.</span><br>' : '') + (items.some((i) => i.name.endsWith('.xlsx')) && selecting ? '<i class="fa-solid fa-circle-info"></i> 엑셀은 전용 처리기로 처리됩니다(문서 유형·파서 선택과 관계없음).' : '');
+
+  const pending = items.filter((i) => ['running', 'queued'].includes(i.status));
+  $('uploadBtn').disabled = !selecting;
+  $('uploadBtn').innerHTML = selecting ? `<i class="fa-solid fa-rocket"></i> ${items.length}개 업로드 시작` : pending.length ? '<i class="fa-solid fa-hourglass-half"></i> 처리가 끝나면 추가 업로드할 수 있습니다' : '<i class="fa-solid fa-rocket"></i> 업로드할 파일을 선택하세요';
+
+  $('batchProgress').hidden = !items.length || selecting;
+  if (!items.length || selecting) { $('fileList').innerHTML = ''; return; }
+  const done = items.filter((i) => ['completed', 'review'].includes(i.status)).length;
+  $('batchCount').textContent = `${items.length}개 중 ${done}개 완료`;
+  const chips = [];
+  const run = items.filter((i) => i.status === 'running').length; if (run) chips.push(`<span class="summary-chip running">처리 중 ${run}</span>`);
+  const q = items.filter((i) => i.status === 'queued').length; if (q) chips.push(`<span class="summary-chip">대기 ${q}</span>`);
+  const f = items.filter((i) => i.status === 'failed').length; if (f) chips.push(`<span class="summary-chip failed">실패 ${f}</span>`);
+  const r = items.filter((i) => i.status === 'review').length; if (r) chips.push(`<span class="summary-chip review nw" data-new="도면 확인 필요">확인 필요 ${r}</span>`);
+  $('batchChips').innerHTML = chips.join(' ');
+  const w = (n) => (n / items.length) * 100;
+  $('overall').innerHTML = `<span class="completed" style="width:${w(done)}%"></span><span class="failed" style="width:${w(f)}%"></span><span class="running" style="width:${w(run)}%"></span>`;
+
+  $('fileList').innerHTML = items.map((it, idx) => {
+    const steps = STEPS[it.kind];
+    const stateLabel = { completed: '완료', review: '완료 · 확인 필요', running: '처리 중', queued: '대기', failed: '실패' }[it.status];
+    const stepHtml = ['running', 'failed', 'completed', 'review'].includes(it.status)
+      ? `<ol class="upload-steps ${it.kind === 'drawing' ? 'nw' : ''}" data-new="도면 5단계">${steps.map((s, i) => {
+          const cur = ['completed', 'review'].includes(it.status) ? steps.length : it.step;
+          const cls = i < cur ? 'done' : i > cur ? '' : it.status === 'failed' ? 'error' : 'active';
+          return `<li class="${cls}" title="${s}"></li>`; }).join('')}</ol>` : '';
+    const label = it.status === 'running' ? it.label : it.status === 'failed' ? `${steps[it.step]} 단계에서 실패` : it.status === 'queued' ? it.label : '처리 완료';
+    let extra = '';
+    if (it.status === 'failed') extra += `<p class="upload-file-message error"><i class="fa-solid fa-circle-exclamation"></i>${esc(ERR[it.code])}</p>`;
+    if (it.dup) extra += `<p class="upload-file-message info nw" data-new="같은 품번: 안내만(D-01)"><i class="fa-solid fa-circle-info"></i><span>같은 품번(<b>DW-100231</b>) 문서가 이미 있습니다: <b>shaft_drive</b>(조립 작업표준). 개정본이면 그 문서의 [새 버전 등록]으로 올려 주세요. 이 파일은 새 문서로 등록되었습니다.</span></p>`;
+    if (it.result && it.result !== 'excel') {
+      const d = it.result; const t = d.title;
+      const warnN = d.warnings.length;
+      extra += `<details class="batch-result nw" data-new="도면 결과 요약" ${idx === 0 ? 'open' : ''}><summary>도면 처리 결과 · <b>${esc(t.part_no)}</b> · Rev ${esc(t.rev || '미검출')} · 경고 ${warnN}</summary>
+        <dl><dt>품명</dt><dd>${esc(t.part_name)}</dd><dt>용지 · 축척</dt><dd>${t.sheet} · ${t.scale}</dd><dt>부품표</dt><dd>${d.bom.length ? d.bom.length + '행' : '없음(가공품)'}</dd><dt>대화 주제</dt><dd>조립 작업표준</dd><dt>검색</dt><dd>미적용(검수 후 다음 단계에서 적용)</dd></dl>
+        <button class="btn-text primary" data-open-result="${d === MISSING ? 'd3' : d === PART ? 'd2' : 'd1'}"><i class="fa-solid fa-up-right-from-square"></i> 처리 결과 보기</button></details>`;
+    } else if (it.result === 'excel') {
+      extra += `<details class="batch-result"><summary>처리 결과 · 9페이지 · 64개 청크</summary><dl><dt>문서 유형</dt><dd>스프레드시트 · 파일 확장자</dd><dt>대화 주제</dt><dd>조립 작업표준</dd></dl></details>`;
+    }
+    return `<li class="upload-file ${it.status}">
+      <div class="upload-file-main">
+        <div class="upload-file-name"><i class="${it.kind === 'drawing' ? 'fa-solid fa-compass-drafting ico-drawing' : 'fa-regular fa-file-lines'}"></i><strong title="${esc(it.name)}">${esc(it.name)}</strong><span class="upload-file-size">${it.size}</span></div>
+        <div>${it.status === 'selected' ? `<input class="model-input" value="${esc(it.model)}" aria-label="모델명"/>` : `<span class="model-locked"><span class="model-locked-label">모델명</span>${esc(it.model)}</span>`}</div>
+        <div class="upload-file-status"><span class="upload-state ${it.status}">${it.status === 'running' ? '<i class="fa-solid fa-spinner fa-spin"></i> ' : ''}${stateLabel}</span>${stepHtml}<span class="upload-step-label">${label}</span></div>
+        <div>${it.status === 'failed' ? '<button class="btn-text danger"><i class="fa-solid fa-rotate-right"></i> 재시도</button>' : ''}</div>
+      </div>${extra}</li>`;
+  }).join('');
+}
+
+/* ── 문서 목록 ── */
+function canReview(doc) { return state.viewer === 'admin' || (state.viewer === 'owner' && doc.owner); }
+function canEdit(doc) { return state.viewer === 'admin' ? doc.owner : state.viewer === 'owner' && doc.owner; }
+function renderDocs() {
+  const off = state.scenario === 'off';
+  let docs = DOCS().filter((d) => !(off && d.type === 'drawing'));
+  const topics = ['조립 작업표준', '설비 매뉴얼'];
+  const drawingN = docs.filter((d) => d.type === 'drawing').length;
+  $('topicBar').innerHTML =
+    [['', '전체', docs.length], ...topics.map((t) => [t, t, docs.filter((d) => d.topic === t).length])]
+      .map(([v, l, c]) => `<button class="topic-chip ${state.topic === v ? 'active' : ''}" data-topic="${esc(v)}"><span>${esc(l)}</span><span class="topic-chip-count">${c}</span></button>`).join('') +
+    (drawingN ? `<span class="topic-sep"></span><button class="topic-chip type nw ${state.typeFilter ? 'active' : ''}" data-new="유형 칩" data-type-chip aria-pressed="${state.typeFilter}"><i class="fa-solid fa-compass-drafting"></i><span>도면</span><span class="topic-chip-count">${drawingN}</span></button>` : '');
+  docs = docs.filter((d) => (!state.topic || d.topic === state.topic) && (!state.typeFilter || d.type === 'drawing'));
+  $('docRows').innerHTML = docs.map((doc) => {
+    const dr = doc.type === 'drawing';
+    const t = dr ? doc.d.title : null;
+    const reviewed = state.reviewed[doc.id];
+    const warnN = dr ? doc.d.warnings.length : 0;
+    const typeLabel = { drawing: '도면', spreadsheet: '스프레드시트', manual: '매뉴얼' }[doc.type];
+    return `<tr>
+      <td style="min-width:260px"><span class="model-name">${esc(doc.model)}${canEdit(doc) ? ' <i class="fa-solid fa-pen" style="font-size:.65rem;color:#94a3b8"></i>' : ''}</span>
+        <div class="filename-cell-content"><i class="${dr ? 'fa-solid fa-compass-drafting ico-drawing' : 'fa-regular fa-file-lines'}"></i><button class="filename-link" title="원본 열기">${esc(doc.file)}</button></div>
+        ${dr ? `<div class="drawing-meta nw" data-new="품번·Rev">${esc(t.part_no)} · Rev ${esc(t.rev || '미검출')}</div>` : ''}</td>
+      <td><span class="badge ${doc.type} ${dr ? 'nw' : ''}" data-new="도면 배지">${typeLabel}</span>
+        ${dr ? `<div class="state-chips nw" data-new="상태 칩"><span class="state-chip">검색 미적용</span><span class="state-chip ${reviewed ? 'reviewed' : 'pending'}">${reviewed ? '검수 완료' : '미검수'}</span>${warnN ? `<span class="state-chip warn">경고 ${warnN}</span>` : ''}</div>` : ''}</td>
+      <td>${esc(doc.pages)}</td>
+      <td><button class="topic-link" data-topic="${esc(doc.topic)}">${esc(doc.topic)}</button></td>
+      <td>${esc(doc.uploader)}</td>
+      <td>${esc(doc.parser)}</td>
+      <td><span class="version-badge">v${doc.ver}</span></td>
+      <td style="white-space:nowrap">${esc(doc.updated)}</td>
+      <td><div class="document-actions">
+        ${dr ? `<button class="btn-doc-action result nw" data-new="처리 결과" data-open-result="${doc.id}"><i class="fa-solid fa-clipboard-check"></i><span>처리 결과</span></button>` : ''}
+        <button class="btn-doc-action" ${canEdit(doc) ? '' : 'disabled title="본인이 업로드한 문서만 새 버전을 등록할 수 있습니다."'}><i class="fa-solid fa-arrow-up-from-bracket"></i><span>새 버전 등록</span></button>
+        <button class="btn-doc-action" data-history="${doc.id}"><i class="fa-solid fa-clock-rotate-left"></i><span>버전 이력</span></button>
+        <button class="btn-delete-doc" ${canEdit(doc) ? '' : 'disabled'} title="문서 삭제"><i class="fa-solid fa-trash"></i></button>
+      </div></td></tr>`;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:2rem">조건에 맞는 문서가 없습니다.</td></tr>`;
+}
+
+/* ── 처리 결과 대화상자 ── */
+const TABS = [['summary', '요약'], ['bom', '부품표'], ['revision', '개정이력'], ['notes', '주기'], ['warn', '경고·정보'], ['proc', '처리 정보']];
+function openResult(id) {
+  const doc = DOCS().find((d) => d.id === id); if (!doc) return;
+  state.current = doc; state.tab = 'summary';
+  renderResult(); openModal('resultOverlay');
+}
+function missingFields(d) { return [['part_no', '품번'], ['part_name', '품명'], ['rev', '개정']].filter(([k]) => !d.title[k]).map(([, l]) => l); }
+function renderResult() {
+  const doc = state.current; const d = doc.d; const t = d.title;
+  const miss = missingFields(d);
+  $('resultSub').innerHTML = `${esc(doc.model)} · ${esc(doc.file)} · v${doc.ver} · 조립 작업표준 · 업로더 ${esc(doc.uploader)}`;
+  const reviewed = state.reviewed[doc.id];
+  $('resultBanner').innerHTML = miss.length
+    ? `<div class="dialog-banner warn nw" data-new="필수 항목 누락"><i class="fa-solid fa-triangle-exclamation"></i><span>표제란 필수 항목(<b>${miss.join('·')}</b>)을 찾지 못했습니다. 원본 도면을 확인한 뒤 검수 완료로 기록해 주세요. 값 수정은 이번 단계에서 지원하지 않습니다.</span></div>`
+    : reviewed ? `<div class="dialog-banner ok"><i class="fa-solid fa-circle-check"></i><span>검수 완료 · 관리자 2026-11-12 11:05 · 다음 단계에서 검색에 적용할 수 있습니다.</span></div>` : '';
+  const warnN = d.warnings.length, infoN = d.infos.length;
+  $('resultTabs').innerHTML = TABS.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" role="tab" data-tab="${k}">${l}${k === 'warn' ? ` ${warnN}+${infoN}${warnN ? '' : ''}` : ''}</button>`).join('');
+  $('resultBody').innerHTML = tabBody(state.tab, d, t);
+  const can = canReview(doc);
+  const rb = $('reviewBtn');
+  rb.disabled = !can;
+  rb.title = can ? '' : '업로드한 본인 또는 관리자만 검수할 수 있습니다.';
+  rb.className = reviewed ? 'btn-cancel' : 'btn-primary green';
+  rb.innerHTML = reviewed ? '<i class="fa-solid fa-rotate-left"></i> 검수 취소' : '<i class="fa-solid fa-check"></i> 검수 완료';
+}
+function tabBody(tab, d, t) {
+  const v = (x) => (x ? esc(x) : null);
+  if (tab === 'summary') {
+    const rows = [['품번', t.part_no, 1], ['품명', t.part_name], ['개정', t.rev ? `${t.rev} (개정 ${t.rev_major} · 반복 ${t.rev_iter})` : ''], ['날짜', t.date], ['축척', t.scale], ['용지 · 단위', `${t.sheet} · ${t.units}`], ['재질', t.material], ['재질 그룹', t.material_group], ['후처리', t.after_treatment], ['PART SPEC', t.part_spec], ['작성 · 검토 · 승인', `${t.drawn} · ${t.checked} · ${t.approved}`], ['도면 종류', d.bom.length ? '조립도(부품표 있음)' : '가공품']];
+    return `<div class="summary-grid"><div>
+        <button class="thumb-main" data-zoom="full" aria-label="전체 도면 확대">${drawingSvg(d, 'full')}</button>
+        <div class="thumb-row">
+          <button class="thumb-crop" data-zoom="title_block">${drawingSvg(d, 'title_block', 'preserveAspectRatio="xMidYMid meet"')}<span>표제란</span></button>
+          ${d.bom.length ? `<button class="thumb-crop" data-zoom="bom">${drawingSvg(d, 'bom', 'preserveAspectRatio="xMidYMid meet"')}<span>부품표</span></button>` : ''}
+          <button class="thumb-crop" data-zoom="revision">${drawingSvg(d, 'revision', 'preserveAspectRatio="xMidYMid meet"')}<span>개정이력</span></button>
+        </div></div>
+      <div><div class="sec-title" style="margin-top:0">표제란</div><table class="kv">${rows.map(([k, x, mono]) => `<tr><th>${k}</th>${v(x) ? `<td class="${mono ? 'mono' : ''}">${v(x)}</td>` : '<td class="missing">미검출</td>'}</tr>`).join('')}</table>
+        <div class="sec-title">검색에 쓸 메타데이터(다음 단계)</div><p class="dialog-hint" style="margin:0">품번·품명·개정·재질·사양·도면 종류·부품표 품번 ${d.bom.length}개를 저장했습니다. 검수 후 [검색 적용]하면 챗봇 답변에서 이 도면을 볼 수 있게 됩니다.</p></div></div>`;
+  }
+  if (tab === 'bom') {
+    if (!d.bom.length) return '<p class="empty-note">부품표가 없는 도면(가공품)입니다.</p>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><span class="dialog-hint">${d.bom.length}행 · 표 선 기준으로 행·열을 복원했습니다.</span><button class="btn-text primary" data-zoom="bom"><i class="fa-solid fa-magnifying-glass-plus"></i> 원본 영역 보기</button></div>
+      <table class="grid-table"><thead><tr><th>번호</th><th>REV</th><th>품번</th><th>품명</th><th>수량</th><th>재질</th><th>재질 그룹</th><th>사양</th><th>후처리</th></tr></thead><tbody>${d.bom.map((b) => `<tr><td>${b.no}</td><td>${b.rev}</td><td style="font-family:Consolas,monospace">${esc(b.part_no)}</td><td>${esc(b.name)}</td><td>${b.qty}</td><td>${esc(b.material)}</td><td>${esc(b.group)}</td><td>${esc(b.spec)}</td><td>${esc(b.treat)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  if (tab === 'revision') {
+    if (!d.revisions.length) return '<p class="empty-note">개정 이력이 비어 있습니다.</p>';
+    return `<div style="display:flex;justify-content:flex-end;margin-bottom:.5rem"><button class="btn-text primary" data-zoom="revision"><i class="fa-solid fa-magnifying-glass-plus"></i> 원본 영역 보기</button></div><table class="grid-table"><thead><tr><th>개정</th><th>내용</th><th>날짜</th><th>작성</th><th>검토</th></tr></thead><tbody>${d.revisions.map((r) => `<tr><td>${r.rev}</td><td>${esc(r.desc)}</td><td>${r.date}</td><td>${esc(r.drawn)}</td><td>${esc(r.checked)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  if (tab === 'notes') {
+    return `<div class="sec-title" style="margin-top:0">주기</div><ol style="margin:0;padding-left:1.2rem;line-height:1.8;font-size:.84rem">${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
+      <div class="sec-title">일반공차 규격</div><p style="margin:0;font-size:.84rem">KS B ISO 2768-m</p>
+      <div class="sec-title">제외한 고정 문구</div><p class="dialog-hint" style="margin:0">양식에 항상 있는 일반공차표·보안 문구는 기타 글자에서 뺐습니다(보안 문구 있음 → 보안 등급 확인 대상).</p>`;
+  }
+  if (tab === 'warn') {
+    const g = (title, list, empty) => `<div class="warn-group"><h4>${title} ${list.length}</h4>${list.length ? list.map((w) => `<div class="warn-item"><code>${w.code}</code><span>${esc(w.text)}</span><span style="color:#64748b">${w.count}</span></div>`).join('') : `<div class="warn-item"><span></span><span style="color:#94a3b8">${empty}</span><span></span></div>`}</div>`;
+    return g('<i class="fa-solid fa-triangle-exclamation" style="color:#dc2626"></i> 경고 — 확인 필요', d.warnings, '확인이 필요한 항목이 없습니다.') + g('<i class="fa-solid fa-circle-info" style="color:#2563eb"></i> 정보 — 자동 조치됨', d.infos, '없음');
+  }
+  const p = d.proc;
+  return `<table class="kv"><tr><th>변환기</th><td>${p.converter}</td></tr><tr><th>도면 읽기</th><td>ezdxf ${p.ezdxf}</td></tr><tr><th>표제란 양식</th><td>${p.template}</td></tr><tr><th>파일 크기</th><td>${p.size}</td></tr><tr><th>확인용 md</th><td class="mono">${p.md}</td></tr></table>
+    <div class="sec-title">단계별 소요 시간</div><table class="grid-table"><thead><tr><th>단계</th><th>소요 시간</th></tr></thead><tbody>${p.steps.map(([s, x]) => `<tr><td>${s}</td><td>${x}</td></tr>`).join('')}</tbody></table>
+    <div class="sec-title">검색 데이터</div><p class="dialog-hint" style="margin:0">임베딩·검색 DB 저장 없음(0건). 도면 파싱 결과 파일만 저장했습니다.</p>`;
+}
+function zoom(region) {
+  const names = { full: '전체 도면', title_block: '표제란', bom: '부품표', revision: '개정이력' };
+  $('viewerTitle').innerHTML = `<i class="fa-solid fa-image"></i> ${names[region]} · ${esc(state.current.d.title.part_no)}`;
+  $('viewerBody').innerHTML = drawingSvg(state.current.d, region, `width="${region === 'full' ? 1200 : 900}"`);
+  openModal('viewerOverlay');
+}
+function onReview() {
+  const doc = state.current;
+  if (state.reviewed[doc.id]) { state.reviewed[doc.id] = false; refresh(); return; }
+  const miss = missingFields(doc.d);
+  if (miss.length) {
+    $('confirmText').innerHTML = `필수 항목(<b>${miss.join('·')}</b>)이 비어 있습니다.<br>원본 도면을 확인했으면 검수 완료로 기록합니다. 비어 있는 값은 그대로 저장됩니다.`;
+    openModal('confirmOverlay'); return;
+  }
+  state.reviewed[doc.id] = true; refresh();
+}
+
+/* ── 버전 이력 ── */
+function openHistory(id) {
+  const doc = DOCS().find((d) => d.id === id);
+  if (!doc) return;
+  if (doc.type !== 'drawing') { alertless(`(목업) 문서 버전 이력은 이전버전복원 목업 v0.2를 따릅니다.`); return; }
+  $('historySub').textContent = `${doc.model} · 조립 작업표준 · ${doc.file}`;
+  const vers = doc.ver === 2 ? [[2, '2026-11-11 16:02', 'shaft_drive.dwg', 'Rev B.1', true], [1, '2026-10-21 09:40', 'shaft_drive_old.dwg', 'Rev A.3', false]] : [[1, doc.updated, doc.file, `Rev ${doc.d.title.rev || '미검출'}`, true]];
+  $('historyList').innerHTML = vers.map(([n, at, f, rev, cur]) => `<div class="version-row ${cur ? 'current' : ''}"><div><strong>v${n}</strong> ${cur ? '<span class="state-chip reviewed">현재 버전</span>' : ''}<div class="dialog-hint" style="margin-top:.2rem">${esc(f)} · ${rev} · ${at}</div>${cur ? '' : '<p class="version-reason"><i class="fa-solid fa-circle-info"></i> 도면은 아직 검색에 쓰이지 않아 이전 버전 적용 대상이 아닙니다.</p>'}</div><div><button class="btn-text primary"><i class="fa-solid fa-clipboard-check"></i> 처리 결과</button></div></div>`).join('');
+  openModal('historyOverlay');
+}
+function alertless(msg) { $('demoDesc').textContent = msg; }
+
+/* ── 대화상자 공통: 바깥 클릭 무시, Esc 닫기 ── */
+const stack = [];
+function openModal(id) { $(id).hidden = false; stack.push(id); $(id).querySelector('[tabindex="-1"]').focus(); }
+function closeModal(id) { $(id).hidden = true; const i = stack.lastIndexOf(id); if (i >= 0) stack.splice(i, 1); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && stack.length) closeModal(stack[stack.length - 1]); });
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-close],[data-open-result],[data-tab],[data-zoom],[data-topic],[data-type-chip],[data-history]');
+  if (!el) return;
+  if (el.dataset.close) closeModal(el.dataset.close);
+  else if (el.dataset.openResult) openResult(el.dataset.openResult);
+  else if (el.dataset.tab) { state.tab = el.dataset.tab; renderResult(); }
+  else if (el.dataset.zoom) zoom(el.dataset.zoom);
+  else if (el.dataset.history) openHistory(el.dataset.history);
+  else if ('typeChip' in el.dataset) { state.typeFilter = !state.typeFilter; renderDocs(); }
+  else if ('topic' in el.dataset) { const v = el.dataset.topic; state.topic = state.topic === v ? '' : v; renderDocs(); }
+});
+$('reviewBtn').onclick = onReview;
+$('confirmOk').onclick = () => { state.reviewed[state.current.id] = true; closeModal('confirmOverlay'); refresh(); };
+$('uploadBtn').onclick = () => { if (state.scenario === 'select') { $('scenario').value = 'progress'; apply(); } };
+
+function refresh() { renderUpload(); renderDocs(); if (!$('resultOverlay').hidden) renderResult(); }
+function apply() {
+  ['resultOverlay', 'confirmOverlay', 'viewerOverlay', 'historyOverlay'].forEach(closeModal);
+  state.scenario = $('scenario').value; state.viewer = $('viewer').value; state.typeFilter = false; state.topic = '';
+  $('demoDesc').textContent = DESC[state.scenario];
+  refresh();
+  if (state.scenario === 'result') openResult('d1');
+  if (state.scenario === 'missing') openResult('d3');
+  if (state.scenario === 'history') openHistory('d2');
+}
+$('scenario').onchange = apply;
+$('viewer').onchange = () => { state.viewer = $('viewer').value; refresh(); };
+$('demoFold').onclick = () => { const c = document.querySelector('.demo').classList.toggle('collapsed'); $('demoFold').textContent = c ? '펼치기' : '접기'; };
+$('showNew').onchange = () => document.body.classList.toggle('show-new', $('showNew').checked);
+apply();
+</script>
+</body>
+</html>

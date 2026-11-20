@@ -12,6 +12,7 @@ from app.routes.chat import router as chat_router
 # 2026.04.01(sooyeon.choi) 수정 - 멀티컬렉션 관리 기능 추가
 from app.routes.collections import router as collections_router
 from app.routes.ingest import router as ingest_router
+from app.routes.drawings import router as drawings_router  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
 from app.routes.parse import router as parse_router
 from app.routes.query import router as query_router
 from app.routes.voice import router as voice_router
@@ -31,6 +32,8 @@ from app.routes.admin_users import router as admin_users_router
 from app.routes.admin_settings import router as admin_settings_router
 # 2026.07.22(sychoi) 추가 - RAG 평가 자동화 API (evaluation 패키지)
 from app.routes.evaluation import router as eval_router
+# 2026.11.18(sooyeon.choi) 추가 - 시험 대응 일괄 질의 API(eval_batch_query_enabled=false면 404)
+from app.routes.eval_batch import router as eval_batch_router
 from app.routes.spreadsheet_resources import router as spreadsheet_resources_router
 from app.repositories.metadata_repository import MetadataRepository
 # 2026.04.21(sooyeon.choi) 수정 - Kiwi 워밍업만 유지 (Reranker는 vLLM HTTP 전환으로 불필요)
@@ -62,7 +65,7 @@ def _cleanup_spreadsheet_resources() -> None:
         root = Path(__file__).resolve().parent / root
     service = SpreadsheetResourceService(
         root,
-        SpreadsheetResourceRepository(db_path=settings.sqlite_db_path),
+        SpreadsheetResourceRepository(),
         settings.resource_max_upload_bytes,
     )
     # 2026.08.27(sooyeon.choi) 수정 - 실행 중 job 제외와 삭제 실패 재시도를 함께 수행
@@ -117,7 +120,7 @@ async def _session_cleanup_loop() -> None:
         try:
             logger.info("[스케줄러] 만료 세션 정리 시작")
             await asyncio.sleep(_SESSION_CLEANUP_INTERVAL_SECONDS)
-            repo = MetadataRepository(settings.sqlite_db_path)
+            repo = MetadataRepository()
             deleted = repo.delete_expired_query_contexts()
             logger.info(f"[스케줄러] 만료 세션 정리 완료: {deleted}건 삭제")
         except asyncio.CancelledError:
@@ -168,6 +171,17 @@ async def lifespan(app: FastAPI):
             logger.info(f"[평가] 중단된 run {orphaned}건을 failed로 정리")
     except Exception as exc:
         logger.warning(f"[평가] 중단된 평가 작업 정리 실패(무시): {exc}")
+    # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의: 재기동 전 running 작업은 failed(완료분 보존), 대기 작업은 이어서 실행
+    if settings.eval_batch_query_enabled:
+        try:
+            from app.evaluation.batch import runner as eval_batch_runner
+            from app.repositories.eval_batch_repository import EvalBatchRepository
+            interrupted = EvalBatchRepository().mark_interrupted_jobs_failed()
+            if interrupted:
+                logger.info(f"[평가] 중단된 일괄 질의 작업 {interrupted}건을 failed로 정리")
+            eval_batch_runner.kick()
+        except Exception as exc:
+            logger.warning(f"[평가] 일괄 질의 작업 정리 실패(무시): {exc}")
     try:
         yield # yield를 기준으로 앞은 시작 로직, 뒤는 종료 로직
     finally:
@@ -211,6 +225,7 @@ app.include_router(chat_router, prefix="/api")
 # 2026.04.01(sooyeon.choi) 수정 - 멀티컬렉션 관리 기능 추가
 app.include_router(collections_router, prefix="/api")
 app.include_router(ingest_router, prefix="/api")
+app.include_router(drawings_router, prefix="/api")  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
 app.include_router(parse_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 app.include_router(voice_router, prefix="/api")
@@ -230,6 +245,7 @@ app.include_router(admin_users_router, prefix="/api")
 app.include_router(admin_settings_router, prefix="/api")
 # 2026.07.22(sychoi) 추가 - RAG 평가 자동화 API
 app.include_router(eval_router, prefix="/api")
+app.include_router(eval_batch_router, prefix="/api")  # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의
 # 2026.08.27(sooyeon.choi) 추가 - internal upload는 /api prefix 없이 정본 경로 사용
 app.include_router(spreadsheet_resources_router)
 

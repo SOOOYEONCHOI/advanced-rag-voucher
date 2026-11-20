@@ -23,6 +23,7 @@ from app.repositories.department_repository import DepartmentRepository
 from app.repositories.permissions_repository import PermissionsRepository
 from app.services.ui_settings_service import UiType
 from app.utils.datetime import now_kst_iso
+from app.utils.password_policy import password_policy_error
 from app.utils.security import get_current_admin, hash_password
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,8 @@ class UserCreateRequest(BaseModel):
     login_id: str = Field(..., min_length=3, max_length=50)
     name: str = Field(..., min_length=1, max_length=100)
     department_id: str
-    password: str = Field(..., min_length=6)
+    # 2026.11.13(woojin.jung) 수정 - 길이 규칙은 password_policy_error에서 검사
+    password: str = Field(..., min_length=1)
     ui_type: Optional[UiType] = None
 
 
@@ -53,11 +55,11 @@ class PermissionsUpdateRequest(BaseModel):
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
 def _get_db():
-    return get_database_manager(get_settings().sqlite_db_path)
+    return get_database_manager()
 
 
 def _get_dept_repo() -> DepartmentRepository:
-    return DepartmentRepository(get_settings().sqlite_db_path)
+    return DepartmentRepository()
 
 
 def _get_user_row(user_id: str, db):
@@ -162,6 +164,11 @@ async def create_user(
             detail={"error": "DUPLICATE_LOGIN_ID", "message": "이미 사용 중인 아이디입니다."},
         )
 
+    # 2026.11.13(woojin.jung) 추가 - 비밀번호 규칙 공통 적용
+    policy_error = password_policy_error(body.password, user_id=body.login_id)
+    if policy_error:
+        raise HTTPException(status_code=400, detail={"error": "INVALID_PASSWORD", "message": policy_error})
+
     # 부서 활성 여부 검증
     dept_repo = _get_dept_repo()
     dept = dept_repo.get_by_id(body.department_id)
@@ -189,7 +196,7 @@ async def create_user(
     )
 
     # 기본 보안 정책 생성
-    PermissionsRepository(get_settings().sqlite_db_path).create_default_policy(body.login_id)
+    PermissionsRepository().create_default_policy(body.login_id)
 
     logger.info("사용자 생성: %s → 부서 %s", body.login_id, body.department_id)
     return {

@@ -18,7 +18,7 @@ from app.graphs.dependencies import GraphDependencies
 from app.graphs.retrieval_engine import get_retrieval_config
 from app.graphs.state import PipelineState
 from app.prompts.templates import build_rag_messages
-# 2026.07.16(sooyeon.choi) 수정 - 중복 제거 로직 공통 헬퍼(B11), 임계값 우선순위 헬퍼(B5)
+# 2026.07.16(sooyeon.choi) 수정 - 중복 제거 로직 공통 헬퍼, 임계값 우선순위 헬퍼
 from app.graphs.utils import (
     chunk_log_payload,
     dedup_chunks_by_text,
@@ -87,21 +87,17 @@ async def assemble_context(state: PipelineState, deps: GraphDependencies | None 
         context_top_k = min(context_top_k, max(1, int(citation_limit)))
 
     # relevance_threshold 미달 청크 선제 제거
-    # 2026.07.16(sooyeon.choi) 수정 - threshold_override 우선순위 헬퍼 적용 (B5)
+    # 2026.07.16(sooyeon.choi) 수정 - threshold_override 우선순위 헬퍼 적용
     threshold = effective_threshold(state, settings)
     qualified_chunks = [
         c for c in state.get("reranked_chunks", [])
         if c.get("score", 0.0) >= threshold
     ]
     if len(qualified_chunks) < len(state.get("reranked_chunks", [])):
-        # logger.info(
-        #     f"threshold({threshold}) 미달 청크 제거: "
-        #     f"{len(state.get('reranked_chunks', []))}개 → {len(qualified_chunks)}개"
-        # )
         pass
 
     # 텍스트 해시 기반 중복 제거 (SHA256: 재시작·분산 환경에서도 결정적)
-    # 2026.07.16(sooyeon.choi) 수정 - rerank.py와 중복이던 로직을 공통 헬퍼로 통합 (B11)
+    # 2026.07.16(sooyeon.choi) 수정 - rerank.py와 중복이던 로직을 공통 헬퍼로 통합
     #   입력이 score 내림차순 정렬 상태이므로 '첫 등장 유지'와 'score 최고 유지'는 동일 결과
     unique_chunks = dedup_chunks_by_text(qualified_chunks)
 
@@ -200,10 +196,6 @@ async def assemble_context(state: PipelineState, deps: GraphDependencies | None 
         max_model_tokens,
         max_output_tokens,
     )
-    # logger.info(
-    #     f"컨텍스트 구성 완료: {context_chunk_count}개 청크 포함 "
-    #     f"(전체 {len(unique_chunks)}개 중), {total_chars}자"
-    # )
     # 2026.07.10(sooyeon.choi) 수정 - Citation 생성도 LLM에 실제 전달한 청크 순서를 사용
     return {
         "final_context": final_context,

@@ -2,7 +2,8 @@
 
 라이브 LLM/Qdrant 없이 검증:
   - e2e 모듈/어댑터/metrics import
-  - 순수 지표: cosine_similarity, rule_check, citation P/R/F1
+  - 순수 지표: cosine_similarity, citation correctness/completeness
+  (2026.11.17(sooyeon.choi) 수정 - rule_check·citation P/R/F1·v1·judge 지표 삭제 반영)
   - 규칙 기반 헬퍼와 evaluate_end_to_end 오케스트레이션
 """
 
@@ -75,43 +76,23 @@ def test_pipeline_adapter_imports_when_langgraph_available():
 
 # ── 순수 지표 ────────────────────────────────────────────────────────────────
 
-def test_cosine_similarity_and_rule_check():
-    from app.evaluation.metrics.similarity import cosine_similarity, rule_check
+def test_cosine_similarity():
+    from app.evaluation.metrics.similarity import cosine_similarity
     assert cosine_similarity([1, 0], [1, 0]) == pytest.approx(1.0)
     assert cosine_similarity([1, 0], [0, 1]) == pytest.approx(0.0)
     from app.evaluation.metrics.similarity import InvalidEmbeddingVector
     with pytest.raises(InvalidEmbeddingVector, match="empty_vector"):
         cosine_similarity([], [1])
 
-    rc = rule_check("작업발판 폭은 40cm 이상, 제38조 준수", "발판 폭 40cm 이며 제38조를 따른다")
-    assert rc["match_ratio"] == pytest.approx(1.0)
-    assert set(rc["expected"]) == {"40cm", "제38조"}
-    # 수치 누락
-    rc2 = rule_check("높이 2m 이상", "높이 제한이 있다")
-    assert rc2["match_ratio"] == 0.0 and rc2["missing"] == ["2m"]
-    # 체크 대상 없으면 통과
-    assert rule_check("특별한 수치 없음", "답변")["match_ratio"] == 1.0
 
+def test_removed_metric_helpers_are_gone():
+    # 2026.11.17(sooyeon.choi) 추가 - 삭제한 지표 함수가 다시 쓰이지 않게 확인
+    import app.evaluation.metrics.citation_metrics as citation_metrics
+    import app.evaluation.metrics.similarity as similarity
 
-def test_citation_precision_recall_uses_only_gold_as_correct():
-    from app.evaluation.metrics.citation_metrics import citation_precision_recall
-    # 검색된 문서라도 gold가 아니면 잘못된 인용으로 계산한다.
-    m = citation_precision_recall(
-        cited_ids=["d1", "d2"], gold_ids={"d1"}, retrieved_ids={"d1", "d2"}, prefix="doc"
-    )
-    assert m["doc_precision"] == pytest.approx(0.5)
-    assert m["doc_recall"] == pytest.approx(1.0)
-    # 검색되지도 않은 문서 인용(할루시네이션) → precision 감점
-    m2 = citation_precision_recall(["d9"], {"d1"}, retrieved_ids={"d1"}, prefix="doc")
-    assert m2["doc_precision"] == 0.0 and m2["doc_recall"] == 0.0
-
-
-def test_map_cited_chunk_ids_normalizes():
-    from app.evaluation.metrics.citation_metrics import map_cited_chunk_ids
-    # chunk_text는 reranked text의 전방일치 스니펫이어야 하며, <개정...> 표기·공백은 정규화로 흡수
-    referenced = [{"chunk_text": "작업발판 폭은 40cm 이상 <개정 2020.1.1>"}]
-    reranked = [{"chunk_id": "ck1", "text": "작업발판 폭은 40cm 이상 <개정 2020.1.1> 이어야 한다"}]
-    assert map_cited_chunk_ids(referenced, reranked) == ["ck1"]
+    assert not hasattr(similarity, "rule_check")
+    assert not hasattr(citation_metrics, "citation_precision_recall")
+    assert not hasattr(citation_metrics, "map_cited_chunk_ids")
 
 
 def test_evaluation_citation_metrics_use_actual_context_order():
@@ -127,7 +108,7 @@ def test_evaluation_citation_metrics_use_actual_context_order():
         expected_behavior="answer",
     )
     assert metrics["all_numbers_valid"] is True
-    assert metrics["citation_relevance"] == 1.0
+    assert "citation_relevance" not in metrics
     assert metrics["correctness"] == 1.0
     assert metrics["completeness"] == 1.0
     assert metrics["missing_citation"] is False
@@ -195,13 +176,15 @@ def test_threshold_fallback_branches():
 
 
 def test_guardrail_and_refusal():
-    from app.evaluation.runner.e2e_evaluator import _guardrail, _check_refusal
+    from app.evaluation.metrics.answer_correctness_v1 import check_refusal
+    from app.evaluation.runner.e2e_evaluator import _guardrail
     g = _guardrail({"intent": "rag_query", "should_retrieve": True}, "answer", "답변입니다")
     assert g["intent"] == "rag_query" and g["refusal_correct"] is None
+    assert "format_correct" not in g
     # not_enough_info + 거절 문구 포함 → True
-    assert _check_refusal("not_enough_info", "제공된 문서에서 찾을 수 없습니다") is True
-    assert _check_refusal("not_enough_info", "제38조는 ...") is False
-    assert _check_refusal("answer", "아무거나") is None
+    assert check_refusal("not_enough_info", "제공된 문서에서 찾을 수 없습니다") is True
+    assert check_refusal("not_enough_info", "제38조는 ...") is False
+    assert check_refusal("answer", "아무거나") is None
 
 
 # ── evaluate_end_to_end 오케스트레이션 (목킹) ─────────────────────────────────
@@ -241,6 +224,7 @@ def test_evaluate_end_to_end_assembles_all_fields(monkeypatch):
                 ],
                 "timing": {"retrieve": 12.0},
                 "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                "latency_ms": 1234,
             }
 
     class _FakeEmbedder:
@@ -271,27 +255,36 @@ def test_evaluate_end_to_end_assembles_all_fields(monkeypatch):
     assert pipeline_calls == [(12, 4)]
     assert fields["answer_text"].startswith("작업발판")
     assert "judge_json" not in fields
-    assert fields["similarity"] == pytest.approx(1.0)
-    assert fields["answer_correctness_v1_json"]["status"] == "evaluated"
-    assert fields["answer_correctness_v1_json"]["value"] == pytest.approx(1.0)
-    assert fields["answer_correctness_v1_json"]["metadata"]["citation_tags_removed"] == 1
-    assert fields["answer_correctness_v1_json"]["metadata"]["metric_version"] == "rule-v1.1"
-    assert fields["answer_correctness_v2_json"]["status"] == "evaluated"
-    assert fields["answer_correctness_v2_json"]["value"] == pytest.approx(1.0)
-    assert fields["answer_correctness_v2_json"]["metadata"]["metric_version"] == "rule-v2-shadow.2"
-    assert fields["answer_correctness_f2_json"]["status"] == "evaluated"
-    assert fields["answer_correctness_f2_json"]["value"] == pytest.approx(1.0)
-    assert fields["answer_correctness_f2_json"]["metadata"]["beta"] == pytest.approx(2.0)
-    assert fields["retrieval_json"]["rrf"]["recall@12"] == pytest.approx(1.0)
-    assert fields["retrieval_json"]["rerank"]["ndcg@4"] == pytest.approx(1.0)
-    assert fields["rule_check_json"]["match_ratio"] == pytest.approx(1.0)
-    # 규칙 기반 citation 주요 지표 + 문서 보조 지표
-    assert fields["citation_json"]["doc_recall"] == pytest.approx(1.0)
+    # 2026.11.17(sooyeon.choi) 수정 - Answer Correctness는 F2 단일(answer_correctness_json),
+    #   v1·v2·judge·similarity·rule_check 필드는 더 이상 만들지 않는다.
+    for removed in (
+        "similarity", "answer_correctness_v1_json", "answer_correctness_v2_json",
+        "answer_correctness_f2_json", "answer_correctness_judge_json", "rule_check_json",
+    ):
+        assert removed not in fields
+    correctness = fields["answer_correctness_json"]
+    assert correctness["status"] == "evaluated"
+    assert correctness["value"] == pytest.approx(1.0)
+    assert correctness["metadata"]["method"] == "sentence_alignment_f2"
+    assert correctness["metadata"]["beta"] == pytest.approx(2.0)
+    assert correctness["metadata"]["gold_coverage"] == pytest.approx(1.0)
+    # 응답시간은 어댑터가 잰 그래프 실행 시간
+    assert fields["latency_ms"] == 1234
+    # 검색 지표는 K=1,3,5,10 고정 + 설정 N/K
+    rrf = fields["retrieval_json"]["rrf"]
+    assert rrf["hit@10"] == pytest.approx(1.0)
+    assert rrf["recall@12"] == pytest.approx(1.0)
+    assert "fail@10" not in rrf and "top1_is_relevant" not in rrf and "rr" not in rrf
+    assert not any(key.startswith("document_") for key in rrf)
+    rerank = fields["retrieval_json"]["rerank"]
+    assert rerank["ndcg@4"] == pytest.approx(1.0)
+    assert rerank["ndcg@5"] == pytest.approx(1.0)
+    # 규칙 기반 citation 주요 지표
     assert fields["citation_json"]["correctness"] == pytest.approx(1.0)
     assert fields["citation_json"]["completeness"] == pytest.approx(1.0)
-    assert fields["citation_json"]["citation_f1"] == pytest.approx(1.0)
+    for removed in ("citation_f1", "citation_validity", "doc_recall", "document_f1", "citation_relevance"):
+        assert removed not in fields["citation_json"]
     assert "accuracy" not in fields["citation_json"]
-    assert fields["citation_json"]["citation_relevance"] == 1.0
     # 상세 + ①축
     assert fields["citation_detail_json"]["cited"][0]["citation_id"] == 1
     assert fields["citation_detail_json"]["diagnostics"]["cited_chunk_ids"] == ["gold1"]
@@ -317,6 +310,23 @@ def test_evaluate_end_to_end_refusal_case_is_ok(monkeypatch):
     fields = asyncio.run(e2e.evaluate_end_to_end(item, {}, "coll"))
     assert fields["status"] == "ok"
     assert fields["threshold_fallback_json"]["correct"] is True
+
+
+@pytest.mark.parametrize("rerank_status,marker", [("ok", None), ("error", "error"), ("skipped", "skipped")])
+def test_pipeline_search_metrics_are_independent_of_answer_error(rerank_status, marker):
+    from app.evaluation.runner.e2e_evaluator import _compute_pipeline_retrieval_metrics
+
+    metrics = _compute_pipeline_retrieval_metrics(
+        result={"outcome_code": "llm_error", "retrieval_status": "ok", "rerank_status": rerank_status,
+                "retrieved_chunks": [{"chunk_id": "g"}], "reranked_chunks": [{"chunk_id": "g"}]},
+        gold_chunk_ids={"g"}, retrieval_top_n=10, rerank_top_k=5,
+    )
+    assert metrics["rrf"]["hit@10"] == 1.0
+    if marker:
+        assert metrics["rerank"][marker] is True
+        assert "ndcg@5" not in metrics["rerank"]
+    else:
+        assert metrics["rerank"]["ndcg@5"] == 1.0
 
 
 def test_evaluate_end_to_end_scores_missing_required_answer_as_zero(monkeypatch):
@@ -346,9 +356,9 @@ def test_evaluate_end_to_end_scores_missing_required_answer_as_zero(monkeypatch)
     ))
 
     assert fields["status"] == "ok"
-    assert fields["similarity"] == 0.0
-    assert fields["answer_correctness_v1_json"]["status"] == "evaluated"
-    assert fields["answer_correctness_v1_json"]["reason"] == "empty_system_answer"
+    assert fields["answer_correctness_json"]["status"] == "evaluated"
+    assert fields["answer_correctness_json"]["value"] == 0.0
+    assert fields["answer_correctness_json"]["reason"] == "empty_system_answer"
     assert fields["citation_json"]["correctness"] == 0.0
     assert fields["citation_json"]["completeness"] == 0.0
 
@@ -397,8 +407,8 @@ def test_evaluate_end_to_end_skips_similarity_for_blocked_behaviors(
     ))
 
     assert "similarity" not in fields
-    assert fields["answer_correctness_v1_json"]["status"] == "excluded"
-    assert fields["answer_correctness_v1_json"]["reason"] == "expected_behavior_not_answer"
+    assert fields["answer_correctness_json"]["status"] == "excluded"
+    assert fields["answer_correctness_json"]["reason"] == "expected_behavior_not_answer"
     assert fields["citation_json"]["skipped"] is True
     assert fields["retrieval_json"]["rrf"] == {
         "skipped": True,
@@ -410,7 +420,7 @@ def test_evaluate_end_to_end_skips_similarity_for_blocked_behaviors(
 
 @pytest.fixture
 def repo(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "eval.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("컬렉션", "e2e_agg_coll"),
@@ -438,25 +448,30 @@ def test_aggregate_includes_first_class_axis_metrics(repo):
 
     repo.insert_item_result(
         run_id, snap[0]["qa_id"], status="ok",
-        citation_json={"correctness": 1.0, "completeness": 1.0},
-        similarity=0.8,
-        threshold_fallback_json={"correct": True}, rule_check_json={"match_ratio": 1.0},
+        citation_json={"correctness": 1.0, "completeness": 1.0, "citation_count": 3},
+        answer_correctness_json={"value": 0.8, "status": "evaluated", "reason": None, "metadata": {}},
+        threshold_fallback_json={"correct": True},
+        latency_ms=1500,
     )
     repo.insert_item_result(
         run_id, snap[1]["qa_id"], status="ok",
         threshold_fallback_json={"correct": True},
-        guardrail_json={"refusal_correct": True},
-        rule_check_json={"match_ratio": 0.0},
+        guardrail_json={"refusal_correct": True, "format_correct": False},
     )
     _aggregate_and_save_metrics(repo, run_id, snap)
     mets = {(m["metric_key"], m["segment"]): m["metric_value"] for m in repo.get_run_metrics(run_id)}
 
-    assert mets[("answer.correctness_mean", "all")] == pytest.approx(0.8)
+    assert mets[("answer.correctness", "all")] == pytest.approx(0.8)
     assert ("answer.llm_correctness_mean", "all") not in mets
     assert ("judge.accuracy.mean", "all") not in mets
     assert mets[("citation.correctness", "all")] == pytest.approx(1.0)
     assert mets[("answer.behavior_correct_rate", "all")] == pytest.approx(1.0)  # 둘 다 correct
     assert mets[("answer.refusal_correct_rate", "all")] == pytest.approx(1.0)   # 해당 1건만
-    assert mets[("answer.rule_match.mean", "all")] == pytest.approx(0.5)        # (1.0+0.0)/2
+    # 2026.11.17(sooyeon.choi) 수정 - 삭제 지표는 집계되지 않는다
+    for removed in (
+        "answer.correctness_mean", "answer.similarity.mean", "answer.rule_match.mean",
+        "answer.format_correct_rate", "latency.mean_ms", "citation.citation_count",
+    ):
+        assert (removed, "all") not in mets
     # tag 세그먼트도 유지
     assert mets[("citation.correctness", "tag:legal_reference")] == pytest.approx(1.0)

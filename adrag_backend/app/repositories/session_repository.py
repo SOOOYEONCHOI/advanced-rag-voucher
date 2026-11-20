@@ -10,7 +10,6 @@ import logging
 from datetime import timedelta
 from typing import Optional
 
-from app.core.config import get_settings
 from app.models.data_models import QueryContext
 from app.repositories.database import get_database_manager
 from app.utils.datetime import now_kst, now_kst_iso
@@ -23,8 +22,8 @@ _SESSION_TTL_DAYS = 14
 class SessionRepository:
     """tb_query_sessions CRUD Repository."""
 
-    def __init__(self, db_path: str = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
         logger.debug("SessionRepository initialized")
 
     def _row_to_context(self, row) -> QueryContext:

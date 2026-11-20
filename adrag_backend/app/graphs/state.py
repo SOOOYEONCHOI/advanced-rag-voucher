@@ -74,20 +74,25 @@ class PipelineState(TypedDict):
     retry_count: int                                      # 폴백 재시도 횟수
     retry_target: Optional[str]                           # retrieve | generate_answer
     error: Optional[str]                                  # 오류 메시지 (없으면 None)
-    # 2026.07.16(sooyeon.choi) 추가 - 스키마 누락 필드 보강 (B12)
+    # 2026.11.11(sooyeon.choi) 추가 - 검색 준비 단계 오류의 사용자 안내 유형(permission_denied|collection_unavailable). 없으면 일시 오류 안내
+    error_message_type: Optional[str]
+    # 2026.07.16(sooyeon.choi) 추가 - 스키마 누락 필드 보강
     #   rerank(degraded 폴백)·fallback_handler·assemble_context·check_relevance가
     #   읽고 쓰는 필드인데 TypedDict 스키마에 선언되지 않아 초기 state의 키가
     #   그래프 채널 정의와 어긋나 있었음
     relevance_threshold: Optional[float]                  # rerank 후 컨텍스트 포함 최소 점수 (None이면 settings 값)
-    # 2026.07.16(sooyeon.choi) 추가 - fallback 재시도용 단계별 top_k override (B4)
+    # 2026.07.16(sooyeon.choi) 추가 - fallback 재시도용 단계별 top_k override
     #   기존에는 fallback이 legacy top_k에 값을 써서 from_legacy_top_k()가 candidate=×4,
     #   context=×0.5로 재해석 → 재시도부터 top_k 배분 체계가 변질되던 문제를 분리
     retrieval_override: Optional[Dict[str, int]]          # {"candidate_top_k","rerank_top_k","context_top_k"}
-    # 2026.07.16(sooyeon.choi) 추가 - 시스템 폴백 전용 임계값 우회 (B5)
+    # 2026.07.16(sooyeon.choi) 추가 - 시스템 폴백 전용 임계값 우회
     #   기존에는 rerank degraded 폴백이 relevance_threshold=0.0을 사용자 설정 필드에
     #   덮어써 이후 파이프라인 전체가 오염되던 것을 별도 필드로 분리.
     #   정상 rerank가 None으로 재설정하므로 degraded 통과분에만 일시 적용된다.
     threshold_override: Optional[float]                   # None이 아니면 relevance_threshold보다 우선
+
+    # 2026.11.11(sooyeon.choi) 추가 - 관리자 요청 여부. 비관리자는 접근 가능한 컬렉션 안에서만 검색한다(build_metadata_filter)
+    is_admin: bool
 
     # ── 메타데이터 필터링 ──
     enable_metadata_filtering: Optional[bool]             # None이면 config 설정 따름
@@ -110,9 +115,11 @@ class PipelineState(TypedDict):
     usage: Optional[dict]  # {"prompt_tokens": int, "completion_tokens": int}
     # 2026.06.19(sooyeon.choi) 추가 - 질의 처리 최종 결과 코드
     outcome_code: str
+    retrieval_status: str  # F-08: ok/error/not_run
+    rerank_status: str     # F-09: ok/error/skipped/empty/not_run
 
 
-# 2026.07.16(sooyeon.choi) 추가 - 초기 state 팩토리 (B12)
+# 2026.07.16(sooyeon.choi) 추가 - 초기 state 팩토리
 #   기존: RAGService.query()와 query_stream()에 동일한 40줄 dict 리터럴이 복붙되어
 #   필드 추가 시 한쪽 누락이 그대로 버그가 됨 (context_chunks 추가 시 양쪽 수정 이력 존재)
 #   미사용 키(query_type/inferred_doc_type/selected_strategy)는 스키마와 일치하도록 제거함
@@ -130,6 +137,8 @@ def make_initial_state(
     llm_api_key: Optional[str],
     enable_metadata_filtering: Optional[bool],
     relevance_threshold: Optional[float],
+    # 2026.11.11(sooyeon.choi) 추가 - 관리자 요청 여부(라우트의 principal 기준)
+    is_admin: bool = False,
 ) -> PipelineState:
     """RAG 파이프라인 초기 PipelineState를 생성한다 (query/query_stream 공용)."""
     return {
@@ -145,6 +154,7 @@ def make_initial_state(
         "llm_model": llm_model,
         "llm_api_key": llm_api_key,
         "enable_metadata_filtering": enable_metadata_filtering,
+        "is_admin": bool(is_admin),  # 2026.11.11(sooyeon.choi) 추가
         "intent": None,
         "should_retrieve": None,
         "guardrail_reason": None,
@@ -165,14 +175,17 @@ def make_initial_state(
         "answer_images": [],
         "answer_images_total": 0,  # 2026.11.06(sooyeon.choi) 추가
         "relevance_threshold": relevance_threshold,
-        # 2026.07.16(sooyeon.choi) 추가 - B4/B5 override 필드 초기화
+        # 2026.07.16(sooyeon.choi) 추가 - override 필드 초기화
         "retrieval_override": None,
         "threshold_override": None,
         "retry_count": 0,
         "retry_target": None,
         "error": None,
+        "error_message_type": None,  # 2026.11.11(sooyeon.choi) 추가
         "preprocess_result": {},
         "timing": {},
         "usage": None,
         "outcome_code": "unknown",
+        "retrieval_status": "not_run",
+        "rerank_status": "not_run",
     }

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 config_module = types.ModuleType("app.core.config")
-config_module.get_settings = lambda: SimpleNamespace(sqlite_db_path="", instance_dir="")
+config_module.get_settings = lambda: SimpleNamespace(instance_dir="")
 sys.modules["app.core.config"] = config_module
 
 log_module = types.ModuleType("app.utils.log.log")
@@ -69,9 +69,9 @@ def _service(db_path, vector_repo):
     service.settings = SimpleNamespace(
         max_collections=5,
         embedding_dim=3,
-        sqlite_db_path="", instance_dir=str(db_path),
+        instance_dir=str(db_path),
     )
-    service.collection_repo = CollectionRepository(str(db_path))
+    service.collection_repo = CollectionRepository()
     service.vector_repo = vector_repo
     return service
 
@@ -87,7 +87,7 @@ def _insert_user(repo, user_id="user01"):
 
 
 def test_create_collection_reuses_name_when_rdb_row_is_missing_from_qdrant(tmp_path):
-    repo = CollectionRepository(str(tmp_path / "collections.db"))
+    repo = CollectionRepository()
     _insert_user(repo)
     stale = repo.create("Topic", created_by="user01", qdrant_name="user01_Topic")
     repo.db.execute_update(
@@ -118,7 +118,7 @@ def test_create_collection_reuses_name_when_rdb_row_is_missing_from_qdrant(tmp_p
 
 
 def test_create_collection_keeps_duplicate_when_qdrant_collection_exists(tmp_path):
-    repo = CollectionRepository(str(tmp_path / "collections.db"))
+    repo = CollectionRepository()
     _insert_user(repo)
     repo.create("Topic", created_by="user01", qdrant_name="user01_Topic")
 
@@ -130,7 +130,7 @@ def test_create_collection_keeps_duplicate_when_qdrant_collection_exists(tmp_pat
 
 # 2026.06.30(sooyeon.choi) 추가 - 부서 허용 주제, 개인 차단, 타 부서 격리 검증
 def test_get_accessible_by_user_applies_department_and_blocked_topics(tmp_path):
-    repo = CollectionRepository(str(tmp_path / "collections.db"))
+    repo = CollectionRepository()
     repo.db.execute_update(
         "INSERT INTO tb_departments (department_id, department_name, allowed_topics) VALUES (?, ?, ?)",
         ("D001", "R&D", '["기타", "산업안전보건법"]'),
@@ -202,7 +202,7 @@ def test_require_collection_manager_rejects_other_user():
 
 def test_delete_collection_cleans_topic_only_after_departments_last_collection(tmp_path):
     db_path = tmp_path / "collections.db"
-    repo = CollectionRepository(str(db_path))
+    repo = CollectionRepository()
     for department_id in ("D001", "D002"):
         department_name = f"Department {department_id}"
         repo.db.execute_update(
@@ -288,7 +288,7 @@ def test_list_collections_returns_accessible_read_only_collection(tmp_path, monk
     from app.routes import collections as collections_route
 
     db_path = str(tmp_path / "collections.db")
-    repo = CollectionRepository(db_path)
+    repo = CollectionRepository()
     repo.db.execute_update(
         "INSERT INTO tb_departments (department_id, department_name, allowed_topics) VALUES (?, ?, ?)",
         ("D001", "R&D", '["기타"]'),
@@ -321,7 +321,7 @@ def test_list_collections_returns_accessible_read_only_collection(tmp_path, monk
         collections_route,
         "get_settings",
         lambda: SimpleNamespace(
-            sqlite_db_path="", instance_dir=db_path,
+            instance_dir=db_path,
             qdrant_host="localhost",
             qdrant_port=6333,
         ),

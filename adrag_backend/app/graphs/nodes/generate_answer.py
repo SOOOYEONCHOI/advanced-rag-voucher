@@ -6,6 +6,8 @@ Qwen3의 <think> 태그는 LLMService.strip_thinking()으로 분리한다.
 LLM 호출 실패 시 error 필드를 설정하여 fallback_handler로 분기시킨다.
 """
 
+import time
+
 from langchain_core.callbacks.manager import adispatch_custom_event
 
 from app.core.config import get_settings
@@ -25,8 +27,12 @@ from app.prompts.templates import build_rag_messages
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
+
+
+# 2026.11.18(sooyeon.choi) 추가 - 첫 토큰 시각 기록 키(timing 사전, 단계 시간 합산에는 쓰지 않음)
+FIRST_TOKEN_AT_KEY = "generate_first_token_at"
 
 
 @timed_node("generate_answer")
@@ -55,20 +61,18 @@ async def generate_answer(state: PipelineState, deps: GraphDependencies | None =
     try:
         answer_parts = []
         usage = {}
+        # 2026.11.18(sooyeon.choi) 추가 - 첫 답변 토큰 수신 시각(epoch s). RAGService가 요청 시작 기준 ms로 바꾼다.
+        #   재시도로 다시 생성하면 덮어써 마지막(화면에 남는) 생성 기준이 된다. timed_node와 같은 timing 사전에 기록.
+        timing = state.get("timing")
+        if isinstance(timing, dict):
+            timing.pop(FIRST_TOKEN_AT_KEY, None)
         async for token in llm_service.chat_stream(messages, usage_sink=usage):
+            if not answer_parts and isinstance(timing, dict):
+                timing[FIRST_TOKEN_AT_KEY] = time.time()
             answer_parts.append(token)
             await adispatch_custom_event("rag_token", {"token": token})
         answer = "".join(answer_parts).strip()
         # LLMService.chat()에서 이미 strip_thinking() 처리됨
-        # logger.info(f"답변 생성 완료: {len(answer)}자")
-        # 2026.05.22(sooyeon.choi) 추가 - 노드 출력 로깅
-        # logger.info(f"[generate_answer 출력] 답변 앞 200자: {answer[:200]!r}")
-
-        # [DEBUG] 컨텍스트 및 전체 답변 확인 (검색 품질 디버깅용)
-        # context_preview = (state.get("final_context", "") or "")[:500]
-        # logger.debug(f"[DEBUG] 컨텍스트 앞 500자:\n{context_preview}")
-        # logger.debug(f"[DEBUG] 생성된 전체 답변:\n{answer}")
-
         # 2026.06.16(sooyeon.choi) 추가 - SCR-006 토큰 사용량 캡처 (비스트리밍 전용)
         usage = usage or None
         if not answer:

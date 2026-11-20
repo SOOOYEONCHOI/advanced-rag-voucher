@@ -15,6 +15,8 @@ const DATASET_STATUS_LABELS = {
 };
 const QUESTION_TYPE_LABELS = {
   factual: '사실형', procedural: '절차형', comparative: '비교형', multihop: '멀티홉',
+  // 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성(유형 구분 없음)
+  law: '법령', general: '일반',
 };
 const REVIEW_STATUS_LABELS = {
   pending: '대기', approved: '승인', edited: '수정됨', rejected: '반려',
@@ -66,7 +68,32 @@ export const useEvalDatasets = () => {
   const deleteDatasetTarget = ref(null);
   const isDeletingDataset = ref(false);
   const collections = ref([]);
-  const createForm = ref({ name: '', collection_id: null, target_count: 30, llm_backend: 'vllm' });
+  // 2026.11.19(sooyeon.choi) 수정 - 생성 방식(typed=기존 유형별 / law_article=법령 조항 / single_section=일반 문서 단일 출처)
+  const emptyCreateForm = (llmModel = '') => ({
+    name: '', collection_id: null, target_count: 30, llm_backend: 'vllm', llm_model: llmModel,
+    generation_mode: 'typed', include_annex: false, article_ref_ratio: 30, query_id_prefix: '',
+  });
+  const createForm = ref(emptyCreateForm());
+  const downloadingKind = ref(null); // 2026.11.19(sooyeon.choi) 추가 - 'approved' | 'testset'
+  // 2026.11.18(sooyeon.choi) 추가 - vLLM에 띄워진 생성 모델 목록 (기본=챗봇 LLM, 꺼진 모델은 선택 불가)
+  const genModels = ref([]);
+  const genModelsLoading = ref(false);
+  const defaultGenModel = () => genModels.value.find((m) => m.is_default)?.model || '';
+  const loadGenModels = async () => {
+    genModelsLoading.value = true;
+    try {
+      const { data } = await evalApi.getGenerationModels();
+      genModels.value = data.items || [];
+    } catch {
+      genModels.value = [];
+    } finally {
+      genModelsLoading.value = false;
+    }
+    const current = genModels.value.find((m) => m.model === createForm.value.llm_model);
+    if (!current || (!current.available && !current.is_default)) {
+      createForm.value.llm_model = defaultGenModel();
+    }
+  };
 
   const goldsets = ref([]);
   const finalizeNote = ref('');
@@ -83,6 +110,60 @@ export const useEvalDatasets = () => {
   let pollTimer = null;
 
   const isGenerating = computed(() => selectedDataset.value?.status === 'generating');
+
+  // 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋(확정 데이터셋 여러 개 → 한 데이터셋)
+  const mergeEnabled = ref(false);
+  const mergeSelection = ref([]); // 고른 순서대로 dataset_id
+  const showMergeModal = ref(false);
+  const mergeName = ref('');
+  const isMerging = ref(false);
+  const datasetConfig = (dataset) => {
+    const raw = dataset?.gen_config_json;
+    if (raw && typeof raw === 'object') return raw;
+    try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+  };
+  const isMerged = (dataset) => datasetConfig(dataset).dataset_kind === 'merged';
+  const mergedSources = (dataset) => datasetConfig(dataset).merged_from || [];
+  const collectionLabel = (dataset) => (isMerged(dataset)
+    ? `합본 (${mergedSources(dataset).map((s) => s.law_label || s.collection_name).join(' + ')})`
+    : dataset?.collection_name);
+  const canMergeSelect = (dataset) => !isMerged(dataset) && dataset.status === 'finalized';
+  const isMergeSelected = (dataset) => mergeSelection.value.includes(dataset.dataset_id);
+  const toggleMergeSelect = (dataset) => {
+    if (!canMergeSelect(dataset)) return;
+    mergeSelection.value = isMergeSelected(dataset)
+      ? mergeSelection.value.filter((id) => id !== dataset.dataset_id)
+      : [...mergeSelection.value, dataset.dataset_id];
+  };
+  const clearMergeSelection = () => { mergeSelection.value = []; };
+  const mergeSelectedDatasets = computed(() => mergeSelection.value
+    .map((id) => datasets.value.find((d) => d.dataset_id === id))
+    .filter(Boolean));
+  const mergeItemTotal = computed(() => mergeSelectedDatasets.value
+    .reduce((sum, d) => sum + (d.approved_count ?? 0), 0));
+  const selectedIsMerged = computed(() => isMerged(selectedDataset.value));
+  const openMergeModal = () => {
+    if (mergeSelection.value.length < 2) return;
+    mergeName.value = `시험 합본 ${mergeItemTotal.value}`;
+    showMergeModal.value = true;
+  };
+  const submitMerge = async () => {
+    if (!mergeName.value.trim() || isMerging.value) return;
+    isMerging.value = true;
+    try {
+      const { data } = await evalApi.mergeDatasets({ name: mergeName.value.trim(), datasetIds: mergeSelection.value });
+      showMergeModal.value = false;
+      clearMergeSelection();
+      await loadDatasets();
+      const created = datasets.value.find((d) => d.dataset_id === data.dataset_id);
+      if (created) await selectDataset(created);
+      showToast(`합본 데이터셋을 만들었습니다(${data.item_count}문항, 확정 v1).`);
+    } catch (e) {
+      showToast(e.response?.data?.detail || '합본 데이터셋을 만들지 못했습니다.', 'error');
+    } finally {
+      isMerging.value = false;
+    }
+  };
   const qaTotalPages = computed(() => Math.max(1, Math.ceil(qaTotal.value / qaPageSize.value)));
   const generateProgress = computed(() => {
     const d = selectedDataset.value;
@@ -158,6 +239,8 @@ export const useEvalDatasets = () => {
     try {
       const { data } = await evalApi.listDatasets();
       datasets.value = data.items || [];
+      mergeEnabled.value = data.merge_enabled === true; // 2026.11.20(sooyeon.choi) 수정 - 합본 버튼 표시
+      mergeSelection.value = mergeSelection.value.filter((id) => datasets.value.some((d) => d.dataset_id === id && canMergeSelect(d)));
       const currentId = selectedDataset.value?.dataset_id;
       const current = datasets.value.find((dataset) => dataset.dataset_id === currentId);
       const generating = current?.status === 'generating'
@@ -210,11 +293,30 @@ export const useEvalDatasets = () => {
     }
   };
 
-  const downloadApprovedExcel = async (dataset) => {
+  // 2026.11.19(sooyeon.choi) 수정 - 승인 QA / 시험 데이터셋 다운로드 공용
+  const DOWNLOADS = {
+    approved: {
+      request: (id) => evalApi.downloadApprovedDataset(id),
+      fallback: (id) => `eval_dataset_${id}.xlsx`,
+      error: '승인 QA Excel 다운로드에 실패했습니다.',
+    },
+    testset: {
+      request: (id) => evalApi.downloadTestset(id),
+      fallback: (id) => `eval_testset_${id}.xlsx`,
+      error: '시험 데이터셋 다운로드에 실패했습니다.',
+    },
+  };
+
+  const downloadApprovedExcel = (dataset) => downloadDatasetExcel(dataset, 'approved');
+  const downloadTestsetExcel = (dataset) => downloadDatasetExcel(dataset, 'testset');
+
+  const downloadDatasetExcel = async (dataset, kind) => {
     if (!dataset || (dataset.approved_count ?? 0) < 1 || downloadingDatasetId.value !== null) return;
+    const spec = DOWNLOADS[kind];
     downloadingDatasetId.value = dataset.dataset_id;
+    downloadingKind.value = kind;
     try {
-      const response = await evalApi.downloadApprovedDataset(dataset.dataset_id);
+      const response = await spec.request(dataset.dataset_id);
       const blob = response.data instanceof Blob
         ? response.data
         : new Blob([response.data], { type: response.headers['content-type'] });
@@ -223,16 +325,17 @@ export const useEvalDatasets = () => {
       link.href = url;
       link.download = responseFilename(
         response.headers['content-disposition'],
-        `eval_dataset_${dataset.dataset_id}.xlsx`,
+        spec.fallback(dataset.dataset_id),
       );
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      showToast((await blobErrorDetail(error)) || '승인 QA Excel 다운로드에 실패했습니다.', 'error');
+      showToast((await blobErrorDetail(error)) || spec.error, 'error');
     } finally {
       downloadingDatasetId.value = null;
+      downloadingKind.value = null;
     }
   };
 
@@ -318,6 +421,20 @@ export const useEvalDatasets = () => {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   };
 
+  // 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성(법령 조항 / 일반 문서) gen_config
+  const singleSourceConfig = (form) => {
+    if (form.generation_mode === 'typed') return {};
+    const config = { generation_mode: form.generation_mode };
+    const prefix = String(form.query_id_prefix || '').trim();
+    if (prefix) config.query_id_prefix = prefix;
+    if (form.generation_mode === 'law_article') {
+      config.include_annex = Boolean(form.include_annex);
+      const ratio = Number(form.article_ref_ratio);
+      config.article_ref_ratio = Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 100) / 100 : 0.3;
+    }
+    return config;
+  };
+
   const createDataset = async () => {
     if (!createForm.value.name || !createForm.value.collection_id) {
       loadError.value = '이름과 컬렉션을 입력하세요.';
@@ -332,10 +449,15 @@ export const useEvalDatasets = () => {
         gen_config: {
           target_count: Number(createForm.value.target_count) || 30,
           llm_backend: createForm.value.llm_backend,
+          // 2026.11.18(sooyeon.choi) 추가 - 선택한 vLLM 모델명(주소는 서버가 설정에서 찾음)
+          ...(createForm.value.llm_backend === 'vllm' && createForm.value.llm_model
+            ? { llm_model: createForm.value.llm_model } : {}),
+          // 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성 설정(기존 유형별 생성은 보내지 않음)
+          ...singleSourceConfig(createForm.value),
         },
       });
       showCreateModal.value = false;
-      createForm.value = { name: '', collection_id: null, target_count: 30, llm_backend: 'vllm' };
+      createForm.value = emptyCreateForm(defaultGenModel());
       await loadDatasets();
     } catch (e) {
       loadError.value = e.response?.data?.detail || '데이터셋 생성 요청에 실패했습니다.';
@@ -352,6 +474,33 @@ export const useEvalDatasets = () => {
       showToast(e.response?.data?.detail || '승인에 실패했습니다.', 'error');
     }
   };
+  // 2026.11.19(sooyeon.choi) 추가 - '검색 확인 필요' + 법령 조항·일반 문서 방식 문항만 같은 근거로 다시 생성
+  const regeneratingQaId = ref(null);
+  const canRegenerate = (item) => !selectedIsMerged.value // 2026.11.20(sooyeon.choi) 수정 - 합본은 원본에서 다시 생성
+    && item.self_valid_rank == null && ['law', 'general'].includes(item.question_type);
+  const regenerateLabel = (item) => (item.question_type === 'law' ? '같은 조항으로 다시 생성' : '같은 섹션으로 다시 생성');
+  const regenerateItem = async (item) => {
+    if (!canRegenerate(item) || regeneratingQaId.value !== null) return;
+    regeneratingQaId.value = item.qa_id;
+    try {
+      const { data } = await evalApi.regenerateQaItem(item.qa_id);
+      item.question = data.question;
+      item.gold_answer = data.gold_answer;
+      item.self_valid_rank = data.self_valid_rank;
+      item.review_status = data.review_status;
+      item.tags_parsed = data.tags || [];
+      item.source_meta = data.source_meta || item.source_meta;
+      await loadDatasets();
+      showToast(data.self_valid_rank == null
+        ? '다시 생성했습니다. 여전히 검색 확인이 필요합니다.'
+        : `다시 생성했습니다(검색 순위 ${data.self_valid_rank}위). 검수 대기로 돌아갔습니다.`);
+    } catch (e) {
+      showToast(e.response?.data?.detail || '다시 생성에 실패했습니다.', 'error');
+    } finally {
+      regeneratingQaId.value = null;
+    }
+  };
+
   const rejectItem = async (item) => {
     try {
       await evalApi.rejectQaItem(item.qa_id);
@@ -502,16 +651,22 @@ export const useEvalDatasets = () => {
 
   return {
     isAdmin, displayName, sidebarOpen, isLoading, loadError, toast,
-    datasets, selectedDataset, downloadingDatasetId, isGenerating, generateProgress,
+    datasets, selectedDataset, downloadingDatasetId, downloadingKind, isGenerating, generateProgress,
     qaItems, displayQaItems, qaTotal, qaPage, qaPageSize, qaTotalPages,
     statusFilter, typeFilter, undetectedOnly, undetectedCount,
     selectedQaIds, isAllSelected, isSelectingAll, toggleSelectAll, editingItem,
     approvedCount, datasetItemCount, showCreateModal, collections, createForm, goldsets, finalizeNote,
+    genModels, genModelsLoading, loadGenModels,
     deleteDatasetTarget, isDeletingDataset,
-    loadDatasets, loadCollections, selectDataset, downloadApprovedExcel, loadQaItems, applyFilters, goToPage, toggleExpand,
+    loadDatasets, loadCollections, selectDataset, downloadApprovedExcel, downloadTestsetExcel, loadQaItems, applyFilters, goToPage, toggleExpand,
     createDataset, approveItem, rejectItem, bulkApprove, bulkReject,
+    regeneratingQaId, canRegenerate, regenerateLabel, regenerateItem,
     startEdit, toggleEditTag, saveEdit, cancelEdit, finalizeDataset, deleteDataset,
     closeDeleteDatasetModal, confirmDeleteDataset, logout,
+    // 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋
+    mergeEnabled, mergeSelection, showMergeModal, mergeName, isMerging, mergeSelectedDatasets, mergeItemTotal,
+    selectedIsMerged, isMerged, mergedSources, collectionLabel, canMergeSelect, isMergeSelected,
+    toggleMergeSelect, clearMergeSelection, openMergeModal, submitMerge,
     statusLabel, typeLabel, reviewLabel, tagLabel, behaviorLabel, formatDate,
     EXPECTED_BEHAVIOR_OPTIONS, AVAILABLE_TAGS,
   };

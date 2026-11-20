@@ -18,13 +18,33 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 시스템 의존성
+# 2026.10.28(woojin.jung) 추가 - Excel 시트 PDF 렌더링용 LibreOffice UNO와 한글 글꼴
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     git \
     curl \
     poppler-utils \
+    libreoffice-calc \
+    python3-uno \
+    fonts-noto-cjk \
+    fonts-nanum \
     && rm -rf /var/lib/apt/lists/*
+
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - DWG→DXF 변환기 LibreDWG(GPLv3)를 소스로 빌드해 dwg2dxf만 쓴다
+#   백엔드는 별도 프로세스로만 호출한다(라이브러리 링크 없음). 빌드하지 않으려면 --build-arg WITH_LIBREDWG=false
+ARG WITH_LIBREDWG=true
+ARG LIBREDWG_VERSION=0.13.3
+RUN if [ "$WITH_LIBREDWG" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends make xz-utils \
+      && curl -fsSL "https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz" -o /tmp/libredwg.tar.xz \
+      && tar -xJf /tmp/libredwg.tar.xz -C /tmp \
+      && cd /tmp/libredwg-${LIBREDWG_VERSION} \
+      && ./configure --disable-bindings --disable-docs --prefix=/usr/local \
+      && make -j"$(nproc)" && make install && ldconfig \
+      && cd / && rm -rf /tmp/libredwg* && rm -rf /var/lib/apt/lists/* \
+      && dwg2dxf --version; \
+    fi
 
 # 가상환경 생성
 RUN python -m venv $VIRTUAL_ENV
@@ -43,7 +63,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 필수 디렉토리 생성 (소스 마운트 전 생성하여 마운트 후에도 유지)
-RUN mkdir -p /app/instance/db /app/instance/log /app/logs /app/uploads /app/data
+# 2026.10.28(woojin.jung) 수정 - UNO 시트 미리보기 작업 디렉터리까지 개발 컨테이너에 생성
+RUN mkdir -p /app/instance/db /app/instance/log /app/instance/sheet_preview /app/logs /app/uploads /app/data
 
 EXPOSE 8081
 

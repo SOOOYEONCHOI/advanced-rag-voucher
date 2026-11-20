@@ -1,6 +1,11 @@
 <template>
   <router-view />
+  <AppTooltip />
 </template>
+
+<script setup>
+import AppTooltip from './components/AppTooltip.vue'
+</script>
 
 <style>
 html,

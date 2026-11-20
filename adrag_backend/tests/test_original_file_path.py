@@ -14,10 +14,10 @@ _ADMIN = {"user_id": "admin", "is_admin": True}
 
 
 def _prod_like_storage(tmp_path):
-    """운영 구조 재현: SQLITE_DB_PATH=<데이터>/db/x.db → 원본 저장 폴더 <데이터>/data (백엔드 소스 폴더 밖)."""
+    """운영 구조 재현: UPLOADED_FILES_BASE_DIR=<데이터>/data → 원본 저장 폴더 <데이터>/data (백엔드 소스 폴더 밖)."""
     data_root = tmp_path / "mnt_data"
     (data_root / "db").mkdir(parents=True)
-    settings = SimpleNamespace(sqlite_db_path=str(data_root / "db" / "db_rag_metadata.db"))
+    settings = SimpleNamespace(uploaded_files_base_dir=str(data_root / "data"))
     return settings, get_original_file_storage(settings)
 
 
@@ -78,7 +78,7 @@ class _FakeDb:
 
 def _open(monkeypatch, settings, source_path, principal=_ADMIN):
     monkeypatch.setattr(ingest_routes, "get_settings", lambda: settings)
-    monkeypatch.setattr(ingest_routes, "get_database_manager", lambda _path: _FakeDb(source_path))
+    monkeypatch.setattr(ingest_routes, "get_database_manager", lambda *_: _FakeDb(source_path))
     return asyncio.run(ingest_routes.open_original_document("doc-1", principal=principal))
 
 

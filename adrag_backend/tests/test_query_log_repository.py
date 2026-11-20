@@ -48,7 +48,7 @@ def reset_database_singletons():
 
 def test_log_query_stores_outcome_answer_and_snapshots(tmp_path):
     db_path = str(tmp_path / "query-log.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name, department_name)
@@ -143,7 +143,7 @@ def test_log_query_stores_outcome_answer_and_snapshots(tmp_path):
 
 def test_store_citations_deduplicates_same_document(tmp_path):
     db_path = str(tmp_path / "citations.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name)
@@ -189,7 +189,7 @@ def test_store_citations_deduplicates_same_document(tmp_path):
 
 def test_daily_stats_preserve_kst_calendar_date(tmp_path):
     db_path = str(tmp_path / "kst-stats.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name)
@@ -208,7 +208,7 @@ def test_daily_stats_preserve_kst_calendar_date(tmp_path):
         "UPDATE tb_query_logs SET created_at=? WHERE log_id=?",
         ("2026-06-19T00:30:00+09:00", log_id),
     )
-    stats = StatsRepository(db_path)
+    stats = StatsRepository()
 
     # 2026.06.19(sooyeon.choi) 추가 - KST 자정 직후 로그가 전날로 이동하지 않는지 검증
     trend = stats.daily_usage_trend(
@@ -233,7 +233,7 @@ def test_daily_stats_preserve_kst_calendar_date(tmp_path):
 
 def test_user_statistics_are_isolated_and_use_outcome_codes(tmp_path):
     db_path = str(tmp_path / "user-stats.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     for user_id in ("user01", "user02"):
         repo.db.execute_update(
             """
@@ -278,7 +278,7 @@ def test_user_statistics_are_isolated_and_use_outcome_codes(tmp_path):
         (user01_success,),
     )
 
-    stats = StatsRepository(db_path)
+    stats = StatsRepository()
     start = "2026-06-19T00:00:00+09:00"
     end = "2026-06-20T00:00:00+09:00"
 
@@ -304,7 +304,7 @@ def test_user_statistics_are_isolated_and_use_outcome_codes(tmp_path):
 
 def test_admin_flagged_queries_are_paginated_with_user_snapshot(tmp_path):
     db_path = str(tmp_path / "admin-flagged.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     for index in range(3):
         user_id = f"user{index}"
         repo.db.execute_update(
@@ -325,7 +325,7 @@ def test_admin_flagged_queries_are_paginated_with_user_snapshot(tmp_path):
             (f"2026-06-19T10:00:0{index}+09:00", log_id),
         )
 
-    stats = StatsRepository(db_path)
+    stats = StatsRepository()
     start = "2026-06-19T00:00:00+09:00"
     end = "2026-06-20T00:00:00+09:00"
 
@@ -346,7 +346,7 @@ def test_admin_flagged_queries_are_paginated_with_user_snapshot(tmp_path):
 
 def test_department_statistics_keep_query_time_snapshot(tmp_path):
     db_path = str(tmp_path / "department-stats.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name, department_name)
@@ -372,7 +372,7 @@ def test_department_statistics_keep_query_time_snapshot(tmp_path):
         ("변경부서", "user01"),
     )
 
-    stats = StatsRepository(db_path)
+    stats = StatsRepository()
     items = stats.department_usage(
         "2026-06-18T00:00:00+09:00",
         "2026-06-19T00:00:00+09:00",
@@ -389,7 +389,7 @@ def test_department_statistics_keep_query_time_snapshot(tmp_path):
 
 def test_department_weekly_trend_uses_monday_boundaries(tmp_path, monkeypatch):
     db_path = str(tmp_path / "department-weekly.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name, department_name)
@@ -418,7 +418,7 @@ def test_department_weekly_trend_uses_monday_boundaries(tmp_path, monkeypatch):
         "_kst_now",
         lambda: datetime(2026, 6, 19, 12, 0, tzinfo=kst),
     )
-    trend = StatsRepository(db_path).department_weekly_trend(weeks=2)
+    trend = StatsRepository().department_weekly_trend(weeks=2)
 
     # 2026.06.19(sooyeon.choi) 추가 - 월요일 경계·빈 구간 보정·주차 메타데이터 검증
     assert trend["weeks"][0]["start_date"] == "2026-06-08"
@@ -433,7 +433,7 @@ def test_department_weekly_trend_uses_monday_boundaries(tmp_path, monkeypatch):
 
 def test_top_users_apply_tie_break_order(tmp_path):
     db_path = str(tmp_path / "top-users.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     for user_id in ("user01", "user02", "user03"):
         repo.db.execute_update(
             """
@@ -461,7 +461,7 @@ def test_top_users_apply_tie_break_order(tmp_path):
                 ),
             )
 
-    users = StatsRepository(db_path).top_users_by_activity(
+    users = StatsRepository().top_users_by_activity(
         "2026-06-19T00:00:00+09:00",
         "2026-06-20T00:00:00+09:00",
         10,
@@ -478,7 +478,7 @@ def test_top_users_apply_tie_break_order(tmp_path):
 
 def test_document_health_excludes_deleted_and_non_ready_documents(tmp_path):
     db_path = str(tmp_path / "document-health.db")
-    repo = QueryLogRepository(db_path)
+    repo = QueryLogRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name)
@@ -557,7 +557,7 @@ def test_document_health_excludes_deleted_and_non_ready_documents(tmp_path):
         (log_id, "2026-06-18T09:00:00+09:00"),
     )
 
-    stats = StatsRepository(db_path)
+    stats = StatsRepository()
     now = "2026-06-19T12:00:00+09:00"
     cutoff = "2026-04-20T12:00:00+09:00"
 
@@ -581,7 +581,7 @@ def test_document_health_excludes_deleted_and_non_ready_documents(tmp_path):
 
 def test_document_repository_sets_content_date_and_updates_review_date(tmp_path):
     db_path = str(tmp_path / "document-review.db")
-    repo = DocumentRepository(db_path)
+    repo = DocumentRepository()
     repo.db.execute_update(
         """
         INSERT INTO tb_users (user_id, user_pwd, user_name)

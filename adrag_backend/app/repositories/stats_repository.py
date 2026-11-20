@@ -11,10 +11,12 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 
 logger = logging.getLogger(__name__)
+
+# 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외(통계·순위·문서 참조 집계 공통 조건)
+BATCH_EVAL_EXCLUDE = "input_mode <> 'batch_eval'"
 
 KST = timezone(timedelta(hours=9))
 
@@ -30,8 +32,8 @@ def _date_str(dt: datetime) -> str:
 class StatsRepository:
     """집계 쿼리 전담 (읽기 전용)."""
 
-    def __init__(self, db_path: Optional[str] = None):
-        self.db = get_database_manager(db_path or get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
 
     # ── 기간 필터 헬퍼 ──────────────────────────────────────────────────────
 
@@ -44,6 +46,8 @@ class StatsRepository:
     ) -> Tuple[str, list]:
         """created_at 범위 + 선택적 user_id 조건 문자열과 파라미터를 반환한다."""
         cond = [f"{table_alias}.created_at >= ?", f"{table_alias}.created_at < ?"]
+        # 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
+        cond.append(f"{table_alias}.{BATCH_EVAL_EXCLUDE}")
         params: list = [start, end]
         if user_id:
             cond.append(f"{table_alias}.user_id = ?")
@@ -70,6 +74,7 @@ class StatsRepository:
             SELECT COUNT(DISTINCT (created_at AT TIME ZONE 'Asia/Seoul')::date) AS cnt
             FROM tb_query_logs
             WHERE created_at >= ? AND created_at < ? AND user_id = ?
+              AND input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
             """,
             (start, end, user_id),
         )
@@ -278,6 +283,7 @@ class StatsRepository:
             FROM tb_query_citations c
             JOIN tb_query_logs l ON c.log_id = l.log_id
             WHERE l.created_at >= ? AND l.created_at < ?
+              AND l.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
               {user_cond}
             GROUP BY c.document_id, c.original_filename, c.collection_id
             ORDER BY citation_count DESC
@@ -350,6 +356,7 @@ class StatsRepository:
             SELECT COUNT(*) AS cnt
             FROM tb_query_logs l
             WHERE l.created_at >= ? AND l.created_at < ?
+              AND l.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
               AND (
                 l.outcome_code IN (
                   'no_context', 'retrieval_error', 'llm_error', 'system_error'
@@ -386,6 +393,7 @@ class StatsRepository:
             FROM tb_query_logs l
             LEFT JOIN tb_users u ON l.user_id = u.user_id
             WHERE l.created_at >= ? AND l.created_at < ?
+              AND l.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
               AND (
                 l.outcome_code IN (
                   'no_context', 'retrieval_error', 'llm_error', 'system_error'
@@ -435,6 +443,7 @@ class StatsRepository:
               SUM(CASE WHEN l.feedback IS NOT NULL THEN 1 ELSE 0 END) AS responded
             FROM tb_query_logs l
             WHERE l.created_at >= ? AND l.created_at < ?
+              AND l.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
             GROUP BY COALESCE(NULLIF(TRIM(l.department_snapshot), ''), '미지정')
             ORDER BY query_count DESC, department ASC
             """,
@@ -485,6 +494,7 @@ class StatsRepository:
               COALESCE(NULLIF(TRIM(department_snapshot), ''), '미지정') AS department
             FROM tb_query_logs
             WHERE created_at >= ?
+              AND input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
             ORDER BY department ASC
             """,
             (periods[0][0],),
@@ -500,6 +510,7 @@ class StatsRepository:
                     SELECT COUNT(*) AS cnt
                     FROM tb_query_logs
                     WHERE created_at >= ? AND created_at < ?
+                      AND input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
                       AND COALESCE(
                         NULLIF(TRIM(department_snapshot), ''),
                         '미지정'
@@ -531,6 +542,7 @@ class StatsRepository:
                   WHERE latest.user_id = l.user_id
                     AND latest.created_at >= ?
                     AND latest.created_at < ?
+                    AND latest.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
                   ORDER BY latest.created_at DESC, latest.log_id DESC
                   LIMIT 1
                 )), ''),
@@ -542,6 +554,7 @@ class StatsRepository:
             FROM tb_query_logs l
             LEFT JOIN tb_users u ON l.user_id = u.user_id
             WHERE l.created_at >= ? AND l.created_at < ?
+              AND l.input_mode <> 'batch_eval'  -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외
             GROUP BY l.user_id, u.user_name  -- 2026.10.16 Phase 1.5: PostgreSQL은 비집계 컬럼을 GROUP BY에 명시
             ORDER BY
               query_count DESC,
@@ -593,6 +606,11 @@ class StatsRepository:
               FROM tb_documents d
               LEFT JOIN tb_query_citations cit
                 ON cit.document_id = d.document_id
+               -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외(일괄 질의 인용은 문서 참조로 보지 않음)
+               AND NOT EXISTS (
+                 SELECT 1 FROM tb_query_logs bl
+                 WHERE bl.log_id = cit.log_id AND bl.input_mode = 'batch_eval'
+               )
               WHERE d.deleted_at IS NULL AND d.status = 'ready'
               GROUP BY d.document_id
             )
@@ -632,6 +650,11 @@ class StatsRepository:
               FROM tb_documents d
               LEFT JOIN tb_query_citations cit
                 ON cit.document_id = d.document_id
+               -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외(일괄 질의 인용은 문서 참조로 보지 않음)
+               AND NOT EXISTS (
+                 SELECT 1 FROM tb_query_logs bl
+                 WHERE bl.log_id = cit.log_id AND bl.input_mode = 'batch_eval'
+               )
               WHERE d.deleted_at IS NULL AND d.status = 'ready'
               GROUP BY d.document_id
             )
@@ -670,6 +693,11 @@ class StatsRepository:
                 ON c.collection_id = d.collection_id
               LEFT JOIN tb_query_citations cit
                 ON cit.document_id = d.document_id
+               -- 2026.11.18(sooyeon.choi) 추가 - 시험용 일괄 질의(batch_eval) 제외(일괄 질의 인용은 문서 참조로 보지 않음)
+               AND NOT EXISTS (
+                 SELECT 1 FROM tb_query_logs bl
+                 WHERE bl.log_id = cit.log_id AND bl.input_mode = 'batch_eval'
+               )
               WHERE d.deleted_at IS NULL AND d.status = 'ready'
               GROUP BY d.document_id, c.display_name  -- 2026.10.16 Phase 1.5: 조인 테이블 컬럼은 GROUP BY에 명시
             )

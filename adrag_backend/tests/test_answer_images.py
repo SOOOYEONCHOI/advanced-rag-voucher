@@ -310,7 +310,7 @@ def test_stream_sends_images_and_saves_them_in_history(monkeypatch):
             assert kwargs["answer"] == "조립[IMG:aaa111]"
             return 9
 
-    settings = SimpleNamespace(sqlite_db_path=":memory:", max_query_top_k=20, context_top_k=5,
+    settings = SimpleNamespace(max_query_top_k=20, context_top_k=5,
                                max_citation_results=5, relevance_threshold=0.5)
     monkeypatch.setattr(rag_service_module, "get_settings", lambda: settings)
     monkeypatch.setattr(rag_service_module, "MetadataRepository", lambda *_: FakeRepository())

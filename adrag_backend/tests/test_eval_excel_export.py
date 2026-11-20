@@ -31,7 +31,7 @@ def reset_database_singletons():
 
 
 def test_repository_lists_only_approved_and_edited_in_qa_order(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "eval.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("컬렉션", "excel_export"),
@@ -124,7 +124,7 @@ def test_workbook_keeps_invalid_json_as_text_and_filename_is_sanitized():
 
 @pytest.fixture
 def client(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "api.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("평가용 컬렉션", "excel_api"),

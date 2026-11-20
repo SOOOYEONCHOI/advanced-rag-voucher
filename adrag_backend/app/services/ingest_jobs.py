@@ -7,6 +7,7 @@ from typing import Optional
 from app.repositories.ingest_job_repository import IngestJobRepository
 from app.services.ingest_service import IngestService
 from app.parsers.document_types import DocumentTypeMismatchError
+from app.ingest.drawing.common import DrawingError  # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
 from app.utils.log.log import LoggingLogger
 
 logger = LoggingLogger().getLogger(__name__)
@@ -72,7 +73,7 @@ class IngestJobManager:
         job = await asyncio.to_thread(self._repository.get, job_id)
         if not job:
             return
-        # 2026.11.06(sooyeon.choi) 수정 - 복원 작업은 파일 경로·체크포인트를 쓰지 않으므로 맨 앞에서 분기(B-14)
+        # 2026.11.06(sooyeon.choi) 수정 - 복원 작업은 파일 경로·체크포인트를 쓰지 않으므로 맨 앞에서 분기
         if job.get("operation_type") == "restore":
             from app.services.document_version_restore import run_restore_job
 
@@ -82,7 +83,11 @@ class IngestJobManager:
         # Jobs persisted before document-type selection was introduced may not
         # carry the field; keep their behavior identical to the auto flow.
         request.setdefault("document_type", "auto")
-        resume_from = job["current_step"] if job["current_step"] in {"parse", "chunk", "embed", "index"} else None
+        # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 단계에서 실패한 작업도 그 단계부터 다시 한다
+        resume_from = job["current_step"] if job["current_step"] in {
+            "parse", "chunk", "embed", "index",
+            "drawing_convert", "drawing_extract", "drawing_render", "drawing_store",
+        } else None
         checkpoint_path = request["file_path"] + ".checkpoint"
         await asyncio.to_thread(self._repository.update, job_id, status="running", step="validate")
 
@@ -117,7 +122,7 @@ class IngestJobManager:
                     )
                 except Exception:
                     logger.exception("version failed 표시 실패 job_id=%s", job_id)
-                # 2026.11.06(sooyeon.choi) 수정 - 최신본 변경 실패: 이 작업의 문서 점유 표식 해제(B-01)
+                # 2026.11.06(sooyeon.choi) 수정 - 최신본 변경 실패: 이 작업의 문서 점유 표식 해제
                 try:
                     await asyncio.to_thread(_record_repo().release_pending, request["target_document_id"], job_id)
                 except Exception:
@@ -128,7 +133,8 @@ class IngestJobManager:
                 status="failed",
                 step=step,
                 error=str(exc),
-                error_code=(exc.error_code if isinstance(exc, DocumentTypeMismatchError) else None),
+                # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 오류 코드(E_…)도 남긴다
+                error_code=(exc.error_code if isinstance(exc, (DocumentTypeMismatchError, DrawingError)) else None),
             )
 
 
@@ -145,14 +151,14 @@ def _reopen_version(document_id: str, version_no: int, job_id: str | None = None
         repo.lock_document(document_id)
         current = repo.in_progress_version(document_id)
         if current and current["version_no"] != version_no:
-            raise ValueError(f"이 문서는 v{current['version_no']} 최신본 변경을 처리 중입니다.")
+            raise ValueError(f"이 문서는 v{current['version_no']} 새 버전 등록을 처리 중입니다.")
         # 2026.11.06(sooyeon.choi) 수정 - 다른 작업(복원 등)이 문서를 점유 중이면 재시도하지 않는다
         if job_id and not repo.acquire_pending(document_id, job_id):
             raise ValueError("이 문서는 다른 작업을 처리 중입니다. 완료 후 다시 시도하세요.")
         if not current and not repo.set_version_status(
             document_id, version_no, "building", vectors_purged=False, from_statuses=("failed",)
         ):
-            raise ValueError("재시도할 수 있는 최신본 변경 버전이 아닙니다.")
+            raise ValueError("재시도할 수 있는 새 버전 등록 작업이 아닙니다.")
 
 
 # 2026.11.06(sooyeon.choi) 수정 - 복원 작업 재시도 거부(라우트가 409 RESTORE_RETRY_REQUIRES_NEW_REQUEST로 응답)

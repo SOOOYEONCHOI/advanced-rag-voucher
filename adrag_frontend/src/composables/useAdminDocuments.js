@@ -1,14 +1,14 @@
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { adminApi } from '../api/adminApi';
 import { collectionApi } from '../api/collectionApi';
 import { useAuthStore } from '../stores/authStore';
-import { docTypeLabel, docTypeSourceLabel, formatFileSize, formatTime } from '../utils/textFormat';
+import { handleDialogKeydown, restoreFocus } from '../utils/dialogKeydown';
+import { docTypeLabel, docTypeSourceLabel, formatFileSize, formatTime, parserTypeLabel } from '../utils/textFormat';
 import { useNavigationLock } from './useNavigationLock';
 import { modelNameError, useDocumentUpload } from './useDocumentUpload';
 import { useDocumentVersions } from './useDocumentVersions';
-// 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원(UI-12, R1-5)
-import { useVersionRestore } from './useVersionRestore';
+import { useDocumentVersionRestore } from './useDocumentVersionRestore';
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'auto', label: '자동', description: '파일 형식과 문서 구조를 분석하여 적절한 청킹 방식을 자동 적용합니다.' },
@@ -17,6 +17,8 @@ const DOCUMENT_TYPE_OPTIONS = [
   { value: 'law', label: '법령', description: '장·절·조·항 및 별표·별지 구조를 기준으로 법령 청킹을 적용합니다.' },
   { value: 'spreadsheet', label: '스프레드시트', description: '시트·표·헤더·행 구조를 보존하는 스프레드시트 청킹을 적용합니다.' },
 ];
+
+const TOPIC_CHIP_LIMIT = 8;
 
 export const useAdminDocuments = ({ router }) => {
   const authStore = useAuthStore();
@@ -31,6 +33,7 @@ export const useAdminDocuments = ({ router }) => {
   const collections = ref([]);
   const collectionsForFilter = ref([]);
   const filterCollection = ref('');
+  const filterDocumentType = ref('');
   const sidebarOpen = ref(false);
   const registeredCollections = ref([]);
   const deleteDocTarget = ref(null);
@@ -102,7 +105,12 @@ export const useAdminDocuments = ({ router }) => {
     };
   };
 
-  const collectionTopicLabel = (collectionName) => splitCollectionDisplay(collectionName).topic;
+  // 문서에는 변경되지 않는 저장소 식별자(qdrant_name)가 남으므로,
+  // 최신 대화 주제 목록에서 표시명을 찾아 이름 변경을 문서 목록에도 반영한다.
+  const collectionTopicLabel = (collectionName) => {
+    const collection = collectionsForFilter.value.find((item) => (item.qdrant_name || item.collection_name) === collectionName);
+    return collection?.collection_name || splitCollectionDisplay(collectionName).topic;
+  };
 
   const logout = async () => {
     if (isUploading.value) return;
@@ -130,11 +138,63 @@ export const useAdminDocuments = ({ router }) => {
     upload.addFiles(e.dataTransfer.files);
   };
 
+  // 2026.11.11(woojin.jung) 수정 - 대화 주제 필터를 칩으로 바꾸고 주제별 문서 수를 보여주려고 전체 목록을 받아 화면에서 거른다
+  const filteredDocuments = computed(() =>
+    documents.value.filter((doc) => (!filterCollection.value || doc.collection_name === filterCollection.value) && (!filterDocumentType.value || doc.doc_type === filterDocumentType.value)),
+  );
+  const drawingDocumentCount = computed(() => documents.value.filter((doc) => doc.doc_type === 'drawing').length);
+  const setDocumentTypeFilter = (value) => {
+    filterDocumentType.value = filterDocumentType.value === value ? '' : value;
+    if (editingModelId.value && !filteredDocuments.value.some((doc) => doc.document_id === editingModelId.value)) cancelModelEdit();
+  };
+  const topicFilters = computed(() => {
+    const counts = {};
+    for (const doc of documents.value) counts[doc.collection_name] = (counts[doc.collection_name] || 0) + 1;
+    return [
+      { value: '', label: '전체', count: documents.value.length },
+      ...collectionsForFilter.value.map((col) => ({ value: col.qdrant_name, label: col.collection_name, count: counts[col.qdrant_name] || 0 })),
+    ];
+  });
+  const activeTopicLabel = computed(() => topicFilters.value.find((f) => f.value === filterCollection.value)?.label || '');
+  // 2026.11.11(woojin.jung) 추가 - 주제가 많아도 한 줄 안팎을 유지: 문서 많은 순 상위 칩만 노출, 나머지는 [더보기] 검색 목록
+  const topicsByCount = computed(() => topicFilters.value.slice(1).sort((a, b) => b.count - a.count));
+  const visibleTopicFilters = computed(() => {
+    const top = topicsByCount.value.slice(0, TOPIC_CHIP_LIMIT);
+    const active = topicsByCount.value.find((f) => f.value === filterCollection.value);
+    if (active && !top.includes(active)) top.push(active);
+    return [topicFilters.value[0], ...top];
+  });
+  const hiddenTopicCount = computed(() => Math.max(0, topicsByCount.value.length - TOPIC_CHIP_LIMIT));
+  const topicMenuOpen = ref(false);
+  const topicSearch = ref('');
+  const topicMenuResults = computed(() => {
+    const query = topicSearch.value.trim().toLowerCase();
+    return query ? topicsByCount.value.filter((f) => f.label.toLowerCase().includes(query)) : topicsByCount.value;
+  });
+  const toggleTopicMenu = () => {
+    topicMenuOpen.value = !topicMenuOpen.value;
+    topicSearch.value = '';
+  };
+  const closeTopicMenu = () => {
+    topicMenuOpen.value = false;
+  };
+  const onTopicMenuFocusout = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) closeTopicMenu();
+  };
+  const selectTopicFromMenu = (value) => {
+    if (filterCollection.value !== value) setTopicFilter(value);
+    closeTopicMenu();
+  };
+  const setTopicFilter = (value) => {
+    filterCollection.value = filterCollection.value === value ? '' : value;
+    // 필터로 편집 중인 문서가 화면에서 빠지면 편집 종료
+    if (editingModelId.value && !filteredDocuments.value.some((doc) => doc.document_id === editingModelId.value)) cancelModelEdit();
+  };
+
   const loadDocuments = async () => {
     if (disposed) return;
     try {
-      const params = filterCollection.value ? { collection_name: filterCollection.value } : {};
-      const res = await adminApi.documents(params);
+      const res = await adminApi.documents();
       if (disposed) return;
       documents.value = res.data.documents || [];
       // 2026.10.19(sooyeon.choi) 추가 - 새로고침·필터 변경으로 편집 중인 문서가 목록에서 빠지면 편집 종료
@@ -144,8 +204,8 @@ export const useAdminDocuments = ({ router }) => {
       }
       // 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중인 본인 작업은 상태 확인을 이어간다(새로고침 복원)
       versions.syncPendingJobs(documents.value);
-      // 2026.11.06(sooyeon.choi) 수정 - 복원 처리 중(pending_operation=restore)인 문서는 작업 확인을 이어간다
-      restore.syncPendingRestores(documents.value);
+      // 2026.11.09(woojin.jung) 추가 - 처리 중인 이전 버전 복원(pending_operation)은 작업 확인을 이어간다(새로고침 복원)
+      versionRestore.syncPendingRestores(documents.value);
     } catch {
       if (disposed) return;
       documents.value = [];
@@ -153,9 +213,15 @@ export const useAdminDocuments = ({ router }) => {
   };
 
   // 2026.10.19(sooyeon.choi) 추가 - [최신본 변경]·[버전 이력]
-  const versions = useDocumentVersions({ api: adminApi, loadDocuments, showAlert });
-  // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원: 선택·확인·접수·진행 확인·적용 이력
-  const restore = useVersionRestore({ api: adminApi, documents, loadDocuments, showAlert, versions });
+  const versions = useDocumentVersions({ api: adminApi, documents, loadDocuments, validateFile: upload.replacementFileError });
+  // 2026.11.09(woojin.jung) 추가 - [버전 이력]·이전 버전 복원(대화상자 컴포넌트에 그대로 넘기려고 reactive로 감싼다)
+  const versionRestore = reactive(useDocumentVersionRestore({ api: adminApi, documents, loadDocuments, showAlert }));
+  // 2026.11.09(woojin.jung) 추가 - 최신본 변경·이전 버전 복원의 처리 중·결과를 페이지 상단 한 곳에서 같은 방식으로 안내
+  const pageStatuses = computed(() => [...versions.replaceStatuses.value, ...versionRestore.pageStatuses]);
+  const dismissPageStatus = (status) => {
+    if (status.kind === 'replace') versions.dismissReplaceResult(status.documentId);
+    else versionRestore.dismissResult(status.documentId);
+  };
 
   const loadCollections = async () => {
     if (disposed) return;
@@ -178,15 +244,26 @@ export const useAdminDocuments = ({ router }) => {
   // 2026.06.18(sooyeon.choi) 수정 - 중복 컬렉션 조회 제거
   const loadRegisteredCollections = loadCollections;
 
+  // 2026.11.09(woojin.jung) 수정 - 삭제 확인 창도 다른 창과 같게: 바깥 클릭으로 닫지 않음, Esc 닫기, 포커스를 창 안에 유지·복귀
+  let deleteReturnFocus = null;
   const confirmDeleteDoc = (doc) => {
     uploadError.value = null;
+    deleteReturnFocus = document.activeElement;
     deleteDocTarget.value = doc;
   };
+  const closeDeleteDialog = () => {
+    deleteDocTarget.value = null;
+    const returnFocus = deleteReturnFocus;
+    deleteReturnFocus = null;
+    nextTick(() => restoreFocus(returnFocus));
+  };
+  const onDeleteKeydown = (event) => handleDialogKeydown(event, closeDeleteDialog);
 
   const doDeleteDoc = async () => {
     const doc = deleteDocTarget.value;
     if (!doc) return;
     deleteDocTarget.value = null;
+    deleteReturnFocus = null;
     deletingId.value = doc.document_id;
 
     try {
@@ -280,11 +357,19 @@ export const useAdminDocuments = ({ router }) => {
     startFilenameResize(event);
   };
 
+  // 2026.11.09(woojin.jung) 추가 - Excel은 참고 문서 창의 [Excel 다운로드]와 같이 외부 연결을 제거한 안전한 사본으로 다운로드
+  const spreadsheetViewer = ref(null);
+  const isSpreadsheetFile = (filename) => /\.(xlsx|xlsm|xltx|xltm|xls)$/i.test(filename || '');
+
   const openOriginalDocument = async (doc) => {
     if (!doc?.document_id || openingDocId.value) return;
     openingDocId.value = doc.document_id;
 
     try {
+      if (isSpreadsheetFile(doc.filename)) {
+        await spreadsheetViewer.value?.download({ original_filename: doc.filename }, doc.document_id);
+        return;
+      }
       const res = await adminApi.documentFile(doc.document_id);
       const contentType = res.headers?.['content-type'] || 'application/octet-stream';
       const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: contentType }));
@@ -294,6 +379,26 @@ export const useAdminDocuments = ({ router }) => {
       uploadError.value = err.response?.data?.detail || err.message || '원본 문서를 열 수 없습니다.';
     } finally {
       openingDocId.value = null;
+    }
+  };
+
+  const drawingResultTarget = ref(null);
+  let drawingReturnFocus = null;
+  const openDrawingResult = (doc) => {
+    if (!upload.drawingEnabled.value || doc?.doc_type !== 'drawing') return;
+    drawingReturnFocus = document.activeElement;
+    drawingResultTarget.value = doc;
+  };
+  const closeDrawingResult = () => {
+    drawingResultTarget.value = null;
+    const returnFocus = drawingReturnFocus;
+    drawingReturnFocus = null;
+    nextTick(() => restoreFocus(returnFocus));
+  };
+  const onDrawingReviewChanged = async () => {
+    await loadDocuments();
+    if (drawingResultTarget.value) {
+      drawingResultTarget.value = documents.value.find((doc) => doc.document_id === drawingResultTarget.value.document_id) || drawingResultTarget.value;
     }
   };
 
@@ -317,8 +422,23 @@ export const useAdminDocuments = ({ router }) => {
     alertType,
     documents,
     collections,
-    collectionsForFilter,
     filterCollection,
+    filterDocumentType,
+    filteredDocuments,
+    drawingDocumentCount,
+    setDocumentTypeFilter,
+    topicFilters,
+    activeTopicLabel,
+    setTopicFilter,
+    visibleTopicFilters,
+    hiddenTopicCount,
+    topicMenuOpen,
+    topicSearch,
+    topicMenuResults,
+    toggleTopicMenu,
+    closeTopicMenu,
+    onTopicMenuFocusout,
+    selectTopicFromMenu,
     form,
     documentTypeOptions: DOCUMENT_TYPE_OPTIONS,
     selectedDocumentTypeDescription,
@@ -335,16 +455,25 @@ export const useAdminDocuments = ({ router }) => {
     formatTime,
     docTypeLabel,
     docTypeSourceLabel,
+    parserTypeLabel,
     collectionTopicLabel,
     deleteDocTarget,
     deletingId,
     filenameColumnStyle,
     openingDocId,
     confirmDeleteDoc,
+    closeDeleteDialog,
+    onDeleteKeydown,
     doDeleteDoc,
     startFilenameResize,
     startFilenameResizeFromHeader,
     openOriginalDocument,
+    drawingResultTarget,
+    openDrawingResult,
+    closeDrawingResult,
+    onDrawingReviewChanged,
+    spreadsheetViewer,
+    showAlert,
     // 2026.10.19(sooyeon.choi) 추가 - 모델명 인라인 수정
     editingModelId,
     editingModelValue,
@@ -355,8 +484,10 @@ export const useAdminDocuments = ({ router }) => {
     saveModelEdit,
     // 2026.10.19(sooyeon.choi) 추가 - 최신본 변경·버전 이력
     ...versions,
-    // 2026.11.06(sooyeon.choi) 수정 - 이전 버전 복원
-    ...restore,
+    // 2026.11.09(woojin.jung) 추가 - 버전 이력·이전 버전 복원
+    versionRestore,
+    pageStatuses,
+    dismissPageStatus,
     isAdmin,
     displayName,
     logout,

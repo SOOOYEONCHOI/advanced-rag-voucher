@@ -88,6 +88,9 @@ def postgres_schema():
     except Exception as exc:  # pragma: no cover - 환경 문제
         pytest.exit(f"PostgreSQL 테스트 DB에 접속할 수 없습니다({TEST_DB_URL.render_as_string()}): {exc}", returncode=2)
     config = _alembic_config()
+    # 2026.11.19(sooyeon.choi) 추가 - 이전 세션이 남긴 행 때문에 downgrade 보호 조건
+    #   (0012 batch_eval 질의 로그, 0013 law/general 문항)이 막히지 않도록 테스트 DB 업무 테이블을 먼저 비운다
+    _truncate_leftover_rows()
     command.downgrade(config, "base")
     command.upgrade(config, "head")
     yield config
@@ -97,6 +100,15 @@ def postgres_schema():
 
 
 _clean_engine = None
+
+
+def _truncate_leftover_rows() -> None:
+    with _test_engine().begin() as conn:
+        if not conn.exec_driver_sql("SELECT current_database()").scalar().endswith("_test"):
+            raise RuntimeError("테스트 DB가 아닌 곳을 비우려 했습니다")
+        tables = [row[0] for row in conn.exec_driver_sql(_BUSINESS_TABLES_SQL)]
+        if tables:
+            conn.exec_driver_sql(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE")
 
 
 def _test_engine():

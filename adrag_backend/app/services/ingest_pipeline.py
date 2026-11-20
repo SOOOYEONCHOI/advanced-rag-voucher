@@ -40,6 +40,11 @@ _LOG_STEP_NAMES = {
     "chunk": "parse_chunk",
     "embed": "embed",
     "index": "index",
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 파이프라인 단계(app/services/drawing_pipeline.py)
+    "drawing_convert": "drawing_convert",
+    "drawing_extract": "drawing_extract",
+    "drawing_render": "drawing_render",
+    "drawing_store": "drawing_store",
 }
 
 
@@ -182,7 +187,7 @@ class ChunkStep:
             convert_timeout=settings.excel_xls_convert_timeout,
             model=request.get("product_model"),
         )
-        # 2026.10.16 추가 - Phase 2: 사진 배치(resource_id 발급)·청크↔사진 연결·긴 청크 분할(P2-4·8·9)
+        # 2026.10.16 추가 - Phase 2: 사진 배치(resource_id 발급)·청크↔사진 연결·긴 청크 분할
         # 2026.10.19 수정 - 사진 ID·청크 ID에 실제 버전 사용(최신본 변경)
         image_plan = plan_excel_images(
             output.result, context.document_id, _version_of(request),
@@ -261,7 +266,7 @@ class IndexStep:
         config = data["collection_config"]
         title = extract_doc_title(chunks[0].page_content, parse_result["doc_type"]) if chunks else ""
         file_format = detect_file_format(request["file_path"])
-        # 2026.10.16 추가 - Phase 2(P2-7): 청크 식별자·결정적 포인트 ID(uuid5) — 재시도해도 같은 포인트
+        # 2026.10.16 추가 - Phase 2: 청크 식별자·결정적 포인트 ID(uuid5) — 재시도해도 같은 포인트
         # 2026.10.19 수정 - 최신본 변경이면 다음 버전 번호(포인트 ID·payload version_no가 버전별로 다름)
         version_no = _version_of(request)
         new_version = _is_new_version(request)
@@ -323,7 +328,7 @@ class IndexStep:
             md_dir=(data.get("excel_ingest") or {}).get("md_dir"),
             summary_json=data.get("excel_ingest") or {},
         )
-        # 2026.10.16 수정 - Phase 2: 문서 행·리소스 확정·버전·청크·사진·흐름도를 한 트랜잭션으로 기록(P2-6~P2-13).
+        # 2026.10.16 수정 - Phase 2: 문서 행·리소스 확정·버전·청크·사진·흐름도를 한 트랜잭션으로 기록.
         #   실패하면 DB는 함께 롤백되고, 파이프라인 보상 단계가 Qdrant 포인트·리소스 파일을 지운다.
         with db.get_connection():
             previous_version_no = None
@@ -353,7 +358,7 @@ class IndexStep:
             record_repo.insert_chunk_resources(chunk_resource_links(chunks))
             record_repo.insert_flow_graphs(context.document_id, version_no, data.get("excel_flow_graphs") or [])
             # 2026.11.06(sooyeon.choi) 수정 - 버전 봉인(프로필·벡터 명세·문서 snapshot)과 적용 이력(upload·replace)을
-            #   같은 전환 트랜잭션에 기록한다(설계 v1.1 5.2·5.3·6.5, B-03·B-04)
+            #   같은 전환 트랜잭션에 기록한다(설계 v1.1 5.2·5.3·6.5)
             record_repo.seal_version(
                 context.document_id, version_no,
                 embedding_profile_id=_profile_id_or_none(db),
@@ -372,7 +377,7 @@ class IndexStep:
                 job_id=request.get("job_id"), initial=not new_version,
             )
         data["activated"] = True
-        # 2026.11.06(sooyeon.choi) 수정 - 보존이 켜져 있으면 이전 정상 버전 포인트를 지우지 않는다(B-08)
+        # 2026.11.06(sooyeon.choi) 수정 - 보존이 켜져 있으면 이전 정상 버전 포인트를 지우지 않는다
         if new_version and not _retention_enabled():
             # 2026.10.19 추가 - 전환 후 이전 버전 포인트 정리(실패해도 검색 제외 조건이 가리고, 주기 작업이 다시 시도)
             # 2026.11.06(sooyeon.choi) 수정 - 방금 교체된 이전 버전만 지운다. 보존 기간에 남긴 다른 정상 버전은

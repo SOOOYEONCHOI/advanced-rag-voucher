@@ -9,7 +9,7 @@ JSON Schema의 entity/numericValue 구조에 맞춤.
 import json
 from typing import Any, Dict, List
 
-# 2026.07.16(sooyeon.choi) 수정 - httpx 직접 사용 제거, 공유 클라이언트로 전환 (B6)
+# 2026.07.16(sooyeon.choi) 수정 - httpx 직접 사용 제거, 공유 클라이언트로 전환
 from .metadata_schema import SemanticMeta
 
 
@@ -115,7 +115,7 @@ class SemanticEnricher:
         }
 
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃 (B6)
+            # 2026.07.16(sooyeon.choi) 수정 - 공유 AsyncClient + 요청 단위 타임아웃
             from app.core.http import get_shared_async_client
             resp = await get_shared_async_client().post(
                 f"{self.vllm_api_url}/v1/chat/completions",

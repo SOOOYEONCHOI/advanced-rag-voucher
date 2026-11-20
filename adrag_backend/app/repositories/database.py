@@ -274,7 +274,7 @@ class DatabaseManager:
     _instance = None
     _lock = threading.Lock()
 
-    def __new__(cls, db_path: Optional[str] = None):
+    def __new__(cls):
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -282,8 +282,7 @@ class DatabaseManager:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, db_path: Optional[str] = None):
-        # db_path는 SQLite 시절 인자 — 하위 호환을 위해 받기만 하고 쓰지 않는다(설계 Q-15.7)
+    def __init__(self):
         if self._initialized:
             return
         from app.core.db_config import get_database_settings
@@ -353,8 +352,8 @@ def _create_engine(url: URL, settings) -> Engine:
 _db_manager: Optional[DatabaseManager] = None
 
 
-def get_database_manager(db_path: Optional[str] = None) -> DatabaseManager:
-    """애플리케이션에서 공유하는 DatabaseManager 싱글톤. ``db_path``는 하위 호환용(무시)."""
+def get_database_manager() -> DatabaseManager:
+    """애플리케이션에서 공유하는 DatabaseManager 싱글톤."""
     global _db_manager
     if _db_manager is None:
         _db_manager = DatabaseManager()
@@ -403,7 +402,7 @@ def ensure_schema_ready() -> str:
     return head
 
 
-def initialize_database(db_path: Optional[str] = None) -> DatabaseManager:
+def initialize_database() -> DatabaseManager:
     """개발 환경 초기화: ``alembic upgrade head`` 후 스키마 버전을 확인한다(init_database.py)."""
     from alembic import command
 

@@ -16,7 +16,8 @@ from app.repositories.database import get_database_manager
 from app.repositories.metadata_repository import MetadataRepository
 from app.repositories.spreadsheet_resource_repository import SpreadsheetResourceRepository
 from app.services.spreadsheet_resource_service import ResourceConflictError, SpreadsheetResourceService
-from app.utils.security import SECURITY_HIERARCHY, get_current_principal
+# 2026.11.09(sooyeon.choi) 수정 - 열람 범위는 공통 함수로 판정
+from app.utils.security import document_scope, get_current_principal, in_document_scope
 
 
 router = APIRouter(tags=["spreadsheet-resources"])
@@ -29,7 +30,7 @@ def _service() -> SpreadsheetResourceService:
         root = Path(__file__).resolve().parents[2] / root
     return SpreadsheetResourceService(
         root=root,
-        repository=SpreadsheetResourceRepository(db_path=settings.sqlite_db_path),
+        repository=SpreadsheetResourceRepository(),
         max_upload_bytes=settings.resource_max_upload_bytes,
     )
 
@@ -155,12 +156,9 @@ def _authorize_document(document_id: str, principal: dict) -> None:
     document = dict(rows[0])
     if principal.get("is_admin"):
         return
-    permissions = MetadataRepository(settings.sqlite_db_path).get_user_permissions(principal["user_id"])
-    accessible = set(permissions.accessible_collections or []) if permissions else set()
-    allowed_levels = set(
-        SECURITY_HIERARCHY.get(permissions.max_security_level or "public", ["public"])
-    ) if permissions else set()
-    if document["source_collection"] not in accessible or document["security_level"] not in allowed_levels:
+    permissions = MetadataRepository().get_user_permissions(principal["user_id"])
+    # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 공통 함수 사용
+    if not in_document_scope(document_scope(permissions), document["source_collection"], document["security_level"]):
         raise HTTPException(status_code=403, detail="Resource access denied")
 
 
@@ -176,7 +174,7 @@ async def list_document_resources(
         resources = _service().list_document_resources(document_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid document_id")
-    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 사진이 보존되므로 기본은 현재 적용 버전만(version_no로 특정 버전 조회, B-10).
+    # 2026.11.06(sooyeon.choi) 수정 - 이전 버전 사진이 보존되므로 기본은 현재 적용 버전만(version_no로 특정 버전 조회).
     #   버전 정보가 없는 과거 리소스(version_no NULL)는 그대로 둔다
     if version_no is None:
         rows = get_database_manager().execute_query(

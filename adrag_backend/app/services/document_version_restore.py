@@ -18,40 +18,42 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
+# 2026.11.09(sooyeon.choi) 삭제 - 미사용 import(pathlib.Path, get_database_manager)
 from typing import Any, Callable, Optional
 from uuid import uuid4
 
 from app.core.config import get_settings
-from app.repositories.database import get_database_manager
 from app.repositories.ingest_job_repository import IngestJobRepository
 from app.repositories.ingest_record_repository import IngestRecordRepository, RestoreStateError
 from app.repositories.metadata_repository import MetadataRepository
-from app.utils.security import SECURITY_HIERARCHY
+# 2026.11.09(sooyeon.choi) 수정 - 열람 범위는 공통 함수로 판정
+from app.utils.security import document_scope, in_document_scope
 from app.services.embedding_profile import current_profile_id
 
 logger = logging.getLogger(__name__)
 
 # 화면에 그대로 보여 줄 문구(내부 경로·주소·DB 오류는 넣지 않는다). 명세 v1.1 8절
 BLOCK_MESSAGES = {
-    "FEATURE_DISABLED": "이전 버전 복원 기능이 꺼져 있습니다.",
+    "FEATURE_DISABLED": "버전 적용 기능이 꺼져 있습니다.",
     "ALREADY_ACTIVE": "현재 적용 중인 버전입니다.",
     "JOB_IN_PROGRESS": "다른 작업이 진행 중입니다.",
     "VERSION_NOT_FOUND": "선택한 버전을 찾을 수 없습니다.",
     "VERSION_NOT_RESTORABLE": "정상 처리·적용된 이력이 없는 버전입니다.",
-    "PROFILE_UNKNOWN": "이 버전을 만든 검색 모델 정보를 확인할 수 없어 복원할 수 없습니다.",
+    "PROFILE_UNKNOWN": "이 버전을 만든 검색 모델 정보를 확인할 수 없어 적용할 수 없습니다.",
     "MODEL_UNSUPPORTED": "현재 지원되지 않는 검색 모델로 생성된 버전입니다.",
-    "METADATA_MISSING": "이전 버전 정보가 부족해 복원할 수 없습니다.",
-    "VERIFICATION_REQUIRED": "보관 데이터 검증이 끝나지 않아 아직 복원할 수 없습니다.",
-    "VECTOR_MISSING": "보관된 벡터 데이터가 없어 복원할 수 없습니다.",
-    "SOURCE_MISSING": "이 버전의 원본 파일이 없어 복원할 수 없습니다.",
-    "RESOURCE_MISSING": "이 버전의 사진 등 연결 자료가 없어 복원할 수 없습니다.",
-    "VECTOR_INTEGRITY_MISMATCH": "보관된 검색 데이터가 기록과 달라 복원할 수 없습니다.",
+    "METADATA_MISSING": "이 버전의 정보가 부족해 적용할 수 없습니다.",
+    "VERIFICATION_REQUIRED": "보관 데이터 검증이 끝나지 않아 아직 적용할 수 없습니다.",
+    "VECTOR_MISSING": "보관된 벡터 데이터가 없어 적용할 수 없습니다.",
+    "SOURCE_MISSING": "이 버전의 원본 파일이 없어 적용할 수 없습니다.",
+    "RESOURCE_MISSING": "이 버전의 사진 등 연결 자료가 없어 적용할 수 없습니다.",
+    "VECTOR_INTEGRITY_MISMATCH": "보관된 검색 데이터가 기록과 달라 적용할 수 없습니다.",
     "STATE_CHANGED": "현재 적용 버전이 변경되었습니다. 버전 이력을 다시 확인하세요.",
-    "IDEMPOTENCY_KEY_REUSED": "이미 다른 복원 요청에 사용한 요청 키입니다. 버전 이력을 다시 열어 복원하세요.",
-    "RESTORE_RETRY_REQUIRES_NEW_REQUEST": "복원 작업은 다시 시도할 수 없습니다. 버전 이력에서 새로 복원하세요.",
+    "IDEMPOTENCY_KEY_REUSED": "이미 다른 적용 요청에 사용한 요청 키입니다. 버전 이력을 다시 열어 적용하세요.",
+    "RESTORE_RETRY_REQUIRES_NEW_REQUEST": "버전 적용 작업은 다시 시도할 수 없습니다. 버전 이력에서 새로 적용하세요.",
     "DEPENDENCY_UNAVAILABLE": "검색 데이터 확인 중 연결이 끊어졌습니다.",
     "INVALID_REQUEST": "요청 형식이 올바르지 않습니다.",
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 버전은 검색 데이터가 없어 적용 대상이 아니다
+    "DRAWING_NOT_SUPPORTED": "도면은 아직 검색에 쓰이지 않아 이전 버전 적용 대상이 아닙니다.",
 }
 STATUS_BY_CODE = {
     "INVALID_REQUEST": 422, "FEATURE_DISABLED": 403, "VERSION_NOT_FOUND": 404,
@@ -93,6 +95,9 @@ def version_block_code(version: dict, *, profile_id: Optional[int]) -> Optional[
     순서: 정상 적용 이력 → 벡터 없음(삭제 확정) → 프로필 → snapshot → 검증. 기존 버전 대부분이 '벡터 삭제됨'이므로
     그 사유를 프로필 불명보다 먼저 보여 준다(설계 8절 순서에서 VECTOR_MISSING만 앞당김 — 보고서에 기록).
     """
+    # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 버전(봉인·벡터 없음)은 항상 거부
+    if version.get("processing_engine") == "drawing_ingest":
+        return "DRAWING_NOT_SUPPORTED"
     if version.get("status") != "retired" or not version.get("activated_at"):
         return "VERSION_NOT_RESTORABLE"
     if version.get("vector_storage_state") == "missing":
@@ -111,7 +116,7 @@ def version_block_code(version: dict, *, profile_id: Optional[int]) -> Optional[
 
 
 def evaluate_versions(versions: list[dict], *, doc_code: Optional[str], profile_id: Optional[int], pending_busy: bool):
-    """행마다 (can_restore, code, reason). 현재 적용 행은 항상 ALREADY_ACTIVE, 그 외는 문서 단위 사유를 복사(B-11)."""
+    """행마다 (can_restore, code, reason). 현재 적용 행은 항상 ALREADY_ACTIVE, 그 외는 문서 단위 사유를 복사."""
     rows = []
     for version in versions:
         if version.get("status") == "active":
@@ -316,11 +321,9 @@ def _actor_can_view(db, actor_id: Optional[str], collection_name: Optional[str],
         return False
     if rows[0][0] == "admin":
         return True
-    permissions = MetadataRepository(get_settings().sqlite_db_path).get_user_permissions(actor_id)
-    if not permissions:
-        return False
-    allowed = set(SECURITY_HIERARCHY.get(permissions.max_security_level or "public", ["public"]))
-    return collection_name in set(permissions.accessible_collections or []) and (security_level or "public") in allowed
+    permissions = MetadataRepository().get_user_permissions(actor_id)
+    # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 공통 함수 사용(권한 행이 없으면 불가)
+    return in_document_scope(document_scope(permissions), collection_name, security_level or "public")
 
 
 async def run_restore_job(
@@ -432,7 +435,7 @@ async def run_restore_job(
             code, message = exc.code, BLOCK_MESSAGES.get(exc.code, str(exc))
         else:
             logger.exception("event=version_restore status=error document_id=%s job_id=%s", document_id, job_id)
-            code, message = "RESTORE_FAILED", "복원을 처리하는 중 오류가 발생했습니다."
+            code, message = "RESTORE_FAILED", "버전 적용을 처리하는 중 오류가 발생했습니다."
         logger.warning("event=version_restore status=failed document_id=%s to=%s job_id=%s code=%s",
                        document_id, target, job_id, code)
 

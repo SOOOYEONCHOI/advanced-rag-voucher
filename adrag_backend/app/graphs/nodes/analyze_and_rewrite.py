@@ -22,7 +22,7 @@ from app.graphs.state import PipelineState
 from app.graphs.dependencies import GraphDependencies
 from app.graphs.utils import preview_list, rag_diag, timed_node
 # 2026.07.16(sooyeon.choi) 수정 - 요청마다 EmbeddingClient를 생성하던 것을
-#   retrieve 노드와 동일한 싱글턴을 공유하도록 변경 (B8)
+#   retrieve 노드와 동일한 싱글턴을 공유하도록 변경
 from app.graphs.nodes.retrieve import get_embedding_client
 from app.services.llm_service import get_local_llm_service
 from app.utils.log.log import LoggingLogger
@@ -31,7 +31,7 @@ from app.prompts.pipeline import REWRITE_PROMPT
 # 로거 초기화
 logger = LoggingLogger().getLogger(__name__)
 
-# 2026.07.16(sooyeon.choi) 추가 - QueryPreprocessor 모듈 수준 싱글턴 (B8)
+# 2026.07.16(sooyeon.choi) 추가 - QueryPreprocessor 모듈 수준 싱글턴
 # 2026.07.16(sooyeon.choi) 수정 - 조립 지점을 컨테이너로 이동, getter는 호환용 유지 (3단계)
 def get_query_preprocessor() -> QueryPreprocessor:
     """QueryPreprocessor 싱글턴을 반환한다 (컨테이너 위임)."""
@@ -53,7 +53,7 @@ def parse_rewrite_response(response: Any) -> List[str]:
     """
     try:
         # 2026.07.16(sooyeon.choi) 수정 - LLMService.chat()에서 이미 strip_thinking 처리되므로
-        #   이중 적용 제거 (B14)
+        #   이중 적용 제거
         raw_text = response.choices[0].message.content if response.choices else ""
 
         text = raw_text.strip()
@@ -80,7 +80,7 @@ async def analyze_and_rewrite(state: PipelineState, deps: GraphDependencies | No
     # 사용자가 OpenAI를 선택했더라도 analyze_and_rewrite는 내부 파이프라인 단계이므로
     # 로컬 싱글턴을 재사용하여 객체 생성 오버헤드를 제거한다.
     llm_service = deps.container.local_llm if deps else get_local_llm_service()
-    # 2026.07.16(sooyeon.choi) 수정 - retrieve 노드와 동일한 EmbeddingClient 싱글턴 공유 (B8)
+    # 2026.07.16(sooyeon.choi) 수정 - retrieve 노드와 동일한 EmbeddingClient 싱글턴 공유
     embedding_client = deps.container.embedding if deps else get_embedding_client()
 
     original_query = state["original_query"]
@@ -89,7 +89,7 @@ async def analyze_and_rewrite(state: PipelineState, deps: GraphDependencies | No
     preprocess_result: Dict[str, Any] = {}
     if settings.enable_query_preprocessing:
         try:
-            # 2026.07.16(sooyeon.choi) 수정 - 요청마다 생성 → 싱글턴 재사용 (B8)
+            # 2026.07.16(sooyeon.choi) 수정 - 요청마다 생성 → 싱글턴 재사용
             preprocessor = deps.container.query_preprocessor if deps else get_query_preprocessor()
             pp_result = preprocessor.preprocess(original_query)
             preprocess_result = {
@@ -101,7 +101,6 @@ async def analyze_and_rewrite(state: PipelineState, deps: GraphDependencies | No
         except Exception as e:
             logger.warning(f"규칙 기반 전처리 실패, 건너뜁니다: {e}")
     else:
-        # logger.info("ENABLE_QUERY_PREPROCESSING=false: 규칙 기반 전처리 비활성화됨")
         pass
 
     # ── 사용자 메시지 구성 (전처리 힌트 포함) ──
@@ -183,16 +182,6 @@ async def analyze_and_rewrite(state: PipelineState, deps: GraphDependencies | No
         preview_list(preprocess_result.get("extracted_keywords"), limit=10, max_len=40),
         preview_list(rewritten, limit=5, max_len=120),
     )
-
-    # logger.info(
-    #     f"임베딩 완료: original 1건(Phase1) + 추가 {len(queries_to_embed)}건(Phase2) → "
-    #     f"총 {len(rewritten_query_embeddings)}건 사전 계산"
-    # )
-    # 2026.05.22(sooyeon.choi) 추가 - 노드 출력 로깅
-    # logger.info(
-    #     f"[analyze_and_rewrite 출력] rewritten_queries({len(rewritten)}건): "
-    #     + " | ".join(f"[{i+1}] {q!r}" for i, q in enumerate(rewritten))
-    # )
 
     # To-do: query_type/inferred_doc_type를 활용할 계획이 생기면
     #   반환 dict에 "query_type", "inferred_doc_type" 키를 다시 추가할 것.

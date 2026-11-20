@@ -16,7 +16,7 @@ def _dedup_preserve_order(ids: Sequence[str]) -> List[str]:
     운영 검색은 여러 채널 병합으로 같은 청크가 2회 이상 등장할 수 있는데, 순위·nDCG는
     사용자가 실제 보는 '중복 제거된 순위' 기준으로 계산해야 한다. 중복을 남기면
     (a) nDCG의 DCG가 이중 계산되어 값이 1.0을 초과하고, (b) 뒤 정답의 순위가 밀린다.
-    (설계서 C1) — 모든 순위/집합 지표는 dedup 후 top-k를 자른다.
+    모든 순위/집합 지표는 dedup 후 top-k를 자른다.
     """
     seen: Set[str] = set()
     out: List[str] = []
@@ -130,18 +130,16 @@ def compute_channel_metrics(
 
     metrics: Dict[str, Any] = {}
     for k in k_values:
-        hit = hit_at_k(retrieved_ids, gold_ids, k)
-        metrics[f"hit@{k}"] = hit
-        # 검색 실패율 — top-k에서 정답을 하나도 못 찾은 질문이면 1.0. gold가 없으면
-        # None(집계 분모 제외). 항목별 평균 = 완전 실패 질문 비율(핵심 KPI ④, 낮을수록 좋음).
-        metrics[f"fail@{k}"] = None if hit is None else 1.0 - hit
+        # 2026.11.17(sooyeon.choi) 수정 - fail@k 삭제(1 - hit@k와 같은 값의 중복 지표)
+        metrics[f"hit@{k}"] = hit_at_k(retrieved_ids, gold_ids, k)
         metrics[f"recall@{k}"] = recall_at_k(retrieved_ids, gold_ids, k)
         metrics[f"ndcg@{k}"] = ndcg_at_k(retrieved_ids, gold_ids, k)
-        # C2 — MRR을 K별로 산출한다. 기존 단일 rr은 max_k 고정(=MRR@10)이라 화면의
+        # MRR을 K별로 산출한다. 기존 단일 rr은 max_k 고정(=MRR@10)이라 화면의
         # "MRR@5" 라벨과 불일치했다. rr@5 등 K별 값을 명시적으로 제공한다.
         metrics[f"rr@{k}"] = reciprocal_rank(retrieved_ids, gold_ids, k)
     max_k = max(k_values) if k_values else None
-    metrics["rr"] = reciprocal_rank(retrieved_ids, gold_ids, max_k)  # 하위호환(=rr@max_k)
+    # 2026.11.17(sooyeon.choi) 수정 - 하위호환 rr(=rr@max_k) 삭제, rr@k만 사용
+    # 아래 순위·건수는 상세 화면 진단용이며 집계(평균)하지 않는다(DIAGNOSTIC_KEYS).
     metrics["gold_ranks"] = gold_ranks(retrieved_ids, gold_ids)
     metrics["evidence_rank"] = first_rank(retrieved_ids, gold_ids, max_k)
     deduped = _dedup_preserve_order(retrieved_ids)
@@ -149,15 +147,18 @@ def compute_channel_metrics(
         len(gold_ids & set(deduped[:max_k])) if gold_ids and max_k else 0
     )
     metrics["total_retrieved"] = len(retrieved_ids)
-    metrics["top1_is_relevant"] = (
-        (bool(retrieved_ids) and retrieved_ids[0] in gold_ids) if gold_ids else None
-    )
+    # 2026.11.17(sooyeon.choi) 수정 - top1_is_relevant 삭제(중복 제거 전 1위 기준이라 hit@1과 값이 어긋남)
     return metrics
 
 
-def aggregate_mean(per_item_values: Sequence[float]) -> float:
-    """항목별 지표 평균 (빈 리스트는 0.0)."""
-    if not per_item_values:
-        return 0.0
-    return sum(per_item_values) / len(per_item_values)
+# 2026.11.17(sooyeon.choi) 추가 - 집계 대상 지표 판별(진단값·건수·임계값이 평균되지 않게 화이트리스트로 제한)
+_AGGREGATED_PREFIXES = ("hit@", "recall@", "ndcg@", "rr@")
+
+
+def is_aggregated_retrieval_metric(key: str) -> bool:
+    """run 집계(평균)에 포함하는 검색 지표 키인지 반환한다."""
+    return key.startswith(_AGGREGATED_PREFIXES)
+
+
+# 2026.11.09(sooyeon.choi) 삭제 - 사용처 없는 aggregate_mean()
 

@@ -20,6 +20,12 @@ export const evalApi = {
       responseType: 'blob',
     }));
   },
+  // 2026.11.19(sooyeon.choi) 추가 - 시험 데이터셋(질의·정답 근거·요약) Excel
+  downloadTestset(datasetId) {
+    return http.get(`/eval/datasets/${datasetId}/test-set.xlsx`, adminAuthConfig({
+      responseType: 'blob',
+    }));
+  },
   listQaItems(datasetId, { status, type, page = 1, pageSize = 50 } = {}) {
     return http.get(`/eval/datasets/${datasetId}/items`, adminAuthConfig({
       params: { status, type, page, page_size: pageSize },
@@ -31,11 +37,19 @@ export const evalApi = {
   approveQaItem(qaId) {
     return http.post(`/eval/items/${qaId}/approve`, null, adminAuthConfig());
   },
+  // 2026.11.19(sooyeon.choi) 추가 - '검색 확인 필요' 문항을 같은 조항(섹션)으로 다시 생성
+  regenerateQaItem(qaId) {
+    return http.post(`/eval/items/${qaId}/regenerate`, null, adminAuthConfig());
+  },
   rejectQaItem(qaId) {
     return http.post(`/eval/items/${qaId}/reject`, null, adminAuthConfig());
   },
   bulkReview(qaIds, action) {
     return http.post('/eval/items/bulk-review', { qa_ids: qaIds, action }, adminAuthConfig());
+  },
+  // 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋 만들기(확정 데이터셋 2개 이상, 고른 순서대로)
+  mergeDatasets({ name, datasetIds }) {
+    return http.post('/eval/datasets/merge', { name, dataset_ids: datasetIds }, adminAuthConfig());
   },
   finalizeDataset(datasetId, note = '') {
     return http.post(`/eval/datasets/${datasetId}/finalize`, { note }, adminAuthConfig());
@@ -55,6 +69,10 @@ export const evalApi = {
   },
   deleteOpenAIKey() {
     return http.delete('/eval/settings/dataset-generation/openai-key', adminAuthConfig());
+  },
+  // 2026.11.18(sooyeon.choi) 추가 - 데이터셋 생성용 vLLM 모델 목록(모델명·기본 여부·켜짐 여부)
+  getGenerationModels() {
+    return http.get('/eval/settings/dataset-generation/models', adminAuthConfig());
   },
 
   // ── 골드셋 ─────────────────────────────────────────
@@ -86,9 +104,10 @@ export const evalApi = {
   deleteRun(runId) {
     return http.delete(`/eval/runs/${runId}`, adminAuthConfig());
   },
-  listRunResults(runId, { status, type, page = 1, pageSize = 50 } = {}) {
+  // 2026.11.20(sooyeon.choi) 수정 - law: 합본 실행 법령 필터
+  listRunResults(runId, { status, type, law, page = 1, pageSize = 50 } = {}) {
     return http.get(`/eval/runs/${runId}/results`, adminAuthConfig({
-      params: { status, type, page, page_size: pageSize },
+      params: { status, type, law, page, page_size: pageSize },
     }));
   },
 

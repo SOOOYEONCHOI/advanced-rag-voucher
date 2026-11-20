@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>합본 평가 목업</title>
+<!-- 2026.11.20(sooyeon.choi) 추가 - 합본 데이터셋(산안 60 + 중처 60) 평가 화면 목업. 예시 데이터만 사용 -->
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--line2:#cbd5e1;--text:#0f172a;--sub:#475569;--muted:#64748b;--faint:#94a3b8;
+--blue:#2563eb;--blue-bg:#eff6ff;--green:#15803d;--green-bg:#dcfce7;--red:#b91c1c;--red-bg:#fee2e2;--amber:#b45309;--amber-bg:#fef3c7;--new:#7c3aed;--new-bg:#f5f3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic",system-ui,sans-serif;font-size:14px}
+header.top{background:#0f172a;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:12px}
+header.top h1{font-size:16px;margin:0}
+.badge-admin{background:#334155;border-radius:4px;padding:2px 8px;font-size:12px}
+nav.steps{display:flex;gap:6px;padding:12px 24px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:5}
+nav.steps button{border:1px solid var(--line2);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;color:var(--sub);font-size:13px}
+nav.steps button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+.screen{display:none}.screen.on{display:block}
+.guide{background:var(--new-bg);border:1px dashed var(--new);color:#4c1d95;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.6}
+.guide b{color:var(--new)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.card-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.count{color:var(--muted);font-weight:400;font-size:12px}
+.spacer{flex:1}
+.btn{border:1px solid var(--line2);background:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px;color:var(--sub)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.new{background:var(--new);border-color:var(--new);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f8fafc;color:var(--sub);font-weight:600;font-size:13px;white-space:nowrap}
+.center{text-align:center}
+tr.sel td{background:var(--blue-bg)}
+tr.merged td{background:var(--new-bg)}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;white-space:nowrap}
+.pill.ok{background:var(--green-bg);color:var(--green)}
+.pill.review{background:var(--amber-bg);color:var(--amber)}
+.pill.merge{background:var(--new-bg);color:var(--new);border:1px solid #ddd6fe}
+.pill.law1{background:#e0f2fe;color:#0369a1}
+.pill.law2{background:#fce7f3;color:#be185d}
+.pill.good{background:var(--green-bg);color:var(--green)}
+.pill.bad{background:var(--red-bg);color:var(--red)}
+.pill.na{background:#f1f5f9;color:var(--muted)}
+.new-mark{color:var(--new);font-size:11px;font-weight:700;margin-left:4px}
+.selbar{display:flex;align-items:center;gap:10px;background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:10px;flex-wrap:wrap}
+.muted{color:var(--muted)}.small{font-size:12px}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:12px;width:min(560px,100%);padding:20px 22px;max-height:90vh;overflow:auto}
+.modal h3{margin:0 0 12px;font-size:16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-weight:600;margin-bottom:5px;font-size:13px}
+.field input,.field select{width:100%;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px}
+.box{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#f8fafc;line-height:1.7}
+.row-end{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.form-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.form-row .field{flex:1;min-width:220px;margin:0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi .name{font-size:12px;color:var(--muted)}
+.kpi .title{font-weight:700;margin:2px 0 6px}
+.kpi .val{font-size:26px;font-weight:800}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.6}
+.kpi .pass{color:var(--green);font-weight:700}
+.kpi .split{margin-top:6px;border-top:1px dashed var(--line);padding-top:6px;font-size:12px;color:var(--sub)}
+.split .new-mark{margin:0}
+.filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.filters select{border:1px solid var(--line2);border-radius:6px;padding:6px 8px}
+.newcol{background:#faf5ff !important}
+th.newcol{color:var(--new)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line2);margin-bottom:0}
+.tabs span{padding:6px 14px;border:1px solid var(--line2);border-bottom:none;border-radius:6px 6px 0 0;background:#f8fafc;font-size:12px;color:var(--sub)}
+.tabs span.on{background:#fff;font-weight:700;color:var(--text)}
+.sheet{overflow:auto;border:1px solid var(--line2);border-top:none}
+.sheet table th{background:#d9ead3;color:#1f2937;text-align:center}
+.sheet td{font-size:12px;min-width:70px}
+.sheet td.long{min-width:240px}
+.wrap{overflow-x:auto}
+@media (max-width:860px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.kpis{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top"><h1>We.RAG 평가</h1><span class="badge-admin">관리자</span><span class="spacer"></span><span class="small" style="color:#cbd5e1">목업 · 예시 데이터</span></header>
+<nav class="steps" id="steps">
+  <button data-s="s1" class="on">① 데이터셋 목록 (체크·합본 만들기)</button>
+  <button data-s="s2">② 합본 생성 후 목록</button>
+  <button data-s="s3">③ 평가 실행</button>
+  <button data-s="s4">④ 평가 결과</button>
+  <button data-s="s5">⑤ 결과 xlsx</button>
+</nav>
+<main>
+
+<!-- ① -->
+<section class="screen on" id="s1">
+  <div class="guide"><b>새로 추가</b> 왼쪽 체크 칸과 [합본 데이터셋 만들기] 버튼이 생깁니다. 승인 완료(골드셋 확정) 데이터셋 2개 이상을 체크하면 버튼이 켜집니다. 체크하지 않으면 지금과 똑같이 행을 눌러 검토합니다.</div>
+  <div class="card">
+    <div class="card-title">데이터셋 목록 <span class="count">총 4건</span><span class="spacer"></span>
+      <button class="btn">+ 테스트셋 생성</button>
+    </div>
+    <div class="selbar" id="selbar">
+      <b id="selcount">2개 선택</b><span class="muted small" id="selsum">산안 60 + 중처 60 = 120문항</span><span class="spacer"></span>
+      <button class="btn" onclick="clearSel()">선택 해제</button>
+      <button class="btn new" id="mergeBtn" onclick="openModal()">합본 데이터셋 만들기</button>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th class="center newcol" style="width:44px">선택</th><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">다운로드</th></tr></thead>
+      <tbody id="dsBody">
+        <tr class="sel" data-n="60" data-k="산안"><td class="center newcol"><input type="checkbox" checked onchange="sync()"></td><td class="center">4</td><td>산업안전보건법_법령조항_gemma12B</td><td>AIE_산업안전보건법</td><td class="center"><span class="pill ok">확정 v1</span></td><td class="center">60 / 60</td><td class="center">2026-11-19</td><td class="center">⬇ xlsx</td></tr>
+        <tr class="sel" data-n="60" data-k="중처"><td class="center newcol"><input type="checkbox" checked onchange="sync()"></td><td class="center">3</td><td>중대재해처벌법_법령조항_gemma12B</td><td>AIE_중대재해처벌법</td><td class="center"><span class="pill ok">확정 v1</span></td><td class="center">60 / 60</td><td class="center">2026-11-19</td><td class="center">⬇ xlsx</td></tr>
+        <tr data-n="40" data-k="안내서"><td class="center newcol"><input type="checkbox" onchange="sync()"></td><td class="center">2</td><td>안전보건 안내서_유형별</td><td>AIE_안내서</td><td class="center"><span class="pill ok">확정 v2</span></td><td class="center">40 / 48</td><td class="center">2026-11-12</td><td class="center">⬇ xlsx</td></tr>
+        <tr><td class="center newcol"><input type="checkbox" disabled title="확정본이 없는 데이터셋은 합칠 수 없습니다"></td><td class="center">1</td><td>조립 SOP_시험용</td><td>SOP_조립</td><td class="center"><span class="pill review">검토 중</span></td><td class="center">12 / 30</td><td class="center">2026-11-05</td><td class="center">⬇ xlsx</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted small" style="margin:8px 0 0">· 검토 중인 데이터셋은 체크할 수 없습니다(마지막 줄). · 합본에는 각 데이터셋의 <b>최신 확정본(골드셋)</b> 문항이 들어갑니다.</p>
+  </div>
+</section>
+
+<!-- ② -->
+<section class="screen" id="s2">
+  <div class="guide"><b>합본 생성 후</b> 목록 맨 위에 합본 데이터셋이 생기고 바로 확정 상태가 됩니다. 원본 2개는 그대로 남습니다. 합본 행을 누르면 문항을 볼 수 있지만, <b>수정·다시 생성은 원본에서</b> 하고 합본을 다시 만듭니다.</div>
+  <div class="card">
+    <div class="card-title">데이터셋 목록 <span class="count">총 5건</span></div>
+    <div class="wrap"><table>
+      <thead><tr><th class="center" style="width:44px">선택</th><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">다운로드</th></tr></thead>
+      <tbody>
+        <tr class="merged"><td class="center"><input type="checkbox" disabled title="합본은 다시 합칠 수 없습니다"></td><td class="center">5</td><td>AI+ 시험 합본 120 <span class="pill merge">합본</span></td><td>합본 (AIE_산업안전보건법 + AIE_중대재해처벌법)</td><td class="center"><span class="pill ok">확정 v1</span></td><td class="center">120 / 120</td><td class="center">2026-11-20</td><td class="center">⬇ xlsx</td></tr>
+        <tr><td class="center"><input type="checkbox"></td><td class="center">4</td><td>산업안전보건법_법령조항_gemma12B</td><td>AIE_산업안전보건법</td><td class="center"><span class="pill ok">확정 v1</span></td><td class="center">60 / 60</td><td class="center">2026-11-19</td><td class="center">⬇ xlsx</td></tr>
+        <tr><td class="center"><input type="checkbox"></td><td class="center">3</td><td>중대재해처벌법_법령조항_gemma12B</td><td>AIE_중대재해처벌법</td><td class="center"><span class="pill ok">확정 v1</span></td><td class="center">60 / 60</td><td class="center">2026-11-19</td><td class="center">⬇ xlsx</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="card-title">합본 데이터셋 상세 (행 클릭 시) <span class="pill merge">합본</span></div>
+    <div class="box small">구성: <b>산업안전보건법_법령조항_gemma12B</b> 확정 v1 (60문항) + <b>중대재해처벌법_법령조항_gemma12B</b> 확정 v1 (60문항)<br>
+      문항은 읽기 전용입니다. 고칠 문항이 있으면 원본에서 수정·확정한 뒤 합본을 다시 만들어 주세요.</div>
+    <div class="wrap" style="margin-top:10px"><table>
+      <thead><tr><th>질의ID</th><th class="center newcol">법령</th><th>질문</th><th>근거</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr><td>산안-001</td><td class="center newcol"><span class="pill law1">산업안전보건법</span></td><td>사업주가 근로자에게 실시해야 하는 안전보건교육의 종류는 무엇인가요?</td><td class="small">산업안전보건법 시행령 · 제00조</td><td class="center"><span class="pill ok">승인</span></td></tr>
+        <tr><td>산안-002</td><td class="center newcol"><span class="pill law1">산업안전보건법</span></td><td>안전보건관리책임자의 업무에는 어떤 것이 포함되나요?</td><td class="small">산업안전보건법 · 제00조</td><td class="center"><span class="pill ok">승인</span></td></tr>
+        <tr><td>중처-001</td><td class="center newcol"><span class="pill law2">중대재해처벌법</span></td><td>중대산업재해의 정의는 무엇인가요?</td><td class="small">중대재해처벌법 · 제00조</td><td class="center"><span class="pill ok">승인</span></td></tr>
+        <tr><td colspan="5" class="center muted small">… 총 120문항</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ③ -->
+<section class="screen" id="s3">
+  <div class="guide"><b>바뀌는 것 없음</b> 평가 실행 화면은 지금과 같습니다. 골드셋 선택 목록에 합본이 함께 나오고, 고르면 120문항이 법령별 컬렉션에서 각각 검색됩니다. 아래 안내 문구 한 줄만 추가됩니다.</div>
+  <div class="card">
+    <div class="card-title">새 평가 실행</div>
+    <div class="form-row">
+      <div class="field"><label>골드셋</label>
+        <select>
+          <option selected>AI+ 시험 합본 120 · v1 (120문항) [합본]</option>
+          <option>산업안전보건법_법령조항_gemma12B · v1 (60문항)</option>
+          <option>중대재해처벌법_법령조항_gemma12B · v1 (60문항)</option>
+          <option>안전보건 안내서_유형별 · v2 (40문항)</option>
+        </select></div>
+      <div class="field"><label>평가 범위</label>
+        <select><option selected>전체 RAG (검색 + 답변 생성)</option><option>검색만</option></select></div>
+      <button class="btn primary">평가 실행</button>
+    </div>
+    <p class="small" style="color:var(--new);margin:10px 0 0">ⓘ 합본: 산안 60문항은 AIE_산업안전보건법, 중처 60문항은 AIE_중대재해처벌법에서 검색합니다. 답변 생성은 1건씩 순서대로 실행합니다.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">평가 실행 이력</div>
+    <div class="wrap"><table>
+      <thead><tr><th class="center">실행</th><th>골드셋</th><th class="center">범위</th><th class="center">상태</th><th class="center">진행</th><th class="center">시작</th></tr></thead>
+      <tbody>
+        <tr class="merged"><td class="center">#8</td><td>AI+ 시험 합본 120 <span class="pill merge">합본</span> v1</td><td class="center">전체 RAG</td><td class="center"><span class="pill review">실행 중</span></td><td class="center">47 / 120</td><td class="center">11-20 14:02</td></tr>
+        <tr><td class="center">#6</td><td>산업안전보건법_법령조항_gemma12B v1</td><td class="center">전체 RAG</td><td class="center"><span class="pill ok">완료</span></td><td class="center">60 / 60</td><td class="center">11-19 17:40</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ④ -->
+<section class="screen" id="s4">
+  <div class="guide"><b>새로 추가</b> ① 각 카드 아래 법령별 값 한 줄(합본일 때만) ② 항목 표의 <b>질의ID·법령 열</b>과 <b>법령 필터</b>. 카드의 큰 값과 합격 판정은 120문항 전체 기준입니다.</div>
+  <div class="card">
+    <div class="card-title">실행 #8 · AI+ 시험 합본 120 v1 <span class="pill merge">합본</span><span class="spacer"></span>
+      <button class="btn primary">⬇ 결과 xlsx 내려받기</button></div>
+    <div class="card-title" style="font-size:14px;margin-top:4px">검색 품질 (지표 1·2)</div>
+    <div class="kpis">
+      <div class="kpi"><div class="name">지표 1</div><div class="title">검색 완전성 Recall@10</div><div class="val">91.7%</div>
+        <div class="sub">110 / 120 적중 · 목표 80% 이상 <span class="pass">충족</span></div>
+        <div class="split"><span class="new-mark">법령별</span> 산안 93.3% · 중처 90.0%</div></div>
+      <div class="kpi"><div class="name">지표 2</div><div class="title">검색 최종 정합성 NDCG@5</div><div class="val">0.874</div>
+        <div class="sub">표준편차 0.21 · 목표 0.80 이상 <span class="pass">충족</span></div>
+        <div class="split"><span class="new-mark">법령별</span> 산안 0.902 · 중처 0.846</div></div>
+      <div class="kpi"><div class="name">지표 3</div><div class="title">답변 생성 정확도</div><div class="val muted">미측정</div>
+        <div class="sub">LLM-as-a-Judge 심사 후 표시</div>
+        <div class="split muted">법령별 값은 심사 후 표시</div></div>
+      <div class="kpi"><div class="name">지표 4</div><div class="title">답변 생성 평균 반환 시간</div><div class="val">2.41초</div>
+        <div class="sub">표준편차 0.62초<br>첫 토큰 반환 시간 (판정 기준) 2.41초<br>전체 반환 시간 9.12초</div>
+        <div class="split"><span class="new-mark">법령별</span> 산안 2.36초 · 중처 2.46초</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">항목별 결과 <span class="count">120건</span></div>
+    <div class="filters">
+      <select class="newcol" title="새로 추가"><option>법령: 전체</option><option>산업안전보건법</option><option>중대재해처벌법</option></select>
+      <select><option>전체 항목</option><option>문제 항목만</option></select>
+      <select><option>번호순</option><option>낮은 점수부터</option></select>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th class="center">번호</th><th class="newcol">질의ID</th><th class="center newcol">법령</th><th>질문</th><th class="center">지표 1 Recall@10</th><th class="center">지표 2 NDCG@5</th><th class="center">지표 3 답변 정확도</th><th class="center">지표 4 반환 시간</th><th class="center">상세보기</th></tr></thead>
+      <tbody>
+        <tr><td class="center">1</td><td class="newcol">산안-001</td><td class="center newcol"><span class="pill law1">산안</span></td><td>사업주가 근로자에게 실시해야 하는 안전보건교육의 종류는 무엇인가요?</td><td class="center"><span class="pill good">적중</span></td><td class="center"><span class="pill good">1.000</span></td><td class="center"><span class="pill na">미측정</span></td><td class="center small">2.10초 <span class="muted">/ 8.84초</span></td><td class="center">🔍</td></tr>
+        <tr><td class="center">2</td><td class="newcol">산안-002</td><td class="center newcol"><span class="pill law1">산안</span></td><td>안전보건관리책임자의 업무에는 어떤 것이 포함되나요?</td><td class="center"><span class="pill good">적중</span></td><td class="center"><span class="pill good">0.631</span></td><td class="center"><span class="pill na">미측정</span></td><td class="center small">2.33초 <span class="muted">/ 9.40초</span></td><td class="center">🔍</td></tr>
+        <tr><td class="center">61</td><td class="newcol">중처-001</td><td class="center newcol"><span class="pill law2">중처</span></td><td>중대산업재해의 정의는 무엇인가요?</td><td class="center"><span class="pill good">적중</span></td><td class="center"><span class="pill good">1.000</span></td><td class="center"><span class="pill na">미측정</span></td><td class="center small">2.51초 <span class="muted">/ 7.92초</span></td><td class="center">🔍</td></tr>
+        <tr><td class="center">62</td><td class="newcol">중처-002</td><td class="center newcol"><span class="pill law2">중처</span></td><td>경영책임자가 이행해야 하는 안전보건 확보의무는 무엇인가요?</td><td class="center"><span class="pill bad">미적중</span></td><td class="center"><span class="pill bad">0.000</span></td><td class="center"><span class="pill na">미측정</span></td><td class="center small">2.44초 <span class="muted">/ 10.31초</span></td><td class="center">🔍</td></tr>
+        <tr><td colspan="9" class="center muted small">… 120건</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ⑤ -->
+<section class="screen" id="s5">
+  <div class="guide"><b>새로 추가</b> 기존 결과 xlsx의 '항목별 결과' 시트에 <b>질의ID · 법령 · 정답 답변 · 생성 답변 · 인용 출처</b> 열이 추가됩니다(보라색 머리글). '요약' 시트의 지표는 120문항 전체 기준이고, 합본이면 법령별 표가 한 개 더 붙습니다.</div>
+  <div class="card">
+    <div class="card-title">파일명: 평가결과_AI+ 시험 합본 120_run8_20261120_1530.xlsx</div>
+    <div class="tabs"><span>요약</span><span class="on">항목별 결과</span></div>
+    <div class="sheet"><table>
+      <thead><tr><th>번호</th><th style="background:#ede9fe">질의ID</th><th style="background:#ede9fe">법령</th><th>질문</th><th style="background:#ede9fe">정답 답변</th><th style="background:#ede9fe">생성 답변</th><th style="background:#ede9fe">인용 출처</th><th>Recall@10</th><th>NDCG@5</th><th>첫 토큰(s)</th><th>전체 응답시간(s)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>산안-001</td><td>산업안전보건법</td><td class="long">사업주가 근로자에게 실시해야 하는 안전보건교육의 종류는 무엇인가요?</td><td class="long">(시험 데이터셋의 정답 답변)</td><td class="long">(챗봇이 생성한 답변 원문)</td><td class="long">산업안전보건법 시행령 제00조</td><td>적중</td><td>100.0%</td><td>2.10</td><td>8.84</td></tr>
+        <tr><td>61</td><td>중처-001</td><td>중대재해처벌법</td><td class="long">중대산업재해의 정의는 무엇인가요?</td><td class="long">(시험 데이터셋의 정답 답변)</td><td class="long">(챗봇이 생성한 답변 원문)</td><td class="long">중대재해처벌법 제00조</td><td>적중</td><td>100.0%</td><td>2.51</td><td>7.92</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tabs" style="margin-top:18px"><span class="on">요약</span><span>항목별 결과</span></div>
+    <div class="sheet"><table>
+      <thead><tr><th>구분</th><th>지표 1 Recall@10</th><th>지표 2 NDCG@5</th><th>지표 4 첫 토큰 평균(s)</th><th>문항 수</th></tr></thead>
+      <tbody>
+        <tr><td><b>전체 (판정 기준)</b></td><td>91.7%</td><td>0.874</td><td>2.41</td><td>120</td></tr>
+        <tr style="background:#faf5ff"><td>산업안전보건법</td><td>93.3%</td><td>0.902</td><td>2.36</td><td>60</td></tr>
+        <tr style="background:#faf5ff"><td>중대재해처벌법</td><td>90.0%</td><td>0.846</td><td>2.46</td><td>60</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted small" style="margin:8px 0 0">※ 수치는 모두 예시입니다.</p>
+  </div>
+</section>
+</main>
+
+<!-- 합본 생성 모달 -->
+<div class="overlay" id="ov" onclick="if(event.target===this)closeModal()">
+  <div class="modal" role="dialog" aria-labelledby="mt">
+    <h3 id="mt">합본 데이터셋 만들기</h3>
+    <div class="field"><label>합본 이름</label><input value="AI+ 시험 합본 120"></div>
+    <div class="field"><label>합칠 데이터셋 (순서대로 이어 붙임)</label>
+      <div class="box">1. 산업안전보건법_법령조항_gemma12B · 확정 v1 · <b>60문항</b> · AIE_산업안전보건법<br>
+        2. 중대재해처벌법_법령조항_gemma12B · 확정 v1 · <b>60문항</b> · AIE_중대재해처벌법<br>
+        <b>합계 120문항</b></div></div>
+    <div class="box small" style="background:#fff">
+      ✔ 질의ID 그대로 유지 (산안-001 ~ 060, 중처-001 ~ 060) · 겹치는 ID 없음<br>
+      ✔ 문항마다 원래 컬렉션에서 검색합니다<br>
+      ✔ 만들면 바로 확정(v1)되어 평가 실행에서 고를 수 있습니다<br>
+      ⓘ 원본을 고친 뒤에는 합본을 다시 만들어야 반영됩니다
+    </div>
+    <div class="row-end"><button class="btn" onclick="closeModal()">취소</button><button class="btn new" onclick="closeModal();go('s2')">만들기</button></div>
+  </div>
+</div>
+
+<script>
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  document.querySelectorAll('#steps button').forEach(b=>b.classList.toggle('on',b.dataset.s===id));window.scrollTo(0,0)}
+document.querySelectorAll('#steps button').forEach(b=>b.onclick=()=>go(b.dataset.s));
+function sync(){const rows=[...document.querySelectorAll('#dsBody tr')];let n=0,sum=0,parts=[];
+  rows.forEach(r=>{const c=r.querySelector('input');const on=c&&c.checked;r.classList.toggle('sel',!!on);
+    if(on){n++;sum+=+r.dataset.n;parts.push(r.dataset.k+' '+r.dataset.n)}});
+  document.getElementById('selbar').style.display=n?'flex':'none';
+  document.getElementById('selcount').textContent=n+'개 선택';
+  document.getElementById('selsum').textContent=n>=2?parts.join(' + ')+' = '+sum+'문항':'2개 이상 골라야 합칠 수 있습니다';
+  document.getElementById('mergeBtn').disabled=n<2}
+function clearSel(){document.querySelectorAll('#dsBody input').forEach(c=>c.checked=false);sync()}
+function openModal(){document.getElementById('ov').classList.add('on')}
+function closeModal(){document.getElementById('ov').classList.remove('on')}
+</script>
+</body>
+</html>

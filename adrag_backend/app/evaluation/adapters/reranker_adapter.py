@@ -35,9 +35,20 @@ class EvalReranker:
         """
         if not hits:
             return []
-        documents = [payload.get("text", "") for _, _, payload in hits]
+        # 2026.11.19(sooyeon.choi) 수정 - 운영 rerank 노드와 같은 입력으로 재랭킹
+        #   기존: 본문만 보내고 같은 본문 중복 제거를 하지 않아, 검색·재정렬 평가의 NDCG@5가
+        #   운영(전체 RAG 평가·일괄 질의)과 다르게 나왔다. 운영과 같이 본문 중복 제거 + [문서명]·[섹션] 접두를 쓴다.
+        from app.graphs.nodes.rerank import _build_rerank_text
+        from app.graphs.utils import dedup_chunks_by_text
+
+        chunks = dedup_chunks_by_text([
+            {"chunk_id": chunk_id, "document_id": payload.get("document_id", ""),
+             "text": payload.get("text", ""), "score": score, "metadata": payload}
+            for chunk_id, score, payload in hits
+        ])
+        documents = [_build_rerank_text(chunk) for chunk in chunks]
         reranked = await _get_client().rerank(query, documents, top_k=top_k)
         return [
-            (hits[idx][0], score, hits[idx][2])
+            (chunks[idx]["chunk_id"], score, chunks[idx]["metadata"])
             for idx, score in reranked
         ]

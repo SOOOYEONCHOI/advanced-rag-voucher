@@ -8,7 +8,6 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from app.core.config import get_settings
 from app.repositories.database import get_database_manager
 from app.utils.datetime import now_kst_iso
 
@@ -30,11 +29,8 @@ class LlmModel:
 class ModelRepository:
     """Repository for tb_llm_models CRUD operations."""
 
-    def __init__(self, db_path: str = None):
-        if db_path:
-            self.db = get_database_manager(db_path)
-        else:
-            self.db = get_database_manager(get_settings().sqlite_db_path)
+    def __init__(self):
+        self.db = get_database_manager()
 
     def _row_to_model(self, row) -> LlmModel:
         return LlmModel(

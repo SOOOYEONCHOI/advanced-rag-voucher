@@ -14,7 +14,7 @@ from ..config import DEFAULT_CONFIG
 from app.utils.log.log import LoggingLogger
 
 # 로거 초기화
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 # ── 공통 패턴 ───────────────────────────────────────────────────────────────

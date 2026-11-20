@@ -20,7 +20,7 @@ def reset_database_singletons():
 
 # 2026.06.30(sooyeon.choi) 추가 - 부서명 변경 시 사용자·컬렉션 동기화 검증
 def test_department_name_update_syncs_users_and_collections(tmp_path):
-    repo = DepartmentRepository(str(tmp_path / "departments.db"))
+    repo = DepartmentRepository()
     department = repo.create("R&D팀")
     department_id = department["department_id"]
 

@@ -1,10 +1,10 @@
 """excel_ingest 사진 → 리소스 파일·배치 행 (2026.10.16 Phase 2, F-3-04 / R3-1·R3-2).
 
-설계: docs/design/reports/phase-2-plan.md P2-4·P2-5
+설계: docs/design/reports/phase-2-plan.md
 - 배치(placement) 1개 = `tb_spreadsheet_resources` 1행. resource_id는 백엔드가 `{document_id}-v{version}-i{순번}`으로
   발급한다(파서 발급 ID와 겹치지 않음). staging 없이 바로 committed.
 - 원본은 기존 저장 규칙 `documents/{document_id}/resources/{resource_id}/original/{sha256}.{ext}`에 그대로 둔다
-  (해시 공유 저장소는 만들지 않음 — 문서 삭제 로직과 충돌, P2-5). emf/wmf는 변환하지 않고 원본 보존.
+  (해시 공유 저장소는 만들지 않음 — 문서 삭제 로직과 충돌). emf/wmf는 변환하지 않고 원본 보존.
 - 순번은 시트 순서·시트 안 배치 순서로 정해 재실행(재시도)해도 같은 ID가 나온다.
 """
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""적재 기록용 청크 식별자·행 만들기 (2026.10.16 Phase 2, P2-6~P2-10). excel·docling 두 경로 공통.
+"""적재 기록용 청크 식별자·행 만들기 (2026.10.16 Phase 2). excel·docling 두 경로 공통.
 
 - ``chunk_id`` = ``{document_id}:{version_no}:{source_key}#{part_no}`` (tb_chunks PK, 사람이 읽을 수 있는 키)
 - ``point_id`` = uuid5(chunk_id) — Qdrant 포인트 ID. 같은 입력이면 재시도해도 같은 ID(중복 포인트 없음).

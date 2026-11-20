@@ -110,7 +110,10 @@ class PipelineContainer:
     @cached_property
     def query_preprocessor(self) -> QueryPreprocessorProtocol:
         """규칙 기반 질의 전처리기 (기본: Kiwi 기반 QueryPreprocessor)."""
-        return QueryPreprocessor()
+        # 2026.11.10(sooyeon.choi) 수정 - 법령 표기 정규화 여부를 설정값으로 전달
+        return QueryPreprocessor(
+            law_notation_normalize=getattr(self.settings, "query_law_notation_normalize", True)
+        )
 
     @cached_property
     def reranker(self) -> Reranker:

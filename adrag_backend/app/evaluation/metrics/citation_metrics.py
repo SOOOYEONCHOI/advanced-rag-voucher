@@ -1,8 +1,8 @@
-"""Citation 정확도 지표 — 문서/청크 단위 Precision·Recall·F1 (순수 함수).
+"""Citation 정확도 지표 — 청크 단위 Correctness·Completeness (순수 함수).
 
+2026.11.17(sooyeon.choi) 수정 - 공식 지표를 correctness·completeness 2종으로 정리
 """
 
-import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set
 
@@ -101,79 +101,8 @@ def analyze_citations(
     )
 
 
-def citation_precision_recall(
-    cited_ids: List[str],
-    gold_ids: Set[str],
-    retrieved_ids: Optional[Set[str]] = None,
-    prefix: str = "doc",
-) -> Dict[str, Optional[float]]:
-    """인용 ID 목록과 정답 ID 집합의 엄격한 Precision/Recall/F1을 계산한다.
-
-    중복을 제거한 인용 집합을 C, 정답 집합을 G라고 할 때:
-    - Precision = |C ∩ G| / |C|
-    - Recall = |C ∩ G| / |G|
-    - F1 = 2 × Precision × Recall / (Precision + Recall)
-
-    ``retrieved_ids``는 기존 호출부와의 호환성을 위해 유지하며 계산에는 사용하지 않는다.
-    """
-    cited_set = {c for c in cited_ids if c}
-    if not gold_ids:
-        return {
-            f"{prefix}_precision": None,
-            f"{prefix}_recall": None,
-            f"{prefix}_f1": None,
-        }
-    if not cited_set:
-        return {f"{prefix}_precision": 0.0, f"{prefix}_recall": 0.0, f"{prefix}_f1": 0.0}
-
-    true_positive = len(cited_set & gold_ids)
-    precision = true_positive / len(cited_set)
-    recall = true_positive / len(gold_ids)
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-    return {
-        f"{prefix}_precision": precision,
-        f"{prefix}_recall": recall,
-        f"{prefix}_f1": f1,
-    }
-
-
-_REVISION_MARKUP_PATTERN = re.compile(r'[<>]')
-
-
-def _normalize_for_match(text: str) -> str:
-    """청크 텍스트 매칭용 정규화 — 개정일자 등에 붙는 <> 표기, 공백 차이를 흡수한다."""
-    return re.sub(r'\s+', '', _REVISION_MARKUP_PATTERN.sub('', text))
-
-
-def map_cited_chunk_ids(
-    referenced_citations: List[Dict[str, Any]],
-    reranked_chunks: List[Dict[str, Any]],
-) -> List[str]:
-    """답변에서 참조된 citation을 실제 chunk_id 목록으로 변환한다.
-
-    citation에 ``chunk_id``가 있으면 그대로 사용한다. 이전 데이터처럼 ``chunk_id``가
-    없으면 citation의 ``chunk_text``를 reranked chunk의 text와 비교해 역추적한다.
-    텍스트 비교 시 ``<개정 ...>`` 같은 표기와 공백 차이를 정규화한다.
-    """
-    cited_chunk_ids: List[str] = []
-    for citation in referenced_citations:
-        chunk_id = citation.get("chunk_id")
-        if chunk_id:
-            cited_chunk_ids.append(chunk_id)
-            continue
-        snippet = _normalize_for_match((citation.get("chunk_text") or "").rstrip("…. ")[:200])
-        if not snippet:
-            continue
-        for chunk in reranked_chunks:
-            text = _normalize_for_match(chunk.get("text") or "")
-            if text.startswith(snippet) or snippet in text[:600]:
-                cited_chunk_ids.append(chunk.get("chunk_id", ""))
-                break
-    return cited_chunk_ids
+# 2026.11.17(sooyeon.choi) 삭제 - 사용처 없는 citation_precision_recall(), map_cited_chunk_ids()
+#   (citation에 chunk_id가 항상 있어 텍스트 역추적이 필요 없음, analyze_citations로 대체)
 
 
 def compute_evaluation_citation_metrics(
@@ -228,49 +157,8 @@ def compute_evaluation_citation_metrics(
         if gold_chunk_ids
         else None
     )
-    citation_f1 = (
-        2 * correctness * completeness / (correctness + completeness)
-        if correctness is not None
-        and completeness is not None
-        and correctness + completeness > 0
-        else 0.0
-        if correctness == 0.0 and completeness == 0.0
-        else None
-    )
-    citation_validity = (
-        len(analysis.valid_numbers) / len(analysis.unique_cited_numbers)
-        if analysis.unique_cited_numbers else None
-    )
-
-    document_true_positive = len(analysis.matched_gold_document_ids)
-    document_denominator = (
-        len(analysis.cited_document_ids) + len(analysis.invalid_numbers)
-    )
-    document_correctness = (
-        document_true_positive / document_denominator
-        if gold_document_ids and document_denominator
-        else 0.0 if gold_document_ids
-        else None
-    )
-    document_completeness = (
-        document_true_positive / len(gold_document_ids)
-        if gold_document_ids else None
-    )
-    document_f1 = (
-        2 * document_correctness * document_completeness
-        / (document_correctness + document_completeness)
-        if document_correctness is not None
-        and document_completeness is not None
-        and document_correctness + document_completeness > 0
-        else 0.0
-        if document_correctness == 0.0 and document_completeness == 0.0
-        else None
-    )
-
-    relevance = (
-        true_positive / len(analysis.cited_chunk_ids)
-        if analysis.cited_chunk_ids else 0.0
-    )
+    # 2026.11.17(sooyeon.choi) 삭제 - citation_f1·citation_validity·document_*·doc_* 별칭·citation_relevance
+    #   (citation_relevance는 잘못된 번호를 빼고 계산해 correctness와 값만 다른 중복 지표였음)
     return {
         "skipped": False,
         "citation_count": len(analysis.cited_numbers),
@@ -278,15 +166,6 @@ def compute_evaluation_citation_metrics(
         "all_numbers_valid": not analysis.invalid_numbers,
         "correctness": correctness,
         "completeness": completeness,
-        "citation_f1": citation_f1,
-        "citation_validity": citation_validity,
-        "document_correctness": document_correctness,
-        "document_completeness": document_completeness,
-        "document_f1": document_f1,
-        # 상세 화면의 기존 doc_* 참조를 위한 조회 호환 alias.
-        "doc_precision": document_correctness,
-        "doc_recall": document_completeness,
-        "doc_f1": document_f1,
         "invalid_citation_count": len(analysis.invalid_numbers),
         "cited_numbers": analysis.unique_cited_numbers,
         "valid_numbers": analysis.valid_numbers,
@@ -297,7 +176,6 @@ def compute_evaluation_citation_metrics(
         "missing_gold_chunk_ids": analysis.missing_gold_chunk_ids,
         "matched_gold_document_ids": analysis.matched_gold_document_ids,
         "missing_gold_document_ids": analysis.missing_gold_document_ids,
-        "citation_relevance": relevance,
         "missing_citation": (
             expected_behavior == "answer"
             and bool(gold_chunk_ids)

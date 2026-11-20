@@ -29,6 +29,49 @@ RRF_WEIGHTS: Dict[QueryType, Dict[str, float]] = {
     QueryType.INCIDENT_NARRATIVE:   {"dense": 1.5, "kiwi_bm25": 0.8, "bm42": 1.0},
 }
 
+# 2026.11.11(sooyeon.choi) 추가 - SOP 가중치 프로필. 법령 조문 질의는 기존 값 유지,
+RRF_WEIGHTS_SOP: Dict[QueryType, Dict[str, float]] = {
+    QueryType.LEGAL_REFERENCE:      dict(RRF_WEIGHTS[QueryType.LEGAL_REFERENCE]),
+    QueryType.CONCEPT_EXPLANATION:  {"dense": 1.0, "kiwi_bm25": 1.5, "bm42": 1.0},
+    QueryType.MENU_MANUAL:          {"dense": 1.0, "kiwi_bm25": 1.5, "bm42": 1.0},
+    QueryType.INCIDENT_NARRATIVE:   {"dense": 1.0, "kiwi_bm25": 1.5, "bm42": 1.0},
+}
+RRF_WEIGHT_PROFILES: Dict[str, Dict[QueryType, Dict[str, float]]] = {
+    "legacy": RRF_WEIGHTS,
+    "sop": RRF_WEIGHTS_SOP,
+}
+
+
+def get_rrf_weights(query_type: QueryType, settings: Any = None) -> Dict[str, float]:
+    """설정 QUERY_TYPE_PROFILE(legacy|sop)에 따른 질의 유형별 채널 가중치. 모르는 값은 legacy."""
+    # 2026.11.11(sooyeon.choi) 추가 - 가중치 표를 설정으로 고른다(기본 legacy = 기존 동작)
+    profile = getattr(settings, "query_type_profile", "legacy") if settings is not None else "legacy"
+    table = RRF_WEIGHT_PROFILES.get(profile, RRF_WEIGHTS)
+    return dict(table.get(query_type, {}))
+
+
+def dense_query_weights(
+    dense_queries: List[str],
+    original_query: str,
+    dense_weight: float,
+    original_share: float | None = None,
+) -> List[float]:
+    """Dense 채널 총가중치를 질의별로 나눈다.
+
+    2026.11.11(sooyeon.choi) 추가 - 재작성 질의가 원문 질의를 희석하지 않도록
+    original_share(0~1)를 원문 질의에 주고 나머지를 재작성 질의에 균등 배분한다.
+    original_share가 없거나, 질의가 1개이거나, 원문이 목록에 없으면 기존처럼 균등 배분한다.
+    """
+    count = len(dense_queries)
+    if count == 0:
+        return []
+    if original_share is None or count == 1 or original_query not in dense_queries:
+        return [dense_weight / count] * count
+    share = min(max(float(original_share), 0.0), 1.0)
+    rest = dense_weight * (1.0 - share) / (count - 1)
+    index = dense_queries.index(original_query)
+    return [dense_weight * share if i == index else rest for i in range(count)]
+
 _MENU_HINT_TERMS = frozenset({"메뉴", "화면", "버튼", "탭", "페이지", "기능", "클릭", "선택"})
 _NARRATIVE_HINT_TERMS = frozenset({"사고", "재해", "사례", "발생", "현장", "작업자", "피해", "원인", "경위"})
 
@@ -106,7 +149,7 @@ class RetrievalConfig:
 def get_retrieval_config(state: PipelineState, settings: Any) -> RetrievalConfig:
     """state의 override/legacy top_k 또는 settings 3단계 값에서 RetrievalConfig를 생성한다.
 
-    우선순위 (2026.07.16(sooyeon.choi) 수정 - B4):
+    우선순위 (2026.07.16(sooyeon.choi) 수정):
       1. retrieval_override — fallback 재시도가 현재 유효 설정 기준으로 계산한 명시 배분
       2. legacy top_k      — 요청에서 명시한 단일 top_k (from_legacy_top_k 자동 매핑)
       3. settings          — 단계별 기본 설정
@@ -130,7 +173,7 @@ def get_retrieval_config(state: PipelineState, settings: Any) -> RetrievalConfig
     )
 
 
-# 2026.07.16(sooyeon.choi) 추가 - fallback 재시도용 검색 범위 확장 계산 (B4)
+# 2026.07.16(sooyeon.choi) 추가 - fallback 재시도용 검색 범위 확장 계산
 #   fallback_handler(그래프)와 query_stream(스트리밍)이 동일 확장 규칙을 공유한다.
 #   candidate/rerank만 2배 확장하고 context는 유지해 배분 의미를 보존한다.
 def expand_retrieval_config_for_fallback(

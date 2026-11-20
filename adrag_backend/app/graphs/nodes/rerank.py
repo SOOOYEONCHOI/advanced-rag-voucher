@@ -22,7 +22,7 @@ from app.core.container import get_container
 from app.graphs.retrieval_engine import get_retrieval_config
 from app.graphs.state import ChunkResult, PipelineState
 from app.graphs.dependencies import GraphDependencies
-# 2026.07.16(sooyeon.choi) 수정 - 중복 제거 로직을 공통 헬퍼로 이동 (B11)
+# 2026.07.16(sooyeon.choi) 수정 - 중복 제거 로직을 공통 헬퍼로 이동
 from app.graphs.utils import chunk_log_payload, dedup_chunks_by_text, rag_diag, timed_node
 from app.interfaces import Reranker
 from app.utils.log.log import LoggingLogger
@@ -38,7 +38,7 @@ def get_reranker_client() -> Reranker:
 # 2026.07.07(sooyeon.choi) 수정 - rerank 호출 전 텍스트 해시 기반 중복 제거
 # 동일 본문이 여러 chunk_id로 검색되면 reranker 입력 슬롯을 낭비하고
 # context 단계에서 중복 제거 후 context_top_k에 못 미칠 수 있음
-# 2026.07.16(sooyeon.choi) 수정 - 로직을 graphs/utils.dedup_chunks_by_text로 이동 (B11)
+# 2026.07.16(sooyeon.choi) 수정 - 로직을 graphs/utils.dedup_chunks_by_text로 이동
 
 
 # 2026.07.07(sooyeon.choi) 수정 - 메타데이터 prefix 포함 reranker 입력 구성
@@ -47,7 +47,8 @@ def get_reranker_client() -> Reranker:
 def _build_rerank_text(chunk: Dict) -> str:
     """reranker 입력용 텍스트: 문서명·섹션 prefix + 본문."""
     metadata = chunk.get("metadata", {})
-    doc_name = metadata.get("filename", "")
+    # 2026.11.10(sooyeon.choi) 수정 - payload 파일명 키는 original_filename(리랭커 입력에 문서명·시트명)
+    doc_name = metadata.get("original_filename") or metadata.get("filename") or ""
     header_path = metadata.get("header_path") or []
     section = (
         metadata.get("section_title")
@@ -58,6 +59,10 @@ def _build_rerank_text(chunk: Dict) -> str:
     prefix_parts = []
     if doc_name:
         prefix_parts.append(f"[문서명] {doc_name}")
+    # 2026.11.10(sooyeon.choi) 추가 - 엑셀 청크는 header_path가 비어 있으므로 시트명을 위치로 붙인다
+    sheet_name = metadata.get("sheet_name")
+    if metadata.get("document_type") == "spreadsheet" and sheet_name:
+        prefix_parts.append(f"[시트] {sheet_name}")
     location = " > ".join(header_path) if header_path else section
     if location:
         prefix_parts.append(f"[섹션] {location}")
@@ -86,7 +91,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
     """vLLM /v1/score 기반 쿼리-청크 관련성 재평가."""
     if not state.get("retrieved_chunks"):
         rag_diag(logger, "[RAG][diag][node=rerank] 건너뜀 reason=청크없음")
-        return {"reranked_chunks": []}
+        return {"reranked_chunks": [], "rerank_status": "empty"}
 
     settings = deps.settings if deps else get_settings()
     # 2026.06.29(sooyeon.choi) 수정 - Task 7: rerank 단계는 reranker_top_k만 사용
@@ -96,7 +101,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
     degraded_top_k = settings.reranker_degraded_top_k
 
     # 2026.07.07(sooyeon.choi) 수정 - rerank 전 텍스트 해시 중복 제거로 후보 슬롯 낭비 방지
-    # 2026.07.16(sooyeon.choi) 수정 - 공통 헬퍼 사용 (B11)
+    # 2026.07.16(sooyeon.choi) 수정 - 공통 헬퍼 사용
     deduped_chunks = dedup_chunks_by_text(state["retrieved_chunks"])
 
     def _degraded_fallback(reason: str) -> dict:
@@ -105,7 +110,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
         임계값 우회가 필요하다.
         2026.07.16(sooyeon.choi) 수정 - relevance_threshold(사용자 설정)에 0.0을
         덮어쓰면 이후 파이프라인 전체에 영구 잔류하므로, 시스템 폴백 전용
-        threshold_override 필드로 분리 (B5). 정상 rerank가 None으로 재설정한다.
+        threshold_override 필드로 분리. 정상 rerank가 None으로 재설정한다.
         """
         passthrough = _make_passthrough(deduped_chunks, degraded_top_k)
         logger.info(
@@ -126,6 +131,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
         return {
             "reranked_chunks": passthrough,
             "threshold_override": 0.0,
+            "rerank_status": "error",
         }
 
     # 2026.04.21(sooyeon.choi) reranker api 호출 분기 처리 추가
@@ -144,10 +150,11 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
             len(passthrough),
         )
         # 2026.07.16(sooyeon.choi) 수정 - RRF 점수는 CE 임계값과 척도가 달라
-        #   임계값 우회가 필요하며, 사용자 설정 대신 override 필드 사용 (B5)
+        #   임계값 우회가 필요하며, 사용자 설정 대신 override 필드 사용
         return {
             "reranked_chunks": passthrough,
             "threshold_override": 0.0,
+            "rerank_status": "skipped",
         }
 
     # 2026.07.07(sooyeon.choi) 수정 - 메타데이터 prefix 포함 텍스트를 reranker에 전달
@@ -190,7 +197,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
             )
         )
 
-    # 2026.07.16(sooyeon.choi) 수정 - 정상 rerank 완료 시점 기준의 임계값으로 진단 (B5)
+    # 2026.07.16(sooyeon.choi) 수정 - 정상 rerank 완료 시점 기준의 임계값으로 진단
     #   이 노드가 threshold_override=None을 반환해 이전 degraded 잔류를 해제하므로,
     #   진단 계산에도 override를 제외한 사용자/기본 임계값을 사용한다.
     threshold = state.get("relevance_threshold")
@@ -216,5 +223,5 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
         min(scores, default=0.0),
     )
     # 2026.07.16(sooyeon.choi) 수정 - 정상 rerank 성공 시 이전 degraded 폴백의
-    #   임계값 우회(threshold_override)를 해제해 잔류 오염 방지 (B5)
-    return {"reranked_chunks": reranked, "threshold_override": None}
+    #   임계값 우회(threshold_override)를 해제해 잔류 오염 방지
+    return {"reranked_chunks": reranked, "threshold_override": None, "rerank_status": "ok"}

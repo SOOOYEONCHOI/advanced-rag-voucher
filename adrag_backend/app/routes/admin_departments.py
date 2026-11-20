@@ -63,7 +63,7 @@ def _to_response(dept: dict) -> dict:
 
 
 def _get_repo() -> DepartmentRepository:
-    return DepartmentRepository(get_settings().sqlite_db_path)
+    return DepartmentRepository()
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ def _get_repo() -> DepartmentRepository:
 @router.get("/summary")
 async def admin_summary(_: dict = Depends(get_current_admin)):
     """전체 요약 수치 (총 사용자 수, 활성 부서 수, 미배정 사용자 수)."""
-    db = get_database_manager(get_settings().sqlite_db_path)
+    db = get_database_manager()
     rows = db.execute_query(
         """
         SELECT

@@ -3,11 +3,11 @@
 from app.core.config import get_settings
 from app.graphs.state import PipelineState
 from app.graphs.dependencies import GraphDependencies
-# 2026.07.16(sooyeon.choi) 수정 - 임계값 우선순위 규칙 공유 (B5)
+# 2026.07.16(sooyeon.choi) 수정 - 임계값 우선순위 규칙 공유
 from app.graphs.utils import effective_threshold
 from app.utils.log.log import LoggingLogger
 
-# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용 (B16)
+# 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
 logger = LoggingLogger().getLogger(__name__)
 
 
@@ -41,7 +41,7 @@ def check_guardrail(state: PipelineState) -> str:
     return "analyze_and_rewrite"
 
 
-# 2026.07.16(sooyeon.choi) 추가 - retrieve 시스템 오류는 재시도 없이 즉시 종료 (B2)
+# 2026.07.16(sooyeon.choi) 추가 - retrieve 시스템 오류는 재시도 없이 즉시 종료
 #   기존: 타임아웃/미등록 컬렉션/Qdrant 장애도 rerank→fallback을 거쳐 확장 재검색을
 #   1회 더 수행한 뒤 "관련 정보를 찾을 수 없습니다"로 응답 → 시스템 장애가
 #   '문서 없음'으로 위장되어 사용자·운영자 모두 오판하던 문제 수정.
@@ -61,7 +61,7 @@ def check_retrieval(state: PipelineState) -> str:
 def check_relevance(state: PipelineState, deps: GraphDependencies | None = None) -> str:
     """rerank 이후 분기: threshold 이상 점수의 청크가 있으면 assemble_context, 없으면 fallback_handler."""
     chunks = state.get("reranked_chunks", [])
-    # 2026.07.16(sooyeon.choi) 수정 - threshold_override 우선순위 헬퍼 적용 (B5)
+    # 2026.07.16(sooyeon.choi) 수정 - threshold_override 우선순위 헬퍼 적용
     threshold = effective_threshold(state, deps.settings if deps else get_settings())
 
     qualified = [c for c in chunks if c.get("score", 0.0) >= threshold]
@@ -96,7 +96,7 @@ def check_fallback_retry(state: PipelineState, deps: GraphDependencies | None = 
     """fallback_handler 이후 라우팅."""
     max_retries = (deps.settings if deps else get_settings()).fallback_max_retries
     if state.get("retry_count", 0) <= max_retries and not state.get("generated_answer"):
-        # 2026.07.16(sooyeon.choi) 수정 - fallback 확장이 retrieval_override로 전환됨에 따라 로그 갱신 (B4)
+        # 2026.07.16(sooyeon.choi) 수정 - fallback 확장이 retrieval_override로 전환됨에 따라 로그 갱신
         logger.info(
             "[RAG][edge=check_fallback_retry] route=retrieve retry_count=%s max_retries=%s retrieval_override=%s threshold=%s",
             state.get("retry_count", 0),
