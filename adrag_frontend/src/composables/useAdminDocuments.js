@@ -233,6 +233,10 @@ export const useAdminDocuments = ({ router }) => {
       registeredCollections.value = availableCollections;
       collectionsForFilter.value = availableCollections;
       collections.value = availableCollections.map((collection) => collection.qdrant_name);
+      // 2026.11.23(woojin.jung) 추가 - 업로드할 대화 주제가 하나뿐이면 미리 선택
+      if (availableCollections.length === 1 && !form.collectionName) {
+        form.collectionName = availableCollections[0].qdrant_name || availableCollections[0].collection_name;
+      }
     } catch {
       if (disposed) return;
       collections.value = [];

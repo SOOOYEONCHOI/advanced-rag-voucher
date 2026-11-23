@@ -28,6 +28,8 @@ from app.routes.admin_stats import router as admin_stats_router
 from app.routes.user_stats import router as user_stats_router
 # 2026.06.29(sooyeon.choi) 추가 - 사용자 권한 관리: 부서/사용자 관리 라우터
 from app.routes.admin_departments import router as admin_departments_router
+# 2026.11.20(woojin.jung) 추가 - 부서 운영관리자: 부서 사용자 권한
+from app.routes.manager_members import router as manager_members_router
 from app.routes.admin_users import router as admin_users_router
 from app.routes.admin_settings import router as admin_settings_router
 # 2026.07.22(sychoi) 추가 - RAG 평가 자동화 API (evaluation 패키지)
@@ -242,6 +244,7 @@ app.include_router(user_stats_router, prefix="/api")
 # admin_departments_router보다 admin_users_router를 먼저 등록하여 /admin/summary 경로 우선순위 확보
 app.include_router(admin_departments_router, prefix="/api")
 app.include_router(admin_users_router, prefix="/api")
+app.include_router(manager_members_router, prefix="/api")
 app.include_router(admin_settings_router, prefix="/api")
 # 2026.07.22(sychoi) 추가 - RAG 평가 자동화 API
 app.include_router(eval_router, prefix="/api")

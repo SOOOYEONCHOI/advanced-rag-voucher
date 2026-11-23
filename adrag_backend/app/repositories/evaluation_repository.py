@@ -136,6 +136,33 @@ class EvalRepository:
             (status, error_message, dataset_id),
         )
 
+    # 2026.11.23(sooyeon.choi) 추가 - 확정 이후에도 질의ID 접두어만 변경(gen_config_json의 다른 값은 유지)
+    def update_dataset_query_id_prefix(self, dataset_id: int, prefix: str) -> Dict[str, Any]:
+        with self._db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT gen_config_json FROM tb_eval_datasets WHERE dataset_id = ? FOR UPDATE",
+                (dataset_id,),
+            )
+            row = cur.fetchone()
+            raw = row[0] if row else None
+            config: Any = raw
+            if isinstance(raw, str):
+                try:
+                    config = json.loads(raw) if raw else {}
+                except json.JSONDecodeError:
+                    config = {}
+            config = dict(config) if isinstance(config, dict) else {}
+            if prefix:
+                config["query_id_prefix"] = prefix
+            else:
+                config.pop("query_id_prefix", None)
+            cur.execute(
+                "UPDATE tb_eval_datasets SET gen_config_json = ?, updated_at = now() WHERE dataset_id = ?",
+                (json.dumps(config, ensure_ascii=False), dataset_id),
+            )
+        return config
+
     def update_dataset_progress(self, dataset_id: int, done: int, total: int) -> None:
         self._db.execute_update(
             """UPDATE tb_eval_datasets SET progress_done = ?, progress_total = ?,

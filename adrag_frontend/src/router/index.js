@@ -25,10 +25,13 @@ const routes = [
   { path: '/statistics', component: StatisticsView, meta: { requiresUserAuth: true } },
   { path: '/settings/ui-integration', component: UiIntegrationSettingsView, meta: { requiresUserAuth: true } },
   { path: '/login', component: LoginView, meta: { public: true } },
-  // 문서 관리·컬렉션 설정: 일반 사용자 전용 관리 화면
-  { path: '/admin', component: AdminView, meta: { requiresAnyAuth: true } },
+  // 문서 관리·대화 주제 설정·부서 사용자 권한: 부서 운영관리자 전용 관리 화면
+  // 2026.11.20(woojin.jung) 수정 - 일반 사용자 → 부서 운영관리자(일반 사용자는 접근 거부 안내)
+  { path: '/admin', component: AdminView, meta: { requiresManagerAuth: true } },
   { path: '/admin/statistics', component: AdminStatisticsView, meta: { requiresAdminAuth: true } },
-  { path: '/admin/collections', component: CollectionSettingsView, meta: { requiresAnyAuth: true } },
+  { path: '/admin/collections', component: CollectionSettingsView, meta: { requiresManagerAuth: true } },
+  // 2026.11.20(woojin.jung) 추가 - 부서 사용자 권한: 관리자 사용자 권한 화면을 자기 부서로 고정해 재사용
+  { path: '/admin/members', component: UserPermissionsView, props: { mode: 'manager' }, meta: { requiresManagerAuth: true } },
   // 사용자 권한: 관리자 전용
   { path: '/admin/users', component: UserPermissionsView, meta: { requiresAdminAuth: true } },
   // 2026.07.22(sychoi) 추가 - RAG 평가 (관리자 전용)
@@ -63,10 +66,11 @@ router.beforeEach((to, _from, next) => {
     return next({ path: '/login', query: { redirect: to.fullPath } });
   }
 
-  // 로그인 사용자(관리자 or 일반) 접근 페이지
-  if (to.meta.requiresAnyAuth) {
+  // 부서 운영관리자 전용 페이지 (역할은 로그인·/auth/me 응답 값, 실제 권한은 서버가 다시 검사)
+  if (to.meta.requiresManagerAuth) {
     if (hasAdmin) return next(ADMIN_HOME_PATH);
-    if (hasUser) return next();
+    if (hasUser && sessionStorage.getItem('user_role') === 'manager') return next();
+    if (hasUser) return next({ path: '/chat', query: { access_denied: 'manager' } });
     return next({ path: '/login', query: { redirect: to.fullPath } });
   }
 

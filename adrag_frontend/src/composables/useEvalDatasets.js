@@ -164,6 +164,39 @@ export const useEvalDatasets = () => {
       isMerging.value = false;
     }
   };
+  // 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 표시·변경(합본 질의ID 충돌 해소). 서버와 같은 정리 규칙
+  const normalizePrefix = (raw) => String(raw || '').replace(/[^0-9A-Za-z가-힣_-]+/g, '').replace(/^[-_]+|[-_]+$/g, '').slice(0, 20);
+  const queryIdPrefix = (dataset) => normalizePrefix(datasetConfig(dataset).query_id_prefix) || 'Q';
+  // 합본 모달: 고른 원본끼리 접두어가 같으면 미리 경고
+  const mergePrefixClashes = computed(() => {
+    const seen = {};
+    mergeSelectedDatasets.value.forEach((d) => { (seen[queryIdPrefix(d)] ||= []).push(d.name); });
+    return Object.entries(seen).filter(([, names]) => names.length > 1).map(([prefix, names]) => ({ prefix, names }));
+  });
+  const prefixTarget = ref(null);
+  const prefixInput = ref('');
+  const isSavingPrefix = ref(false);
+  const openPrefixModal = (dataset) => {
+    if (isMerged(dataset)) return;
+    prefixTarget.value = dataset;
+    prefixInput.value = normalizePrefix(datasetConfig(dataset).query_id_prefix);
+  };
+  const closePrefixModal = () => { if (!isSavingPrefix.value) prefixTarget.value = null; };
+  const savePrefix = async () => {
+    const target = prefixTarget.value;
+    if (!target || isSavingPrefix.value) return;
+    isSavingPrefix.value = true;
+    try {
+      const { data } = await evalApi.updateQueryIdPrefix(target.dataset_id, prefixInput.value.trim());
+      prefixTarget.value = null;
+      await loadDatasets();
+      showToast(`질의ID 접두어를 '${data.query_id_prefix}'(으)로 바꿨습니다. 새로 내려받는 Excel부터 ${data.query_id_prefix}-001 형식입니다.`);
+    } catch (e) {
+      showToast(e.response?.data?.detail || '질의ID 접두어를 바꾸지 못했습니다.', 'error');
+    } finally {
+      isSavingPrefix.value = false;
+    }
+  };
   const qaTotalPages = computed(() => Math.max(1, Math.ceil(qaTotal.value / qaPageSize.value)));
   const generateProgress = computed(() => {
     const d = selectedDataset.value;
@@ -667,6 +700,8 @@ export const useEvalDatasets = () => {
     mergeEnabled, mergeSelection, showMergeModal, mergeName, isMerging, mergeSelectedDatasets, mergeItemTotal,
     selectedIsMerged, isMerged, mergedSources, collectionLabel, canMergeSelect, isMergeSelected,
     toggleMergeSelect, clearMergeSelection, openMergeModal, submitMerge,
+    // 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경
+    queryIdPrefix, mergePrefixClashes, prefixTarget, prefixInput, isSavingPrefix, openPrefixModal, closePrefixModal, savePrefix,
     statusLabel, typeLabel, reviewLabel, tagLabel, behaviorLabel, formatDate,
     EXPECTED_BEHAVIOR_OPTIONS, AVAILABLE_TAGS,
   };

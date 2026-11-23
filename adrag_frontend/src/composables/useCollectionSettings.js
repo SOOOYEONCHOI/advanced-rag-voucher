@@ -107,8 +107,9 @@ export const useCollectionSettings = ({ router }) => {
     try {
       const res = await collectionApi.list();
       collections.value = (res.data.collections || []).map(toItem);
-      // 2026.11.12(woojin.jung) 추가 - 관리 권한이 있는 대화 주제만 시작 화면 질문 설정을 불러온다
-      await Promise.all(collections.value.filter((c) => c.can_update).map(loadStartQuestions));
+      // 2026.11.12(woojin.jung) 추가 - 시작 화면 질문 설정을 불러온다
+      // 2026.11.23(woojin.jung) 수정 - 비활성 부서(읽기 전용)도 미리보기로 볼 수 있게 조회 범위 전체를 불러온다(실패 시 미리보기만 숨김)
+      await Promise.all(collections.value.map(loadStartQuestions));
       if (!currentCollection.value) selectedKey.value = collections.value[0] ? keyOf(collections.value[0]) : null;
     } catch {
       showAlert('대화 주제 목록을 불러오지 못했습니다.', 'error');

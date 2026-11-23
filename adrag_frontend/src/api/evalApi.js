@@ -51,6 +51,10 @@ export const evalApi = {
   mergeDatasets({ name, datasetIds }) {
     return http.post('/eval/datasets/merge', { name, dataset_ids: datasetIds }, adminAuthConfig());
   },
+  // 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경(확정 데이터셋 포함, 빈 값이면 Q)
+  updateQueryIdPrefix(datasetId, queryIdPrefix) {
+    return http.patch(`/eval/datasets/${datasetId}/query-id-prefix`, { query_id_prefix: queryIdPrefix }, adminAuthConfig());
+  },
   finalizeDataset(datasetId, note = '') {
     return http.post(`/eval/datasets/${datasetId}/finalize`, { note }, adminAuthConfig());
   },

@@ -19,7 +19,7 @@ from app.repositories.database import get_database_manager
 from app.routes.ingest import _load_visible_document
 from app.services.ingest_service import get_original_file_storage
 from app.utils.datetime import format_kst_datetime
-from app.utils.security import get_current_principal
+from app.utils.security import can_manage_department, get_current_principal
 
 router = APIRouter(prefix="/ingest", tags=["drawings"])
 
@@ -58,8 +58,9 @@ def _resolve_ir(ir_path: str) -> Path:
     return path
 
 
+# 2026.11.20(woojin.jung) 수정 - 업로더 기준 → 부서 기준(문서 대화 주제 부서의 운영관리자 또는 관리자)
 def _can_review(principal: dict, doc: dict) -> bool:
-    return bool(principal.get("is_admin") or doc.get("uploaded_by") == principal["user_id"])
+    return can_manage_department(principal, doc.get("department_id"))
 
 
 def _review_view(review: Optional[dict]) -> dict[str, Any]:
@@ -119,7 +120,7 @@ async def get_drawing_result(document_id: str, version_no: int, principal: dict 
 def _set_review(document_id: str, version_no: int, principal: dict, status: str, confirm_missing: bool) -> dict:
     doc = _load_visible_document(document_id, principal)
     if not _can_review(principal, doc):
-        raise HTTPException(status_code=403, detail="업로드한 본인 또는 관리자만 검수할 수 있습니다.")
+        raise HTTPException(status_code=403, detail="소속 부서의 운영관리자만 검수할 수 있습니다.")
     row = _version_row(document_id, version_no)
     if row["version_no"] != row["current_version_no"]:
         raise HTTPException(status_code=409, detail="현재 버전만 검수할 수 있습니다.")

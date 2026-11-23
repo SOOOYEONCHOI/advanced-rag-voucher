@@ -19,10 +19,11 @@
     </router-link>
 
     <nav class="nav-menu">
-      <div class="nav-section-title">{{ isAdmin ? '관리' : '챗봇 관리' }}</div>
+      <!-- 2026.11.20(woojin.jung) 수정 - 역할별 메뉴: 관리자 / 부서 운영관리자(챗봇 관리) / 일반 사용자(내 활동 현황만) -->
+      <div class="nav-section-title" v-if="isAdmin || isManager">{{ isAdmin ? '관리' : '챗봇 관리' }}</div>
       <router-link
         to="/admin"
-        v-if="!isAdmin"
+        v-if="isManager"
         class="nav-item"
         :class="{ active: activePage === 'documents', disabled: navigationLocked }"
         :aria-disabled="navigationLocked"
@@ -33,7 +34,7 @@
       </router-link>
       <router-link
         to="/admin/collections"
-        v-if="!isAdmin"
+        v-if="isManager"
         class="nav-item"
         :class="{ active: activePage === 'collections', disabled: navigationLocked }"
         :aria-disabled="navigationLocked"
@@ -42,7 +43,18 @@
         <i class="fa-solid fa-database"></i>
         대화 주제 설정
       </router-link>
-      <div class="nav-section-title nav-section-gap" v-if="!isAdmin">현황 및 설정</div>
+      <router-link
+        to="/admin/members"
+        v-if="isManager"
+        class="nav-item"
+        :class="{ active: activePage === 'members', disabled: navigationLocked }"
+        :aria-disabled="navigationLocked"
+        @click.capture="blockNavigation"
+      >
+        <i class="fa-solid fa-users-gear"></i>
+        부서 사용자 권한
+      </router-link>
+      <div class="nav-section-title" :class="{ 'nav-section-gap': isManager }" v-if="!isAdmin">{{ isManager ? '현황 및 설정' : '현황' }}</div>
       <router-link
         to="/statistics"
         v-if="!isAdmin"
@@ -154,7 +166,7 @@
           <span class="account-avatar" aria-hidden="true">{{ avatarInitial }}</span>
           <span class="account-text">
             <span class="account-name">{{ displayName || '사용자' }}</span>
-            <span class="account-role">{{ isAdmin ? '관리자' : '일반 사용자' }}</span>
+            <span class="account-role">{{ roleLabel }}</span>
           </span>
           <i class="fa-solid fa-chevron-up account-caret" aria-hidden="true"></i>
         </button>
@@ -172,6 +184,9 @@ import ChangePasswordDialog from './ChangePasswordDialog.vue';
 
 const passwordDialogOpen = ref(false);
 const sessionUserId = sessionStorage.getItem('user_id') || '';
+// 2026.11.20(woojin.jung) 추가 - 부서 운영관리자 여부·부서명(로그인 시 세션에 저장, 실제 권한은 서버가 판단)
+const sessionRole = sessionStorage.getItem('user_role') || 'user';
+const sessionDepartment = sessionStorage.getItem('user_department_name') || '';
 
 const props = defineProps({
   isOpen: {
@@ -197,6 +212,13 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'logout']);
+
+const isManager = computed(() => !props.isAdmin && sessionRole === 'manager');
+const roleLabel = computed(() => {
+  if (props.isAdmin) return '관리자';
+  const role = isManager.value ? '운영관리자' : '일반 사용자';
+  return sessionDepartment ? `${sessionDepartment} · ${role}` : role;
+});
 
 const blockNavigation = (event) => {
   if (!props.navigationLocked) return;

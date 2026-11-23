@@ -9,6 +9,8 @@ export const useChatView = ({ router, route }) => {
   const authStore = useAuthStore();
 
   const showAccessDeniedModal = ref(false);
+  // 2026.11.20(woojin.jung) 추가 - 거부 사유: 'manager'(운영관리자 전용 화면) / 그 외(관리자 전용 화면)
+  const accessDeniedReason = ref('');
   const sidebarOpen = ref(false);
   // 2026.11.04(woojin.jung) 추가 - 넓은 화면에서 사이드바 접기(모바일 오버레이는 sidebarOpen)
   const sidebarCollapsed = ref(false);
@@ -580,6 +582,7 @@ export const useChatView = ({ router, route }) => {
     () => route.query.access_denied,
     (val) => {
       if (val) {
+        accessDeniedReason.value = String(val);
         showAccessDeniedModal.value = true;
         router.replace({ path: '/chat' });
       }
@@ -602,6 +605,7 @@ export const useChatView = ({ router, route }) => {
 
   return {
     showAccessDeniedModal,
+    accessDeniedReason,
     sidebarOpen,
     sidebarCollapsed,
     userInput,

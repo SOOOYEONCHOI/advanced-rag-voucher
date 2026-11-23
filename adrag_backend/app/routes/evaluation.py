@@ -27,6 +27,7 @@ from app.evaluation.schemas import (
     BulkReviewRequest,
     DatasetCreateRequest,
     DatasetMergeRequest,
+    DatasetQueryIdPrefixRequest,
     EvalOpenAIKeyRequest,
     FinalizeRequest,
     GoldsetImportRequest,
@@ -258,6 +259,36 @@ async def get_dataset(dataset_id: int, _: dict = Depends(get_current_admin)):
     if not dataset:
         raise HTTPException(status_code=404, detail="데이터셋을 찾을 수 없습니다")
     return dataset
+
+
+# 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경(확정 데이터셋도 가능, 합본 충돌 해소용)
+@router.patch("/datasets/{dataset_id}/query-id-prefix")
+async def update_dataset_query_id_prefix(
+    dataset_id: int,
+    body: DatasetQueryIdPrefixRequest,
+    admin: dict = Depends(get_current_admin),
+):
+    """접두어만 바꾼다. 질의ID는 다운로드·결과 조회 때 다시 계산되므로 문항·골드셋은 그대로다.
+    합본은 만들 때 원본 질의ID를 문항에 저장하므로 바꿀 수 없다."""
+    from app.evaluation.dataset.merge import is_merged_dataset
+    from app.evaluation.excel_exporter import normalize_query_id_prefix
+
+    repo = _repo()
+    dataset = repo.get_dataset(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="데이터셋을 찾을 수 없습니다")
+    if is_merged_dataset(dataset):
+        raise HTTPException(
+            status_code=409,
+            detail="합본 데이터셋의 질의ID는 원본에서 가져온 값이라 바꿀 수 없습니다. 원본 접두어를 바꾼 뒤 합본을 다시 만들어 주세요.",
+        )
+    raw = (body.query_id_prefix or "").strip()
+    prefix = normalize_query_id_prefix(raw)
+    if raw and not prefix:
+        raise HTTPException(status_code=400, detail="접두어에는 한글·영문·숫자·_·- 만 쓸 수 있습니다.")
+    repo.update_dataset_query_id_prefix(dataset_id, prefix)
+    logger.info("질의ID 접두어 변경: admin=%s dataset_id=%s prefix=%s", admin.get("admin_id"), dataset_id, prefix or "Q")
+    return {"dataset_id": dataset_id, "query_id_prefix": prefix or "Q"}
 
 
 @router.get("/datasets/{dataset_id}/approved-items.xlsx")

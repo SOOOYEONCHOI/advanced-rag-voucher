@@ -21,6 +21,7 @@ from app.utils.security import (
     get_current_admin,
     get_current_principal,
     get_current_user,
+    get_user_role,
     hash_password,
     verify_password,
 )
@@ -56,6 +57,11 @@ class UserAuthResponse(BaseModel):
     admin_id: Optional[str] = None
     admin_name: Optional[str] = None
     ui_type: Optional[str] = None
+    # 2026.11.20(woojin.jung) 추가 - 부서 운영관리자 화면 분기용
+    department_id: Optional[str] = None
+    department_name: Optional[str] = None
+    # 2026.11.23(woojin.jung) 추가 - 비활성 부서 안내(운영관리자 읽기 전용, 일반 사용자 대화 주제 없음)
+    department_active: bool = True
 
 
 def _get_user(user_id: str) -> Optional[dict]:
@@ -63,9 +69,9 @@ def _get_user(user_id: str) -> Optional[dict]:
     db = get_database_manager()
     rows = db.execute_query(
         """
-        SELECT user_id, user_pwd, user_name, is_active, ui_type
+        SELECT user_id, user_pwd, user_name, is_active, ui_type, role, department_id, department_name
         FROM tb_users
-        WHERE user_id = ? AND role = 'user'
+        WHERE user_id = ? AND role IN ('user', 'manager')
         """,
         (user_id,),
     )
@@ -78,6 +84,10 @@ def _get_user(user_id: str) -> Optional[dict]:
         "user_name": row["user_name"],
         "is_active": bool(row["is_active"]),
         "ui_type": row["ui_type"],
+        # 2026.11.20(woojin.jung) 추가 - 부서 운영관리자 역할·부서
+        "role": row["role"],
+        "department_id": row["department_id"],
+        "department_name": row["department_name"] or "",
     }
 
 
@@ -89,7 +99,7 @@ def _get_account(user_id: str) -> Optional[dict]:
     rows = db.execute_query(
         """
         SELECT u.user_id, u.user_pwd, u.user_name, u.role, u.is_active, u.ui_type,
-               u.department_name AS department
+               u.department_name AS department, u.department_id
         FROM   tb_users u
         WHERE  u.user_id = ?
         """,
@@ -106,6 +116,7 @@ def _get_account(user_id: str) -> Optional[dict]:
         "is_active": bool(row["is_active"]),
         "ui_type": row["ui_type"],
         "department": row["department"],
+        "department_id": row["department_id"],
     }
 
 
@@ -257,7 +268,7 @@ async def login_user(body: UserLoginRequest, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="비활성화된 사용자입니다.",
+            detail="비활성화된 사용자입니다. 관리자에게 문의하세요.",  # 2026.11.23(woojin.jung) 수정 - 문의처 안내 추가
         )
 
     # 2026.04.10(sooyeon.choi) 추가 - 권한 행이 없는 기존 사용자 보정 (회원가입 전 생성된 계정 대응)
@@ -279,8 +290,11 @@ async def login_user(body: UserLoginRequest, request: Request):
         access_token=token,
         user_id=account["user_id"],
         user_name=account["user_name"],
-        role="user",
+        role=account["role"],
         ui_type=account["ui_type"],
+        department_id=account["department_id"],
+        department_name=account["department"] or "",
+        department_active=bool((get_user_role(account["user_id"]) or {}).get("department_active")),
     )
 
 
@@ -296,7 +310,7 @@ async def logout_user(
         "logout",
         request=request,
         user_id=current_user.get("user_id"),
-        role="admin" if current_user.get("is_admin") else "user",
+        role=current_user.get("role"),
     )
     return {"message": "로그아웃 되었습니다."}
 
@@ -337,7 +351,7 @@ async def change_password(
 
     account = _get_user(user_id)
     if not account or not account["is_active"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="비활성화된 사용자입니다.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="비활성화된 사용자입니다. 관리자에게 문의하세요.")
 
     if not verify_password(body.current_password, account["user_pwd"]):
         _pw_failures[user_id] = failures + [now]
@@ -384,10 +398,13 @@ async def get_me(current_user: dict = Depends(get_current_principal)):
         "user_id": user["user_id"],
         "user_name": user["user_name"],
         "token_type": current_user["token_type"],
-        "role": "user",
+        "role": user["role"],
         "is_admin": False,
         "is_superadmin": False,
         "ui_type": user["ui_type"],
+        "department_id": user["department_id"],
+        "department_name": user["department_name"],
+        "department_active": current_user.get("department_active", False),  # 2026.11.23(woojin.jung) 추가
         "accessible_collections": permissions.accessible_collections if permissions else [],
     }
 

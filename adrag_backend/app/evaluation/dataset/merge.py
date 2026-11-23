@@ -53,8 +53,10 @@ def source_query_ids(dataset: Dict[str, Any], items: List[Dict[str, Any]]) -> Di
 def build_merged_items(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """sources: [{dataset, goldset, items(골드셋 스냅샷)}] (합칠 순서). 합본 문항 dict 목록을 반환한다."""
     merged: List[Dict[str, Any]] = []
-    seen_ids: Dict[str, str] = {}
+    seen_ids: Dict[str, Dict[str, Any]] = {}
     duplicates: List[str] = []
+    # 2026.11.23(sooyeon.choi) 수정 - 겹친 데이터셋 이름·접두어를 문구에 보여 줌(겹친 순서 유지)
+    conflict_labels: List[str] = []
     for source in sources:
         dataset, goldset, items = source["dataset"], source["goldset"], source["items"]
         query_ids = source_query_ids(dataset, items)
@@ -62,8 +64,12 @@ def build_merged_items(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             query_id = query_ids[item.get("qa_id")]
             if query_id in seen_ids:
                 duplicates.append(query_id)
+                for owner in (seen_ids[query_id], dataset):
+                    label = _conflict_label(owner)
+                    if label not in conflict_labels:
+                        conflict_labels.append(label)
                 continue
-            seen_ids[query_id] = dataset.get("name") or ""
+            seen_ids[query_id] = dataset
             meta = _loads(item.get("source_meta_json"), {})
             meta = dict(meta) if isinstance(meta, dict) else {}
             meta.update({
@@ -94,8 +100,17 @@ def build_merged_items(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             })
     if duplicates:
         shown = ", ".join(duplicates[:10])
-        raise MergeError(f"질의ID가 겹칩니다({shown}{' …' if len(duplicates) > 10 else ''}). 원본의 질의ID 접두어를 다르게 해 주세요.")
+        more = f" 외 {len(duplicates) - 10}건" if len(duplicates) > 10 else ""
+        raise MergeError(
+            f"{' · '.join(conflict_labels)}의 질의ID가 겹칩니다({shown}{more}). "
+            "데이터셋 목록에서 원본의 질의ID 접두어를 서로 다르게 바꾼 뒤 다시 합쳐 주세요."
+        )
     return merged
+
+
+def _conflict_label(dataset: Dict[str, Any]) -> str:
+    """에러 문구용 '데이터셋 이름(접두어 X)'."""
+    return f"{dataset.get('name') or dataset.get('dataset_id')}(접두어 {testset_query_id_prefix(dataset)})"
 
 
 def merged_config(sources: List[Dict[str, Any]]) -> Dict[str, Any]:

@@ -50,6 +50,11 @@ class DatasetMergeRequest(BaseModel):
     dataset_ids: List[int] = Field(min_length=2, max_length=10)
 
 
+# 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경(확정 데이터셋 포함, 빈 값이면 기본 'Q')
+class DatasetQueryIdPrefixRequest(BaseModel):
+    query_id_prefix: str = Field(default="", max_length=100)
+
+
 # ── 골드셋 수동 등록 (검증·초기 구축용) ─────────────────────────────────────
 
 class GoldsetImportItem(BaseModel):

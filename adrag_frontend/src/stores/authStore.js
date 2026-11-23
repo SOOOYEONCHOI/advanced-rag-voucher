@@ -14,7 +14,32 @@ const clearUserSession = () => {
   sessionStorage.removeItem('user_token');
   sessionStorage.removeItem('user_id');
   sessionStorage.removeItem('user_name');
+  sessionStorage.removeItem('user_role');
+  sessionStorage.removeItem('user_department_name');
+  sessionStorage.removeItem('user_department_active');
 };
+
+// 2026.11.20(woojin.jung) 추가 - 부서 운영관리자 역할·부서명(라우터 가드·사이드바 표시용, 실제 권한 판단은 서버)
+const saveUserRole = (data) => {
+  if (!data?.role || data.role === 'admin') return;
+  sessionStorage.setItem('user_role', data.role);
+  sessionStorage.setItem('user_department_name', data.department_name || '');
+  // 2026.11.23(woojin.jung) 추가 - 소속 부서 활성 여부(비활성: 운영관리자 읽기 전용 · 일반 사용자 대화 주제 없음)
+  sessionStorage.setItem('user_department_active', data.department_active === false ? '0' : '1');
+};
+
+const readSession = () => ({
+  isAdmin: !!sessionStorage.getItem('admin_token'),
+  hasUser: !!sessionStorage.getItem('user_token'),
+  role: sessionStorage.getItem('admin_token') ? 'admin' : sessionStorage.getItem('user_role') || 'user',
+  departmentName: sessionStorage.getItem('user_department_name') || '',
+  departmentActive: sessionStorage.getItem('user_department_active') !== '0',
+  displayName:
+    sessionStorage.getItem('admin_name') ||
+    sessionStorage.getItem('user_name') ||
+    sessionStorage.getItem('user_id') ||
+    '',
+});
 
 const isAdminLoginResponse = (data) => {
   const role = data?.role || data?.user_role || data?.token_type;
@@ -24,34 +49,25 @@ const isAdminLoginResponse = (data) => {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: emptyUser(),
-    session: {
-      isAdmin: !!sessionStorage.getItem('admin_token'),
-      hasUser: !!sessionStorage.getItem('user_token'),
-      displayName:
-        sessionStorage.getItem('admin_name') ||
-        sessionStorage.getItem('user_name') ||
-        sessionStorage.getItem('user_id') ||
-        '',
-    },
+    session: readSession(),
   }),
 
   getters: {
     isAdmin: (state) => state.session.isAdmin,
     hasUser: (state) => state.session.hasUser,
     displayName: (state) => state.session.displayName,
+    // 2026.11.20(woojin.jung) 추가 - 부서 운영관리자
+    role: (state) => state.session.role,
+    isManager: (state) => state.session.hasUser && state.session.role === 'manager',
+    departmentName: (state) => state.session.departmentName,
+    // 2026.11.23(woojin.jung) 추가 - 비활성 부서
+    departmentInactive: (state) => state.session.hasUser && !state.session.departmentActive,
+    departmentReadOnly: (state) => state.session.hasUser && state.session.role === 'manager' && !state.session.departmentActive,
   },
 
   actions: {
     refreshSession() {
-      this.session = {
-        isAdmin: !!sessionStorage.getItem('admin_token'),
-        hasUser: !!sessionStorage.getItem('user_token'),
-        displayName:
-          sessionStorage.getItem('admin_name') ||
-          sessionStorage.getItem('user_name') ||
-          sessionStorage.getItem('user_id') ||
-          '',
-      };
+      this.session = readSession();
     },
 
     async syncUser() {
@@ -67,6 +83,8 @@ export const useAuthStore = defineStore('auth', {
         this.user = res.data?.user_id
           ? { ...res.data, ui_type: normalizeUiType(res.data.ui_type) }
           : emptyUser();
+        // 운영관리자 변경 등으로 역할이 바뀌었으면 세션 값도 맞춘다
+        saveUserRole(res.data);
       } catch {
         this.user = emptyUser();
       }
@@ -107,8 +125,9 @@ export const useAuthStore = defineStore('auth', {
         return { role: 'admin' };
       }
 
+      saveUserRole({ ...data, ...profile });
       this.refreshSession();
-      return { role: 'user' };
+      return { role: sessionStorage.getItem('user_role') || 'user' };
     },
 
     async logoutAny() {

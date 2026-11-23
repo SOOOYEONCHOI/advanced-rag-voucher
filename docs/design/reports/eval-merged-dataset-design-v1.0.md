@@ -121,8 +121,24 @@
 - 설정 `EVAL_DATASET_MERGE_ENABLED=false`로 끈다.
 - 코드를 되돌려도 DB 구조 변경이 없다. 만들어 둔 합본 데이터셋은 보통 데이터셋처럼 화면에서 삭제할 수 있다.
 
-## 8. 남은 확인 사항
+## 8. 결정 (2026-11-20 사용자 확정)
 
-1. 합본을 만든 뒤 원본을 고치면 합본에 자동으로 반영되지 않는다. 원본 수정 → 확정 → 합본 재생성 순서로 쓴다(제안안).
-2. 법령별 값(결과 카드 한 줄, 요약 시트 표)을 넣을지. 목업에는 포함했다.
-3. 예상 작업 시간: 백엔드 1시간, 화면 1시간, 테스트 30분~1시간.
+1. 원본을 고친 뒤에는 원본을 다시 확정하고 합본을 새로 만든다. 합본 문항은 읽기 전용.
+2. 법령별 값(결과 카드 한 줄, 요약 시트 표)을 넣는다.
+
+## 9. 구현 반영 (2026-11-20)
+
+| 구분 | 파일 |
+|---|---|
+| 설정 | `app/core/config.py` `eval_dataset_merge_enabled`(기본 true) |
+| 합본 문항 | `app/evaluation/dataset/merge.py`(신규) — 원본 골드셋 스냅샷 복사, 질의ID·컬렉션·법령·원본 위치 저장, 질의ID 중복 거부 |
+| 저장소 | `evaluation_repository.py` `latest_goldset`, `create_merged_dataset`, `qa_snapshot_items`, 결과 목록 `law` 필터, 목록·실행 조회에 `dataset_kind` |
+| API | `routes/evaluation.py` `POST /eval/datasets/merge`, 합본 문항 수정·승인·반려·일괄 검토·다시 생성·확정 409, 실행 전 합본 컬렉션 확인, 결과 목록·Excel에 질의ID·법령, `GET /eval/datasets`에 `merge_enabled` |
+| 실행·집계 | `eval_runner.py` `item_collection`(문항별 컬렉션), 세그먼트 `law:*`(같은 식으로 법령별 집계) |
+| 지표 표시 | `metric_catalog.py` `present_law_metrics` → 실행 조회·Excel의 `law_metrics` |
+| Excel | `excel_exporter.py` 결과 항목별 시트 질의ID·(합본)법령·정답 답변·생성 답변·인용 출처 열, 요약 시트 법령별 표. 시험셋 Excel은 합본이면 원본 질의ID와 `법령` 열 |
+| 화면 | `EvalDatasetView.vue`·`useEvalDatasets.js`(체크·합본 만들기·읽기 전용), `EvalRunView.vue`·`useEvalRuns.js`(합본 표시·카드 법령별 값·질의ID·법령 열·법령 필터), `evalApi.js` |
+| 테스트 | `tests/test_eval_merged_dataset.py`(신규 8건), `tests/test_eval_run_excel_export.py`(열 위치 갱신) |
+
+- 결과 Excel 열 순서가 바뀌었다(단독 실행 포함): 지표 열이 질의ID·정답 답변·생성 답변·인용 출처 뒤로 이동.
+- 테스트: 평가 관련 4개 파일을 따로 실행하면 51건 통과·2건 실패. 실패 2건(`test_single_source_generation_law_flow`, `test_regenerate_uses_same_chunk_previous_question_and_resets_review`)은 11-19에 바뀐 생성 프롬프트·생성 코드 때문에 이전부터 실패하던 것이고 이번 변경과 무관하다.

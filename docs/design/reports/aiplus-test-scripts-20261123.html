@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI+ 시험 스크립트</title>
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#f0f2f5; --text:#1b1f24; --muted:#5b6470;
+  --line:#dde1e6; --accent:#2457c5; --accent-soft:#e7eefc; --ok:#1d7a46; --ok-soft:#e3f4ea;
+  --warn:#a35a00; --warn-soft:#fdf0dc; --bad:#b42318; --bad-soft:#fde8e6; --code:#0f3d8a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121417; --surface:#1b1e23; --surface-2:#23272d; --text:#e7eaee; --muted:#9aa3ad;
+    --line:#30353c; --accent:#7ea6ff; --accent-soft:#1e2a44; --ok:#5fd394; --ok-soft:#163324;
+    --warn:#f0b35a; --warn-soft:#3a2a12; --bad:#ff8a80; --bad-soft:#3d1b19; --code:#a9c4ff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121417; --surface:#1b1e23; --surface-2:#23272d; --text:#e7eaee; --muted:#9aa3ad;
+  --line:#30353c; --accent:#7ea6ff; --accent-soft:#1e2a44; --ok:#5fd394; --ok-soft:#163324;
+  --warn:#f0b35a; --warn-soft:#3a2a12; --bad:#ff8a80; --bad-soft:#3d1b19; --code:#a9c4ff;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+header{background:var(--surface);border-bottom:1px solid var(--line)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header .wrap{padding-top:28px;padding-bottom:20px}
+h1{font-size:24px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0;font-size:14px}
+nav{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:6px;padding-bottom:6px}
+nav a{flex:none;color:var(--muted);text-decoration:none;font-size:14px;padding:6px 10px;border-radius:6px}
+nav a:hover{background:var(--surface-2);color:var(--text)}
+section{margin:28px 0}
+h2{font-size:19px;margin:0 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+h3{font-size:16px;margin:22px 0 8px}
+p{margin:6px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.kpi .label{font-size:13px;color:var(--muted)}
+.kpi .value{font-size:30px;font-weight:700;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .meta{font-size:13px;color:var(--muted)}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;vertical-align:middle}
+.b-ok{background:var(--ok-soft);color:var(--ok)}
+.b-warn{background:var(--warn-soft);color:var(--warn)}
+.b-bad{background:var(--bad-soft);color:var(--bad)}
+.b-info{background:var(--accent-soft);color:var(--accent)}
+.note{background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:6px;padding:10px 14px;margin:12px 0;font-size:14px}
+.note.warn{background:var(--warn-soft);border-color:var(--warn)}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface-2);font-weight:600;white-space:nowrap}
+.tbl{overflow-x:auto;border-radius:8px}
+code,.path{font-family:"D2Coding","Cascadia Mono",Consolas,monospace;font-size:13px;color:var(--code)}
+.path{background:var(--surface-2);padding:1px 6px;border-radius:4px;white-space:nowrap}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:8px 0;position:relative}
+pre code{color:var(--text);white-space:pre}
+.copy{position:absolute;top:6px;right:6px;font-size:12px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:6px;padding:2px 8px;cursor:pointer}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:6px 14px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.panel[hidden]{display:none}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:10px 0 14px}
+.step{flex:1 1 130px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;position:relative}
+.step b{display:block;font-size:12px;color:var(--accent);margin-bottom:2px}
+.arrow{align-self:center;color:var(--muted);font-size:18px}
+.step.ext{border-style:dashed}
+.legend{font-size:13px;color:var(--muted)}
+ul,ol{margin:6px 0;padding-left:22px}
+li{margin:3px 0}
+.check li{list-style:none;margin-left:-22px;padding-left:26px;position:relative}
+.check li::before{content:"";position:absolute;left:2px;top:6px;width:13px;height:13px;border:2px solid var(--muted);border-radius:3px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin:10px 0}
+details>summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"▸";display:inline-block;width:18px;color:var(--muted);transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+.talk{padding:0 16px 14px}
+.talk h4{font-size:14px;margin:14px 0 6px;color:var(--accent)}
+.line{display:flex;gap:8px;margin:5px 0;font-size:14px}
+.line .tag{flex:none;font-size:12px;font-weight:600;border-radius:4px;padding:1px 6px;height:fit-content;margin-top:2px}
+.say{background:var(--accent-soft);color:var(--accent)}
+.do{background:var(--surface-2);color:var(--muted)}
+.principles li{margin:5px 0}
+footer{color:var(--muted);font-size:13px;padding:24px 0 40px}
+@media (max-width:600px){
+  h1{font-size:20px}
+  .kpi .value{font-size:26px}
+  .arrow{transform:rotate(90deg);width:100%;text-align:center}
+  .step{flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>AI+ 인증 시험 지표별 스크립트</h1>
+    <p class="sub">2026-11-23 · sooyeon.choi · 근거: AI+ 인증 시험 합의서(접수번호 2026-356-CAI) · 원문 문서 <span class="path">aiplus-test-scripts-20261123.md</span></p>
+  </div>
+</header>
+<nav>
+  <div class="wrap">
+    <a href="#summary">한눈에 보기</a>
+    <a href="#files">파일 구성</a>
+    <a href="#mapping">확인 항목 ↔ 코드</a>
+    <a href="#run">실행 방법</a>
+    <a href="#demo">시연 순서</a>
+    <a href="#talk">시연 대본</a>
+    <a href="#diff">운영과의 차이</a>
+    <a href="#prep">시험 전 준비</a>
+    <a href="#issues">남은 이슈</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<section id="summary">
+  <h2>한눈에 보기</h2>
+  <p>기존 화면·API·평가 코드는 <b>그대로 두고</b> 스크립트 파일만 추가했습니다. DB·설정 변경은 없습니다.</p>
+  <div class="grid" style="margin-top:12px">
+    <div class="card kpi">
+      <div class="label">시험 1 · 검색 완전성 Recall@10</div>
+      <div class="value">97.50%</div>
+      <div class="meta">117/120 · 목표 80% 이상 <span class="badge b-ok">만족</span></div>
+      <div class="meta">산안 95.00% · 중처 100.00%</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">시험 2 · 검색 최종 정합성 NDCG@5</div>
+      <div class="value">0.9444</div>
+      <div class="meta">120문항 평균 · 목표 80% 이상 <span class="badge b-ok">만족</span></div>
+      <div class="meta">산안 0.9442 · 중처 0.9446</div>
+    </div>
+    <div class="card kpi" id="kpi-t4">
+      <div class="label">시험 4 · 평균 반환 시간 (최종 완료)</div>
+      <div class="value">측정 중</div>
+      <div class="meta">목표 5,000ms 이내</div>
+      <div class="meta">첫 토큰 평균: 측정 중</div>
+    </div>
+  </div>
+  <p class="legend" style="margin-top:8px">dev 검증 2026-11-23 · 개발 백엔드 컨테이너 · 데이터셋 3(산업안전보건법)·4(중대재해처벌법) 합본 120문항</p>
+  <div class="note">시험 2의 산안 값 0.9442는 기존 평가 실행 6번(산안 60문항) 재랭킹 NDCG@5 0.94424와 같습니다. 스크립트가 운영 검색·재랭킹 코드와 같은 결과를 낸다는 근거입니다.</div>
+
+  <h3>세 스크립트가 하는 일</h3>
+  <div class="tbl"><table>
+    <tr><th>시험</th><th>방식</th><th>실행 위치</th></tr>
+    <tr><td>1 Recall@10</td><td>운영 검색 노드 <code>retrieve</code>를 그대로 호출 → 상위 10개 안에 정답 청크가 있는지 확인</td><td>백엔드 실행 환경</td></tr>
+    <tr><td>2 NDCG@5</td><td>검색 노드 <code>retrieve</code> + 재랭킹 노드 <code>rerank</code>를 그대로 호출 → 재정렬 상위 5개로 NDCG 계산</td><td>백엔드 실행 환경</td></tr>
+    <tr><td>4 평균 반환 시간</td><td>챗봇 화면과 같은 <code>POST /api/query/stream</code>을 120회 순차 호출 → 첫 토큰·최종 완료 시간 측정</td><td>시험 PC</td></tr>
+  </table></div>
+  <p class="legend">시험 1·2는 운영과 한 가지만 다릅니다: LLM 질의 재작성을 하지 않고 시험 질의문 원문으로만 검색합니다(합의서 문구 "시험 데이터를 입력하여 의미 검색과 BM25 검색"). 시험 3(LLM-as-a-Judge)은 이 문서 범위 밖입니다.</p>
+</section>
+
+<section id="files">
+  <h2>파일 구성</h2>
+  <p>모두 <span class="path">adrag_backend/</span> 아래에 있습니다.</p>
+  <div class="tbl"><table>
+    <tr><th>파일</th><th>역할</th><th>실행 위치</th></tr>
+    <tr><td><span class="path">scripts/aiplus_common.py</span></td><td>시험 데이터 xlsx 읽기, 질의별 컬렉션 선택, CSV·JSON 저장 (앱 코드 import 없음)</td><td>공통</td></tr>
+    <tr><td><span class="path">scripts/aiplus_search.py</span></td><td>시험 1·2 공통: 모델·검색 구성 요소 불러오기, 하이브리드 검색, 재랭킹</td><td>백엔드 실행 환경</td></tr>
+    <tr><td><span class="path">scripts/aiplus_test1_recall10.py</span></td><td>시험 1 Recall@10</td><td>백엔드 실행 환경</td></tr>
+    <tr><td><span class="path">scripts/aiplus_test2_ndcg5.py</span></td><td>시험 2 NDCG@5</td><td>백엔드 실행 환경</td></tr>
+    <tr><td><span class="path">scripts/aiplus_test4_latency.py</span></td><td>시험 4 평균 반환 시간 (httpx·openpyxl만 필요)</td><td>시험 PC</td></tr>
+    <tr><td><span class="path">tests/test_aiplus_common.py</span></td><td>공통 모듈 단위 테스트 5개 (통과)</td><td>—</td></tr>
+  </table></div>
+  <p class="legend">백엔드 실행 환경 = 백엔드 컨테이너 안(<code>docker exec</code>), 또는 같은 .env로 Qdrant·임베딩·Reranker 서버에 닿는 adrag_backend 가상환경.</p>
+
+  <h3>시험 데이터 파일</h3>
+  <p>평가 › 데이터셋 › 다운로드 칸의 <b>시험 데이터셋</b> 버튼으로 받은 xlsx를 그대로 씁니다.</p>
+  <div class="tbl"><table>
+    <tr><th>시트</th><th>쓰는 열</th><th>비고</th></tr>
+    <tr><td>질의</td><td>질의ID, 질의문, 법령(합본), 컬렉션(선택)</td><td>질의ID가 중복되거나 칸이 비어 있으면 시작 전에 멈춤</td></tr>
+    <tr><td>정답 근거</td><td>질의ID, 청크ID</td><td>청크ID = Qdrant 포인트 ID. 한 질의에 여러 개 가능 → 합집합이 정답</td></tr>
+  </table></div>
+  <p class="legend">질의별 검색 컬렉션 결정 순서: 질의 시트 <code>컬렉션</code> 열 → <code>--collection-map</code>(법령=컬렉션) → <code>--collection</code></p>
+</section>
+
+<section id="mapping">
+  <h2>합의서 확인 항목 ↔ 코드 위치</h2>
+  <p>시험기관의 "소스 코드 확인" 항목마다 어느 파일 몇 번째 줄인지, 누가 그 코드를 부르는지 정리했습니다. 줄 번호는 2026-11-23 기준입니다.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="t1">시험 1 Recall@10</button>
+    <button role="tab" aria-selected="false" data-tab="t2">시험 2 NDCG@5</button>
+    <button role="tab" aria-selected="false" data-tab="t4">시험 4 반환 시간</button>
+  </div>
+
+  <div class="panel" id="t1">
+    <div class="flow">
+      <div class="step"><b>1 데이터</b>load_testset()</div><div class="arrow">→</div>
+      <div class="step"><b>2 구성 요소</b>load_components()</div><div class="arrow">→</div>
+      <div class="step"><b>3 검색</b>Dense + BM25<br>retrieve 노드</div><div class="arrow">→</div>
+      <div class="step"><b>4 통합·상위 10</b>가중 RRF → top 10</div><div class="arrow">→</div>
+      <div class="step"><b>5 비교</b>hit_at_k()</div><div class="arrow">→</div>
+      <div class="step"><b>6 산출</b>포함 수 ÷ 전체 × 100</div>
+    </div>
+    <div class="note">Recall@10 = (상위 10개 검색 결과에 정답 근거 청크가 1개 이상 포함된 질의 수 ÷ 전체 시험 질의 수) × 100%</div>
+    <div class="tbl"><table>
+      <tr><th style="width:24%">합의서 확인 항목</th><th>코드 위치와 내용</th><th style="width:20%">호출하는 곳</th></tr>
+      <tr><td>시험 데이터 및 정답 데이터를 불러오는 코드</td><td><span class="path">scripts/aiplus_common.py:63</span> <code>load_testset()</code><br>질의 시트(질의ID·질의문·법령)와 정답 근거 시트(청크ID)를 읽어 질의별 정답 청크ID 집합을 만듦</td><td><span class="path">aiplus_test1_recall10.py:42</span></td></tr>
+      <tr><td>임베딩 모델 및 하이브리드 검색 구성 요소를 불러오는 코드</td><td><span class="path">scripts/aiplus_search.py:35</span> <code>load_components()</code><br>운영 그래프와 같은 <code>default_graph_dependencies()</code>(<span class="path">app/graphs/dependencies.py:16</span>, 관리자 화면 설정 반영)로 임베딩 클라이언트·Kiwi BM25 인코더·Qdrant 저장소·규칙 전처리기를 만듦</td><td><span class="path">aiplus_test1_recall10.py:46</span></td></tr>
+      <tr><td>임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드</td><td><span class="path">scripts/aiplus_search.py:93</span> <code>hybrid_search()</code><br>→ 운영 검색 노드 <span class="path">app/graphs/nodes/retrieve.py:130</span> <code>retrieve()</code><br>→ <span class="path">retrieve.py:79</span> <code>_search_qdrant_hybrid()</code>:<br>· <span class="path">:96</span> 임베딩 <code>embed_query</code> (<span class="path">app/clients/embedding_client.py:169</span>)<br>· <span class="path">:99</span> Kiwi BM25 <code>encode_query</code> (<span class="path">app/clients/kiwi_bm25_encoder.py:58</span>)<br>· <span class="path">:112</span> <code>search_hybrid</code> 호출</td><td><span class="path">aiplus_test1_recall10.py:55</span></td></tr>
+      <tr><td>검색 결과를 통합하여 상위 10개 문서 청크를 추출하는 코드</td><td>통합: <span class="path">app/repositories/vector_repository.py:572</span> <code>search_hybrid()</code><br>· <span class="path">:606</span> prefetch 2종(<span class="path">:610</span> Dense, <span class="path">:618</span> Kiwi BM25)을 Qdrant가 각각 검색<br>· <span class="path">:623</span> 가중 RRF로 하나의 순위로 합침<br>· <span class="path">retrieve.py:249</span> 키워드 일치 가산(<code>apply_soft_boost</code>) 후 후보 40개<br>상위 10개: <span class="path">aiplus_test1_recall10.py:30</span> <code>top_k_chunk_ids()</code></td><td><span class="path">aiplus_test1_recall10.py:57</span></td></tr>
+      <tr><td>상위 10개와 정답을 비교해 정답 근거 청크 포함 여부를 확인하는 코드</td><td><span class="path">app/evaluation/metrics/retrieval_metrics.py:39</span> <code>hit_at_k()</code> — 상위 10개에 정답 청크가 1개라도 있으면 1<br>정답 순위: <span class="path">:108</span> <code>first_rank()</code></td><td><span class="path">aiplus_test1_recall10.py:64</span></td></tr>
+      <tr><td>전체 시험 데이터의 Recall@10을 산출하는 코드</td><td><span class="path">aiplus_test1_recall10.py:79</span> <code>recall = hits / total * 100</code><br>분모 = 전체 시험 질의 수 (검색 오류·정답 없음도 0으로 포함)</td><td><code>run()</code></td></tr>
+      <tr><td>질의별 결과 저장</td><td><span class="path">aiplus_common.py:116</span> <code>write_csv()</code> → <code>test1_recall10_items.csv</code></td><td><span class="path">aiplus_test1_recall10.py:81</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="panel" id="t2" hidden>
+    <div class="flow">
+      <div class="step"><b>1 데이터</b>load_testset()</div><div class="arrow">→</div>
+      <div class="step"><b>2 구성 요소</b>+ Reranker</div><div class="arrow">→</div>
+      <div class="step"><b>3 검색</b>retrieve 노드</div><div class="arrow">→</div>
+      <div class="step"><b>4 재정렬</b>rerank 노드</div><div class="arrow">→</div>
+      <div class="step"><b>5 질의별</b>ndcg_at_k(top 5)</div><div class="arrow">→</div>
+      <div class="step"><b>6 산출</b>합계 ÷ 전체</div>
+    </div>
+    <div class="note">질의별 NDCG@5 = DCG@5 ÷ IDCG@5 · DCG = Σ rel ÷ log₂(순위+1), rel = 정답 청크면 1, 아니면 0 · 검색 최종 정합성 = 질의별 NDCG@5 합 ÷ 전체 시험 질의 수</div>
+    <div class="tbl"><table>
+      <tr><th style="width:24%">합의서 확인 항목</th><th>코드 위치와 내용</th><th style="width:20%">호출하는 곳</th></tr>
+      <tr><td>시험 데이터 및 정답 데이터를 불러오는 코드</td><td><span class="path">scripts/aiplus_common.py:63</span> <code>load_testset()</code></td><td><span class="path">aiplus_test2_ndcg5.py:33</span></td></tr>
+      <tr><td>임베딩 모델 및 Reranker 모델을 불러오는 코드</td><td><span class="path">scripts/aiplus_search.py:35</span> <code>load_components(with_reranker=True)</code><br>시험 1의 구성 요소 + Reranker 클라이언트(<span class="path">app/clients/reranker_client.py</span>). Reranker가 꺼져 있으면 시작 전에 멈춤</td><td><span class="path">aiplus_test2_ndcg5.py:37</span></td></tr>
+      <tr><td>의미 검색과 BM25 키워드 검색을 수행하는 코드</td><td>시험 1과 같음 (<span class="path">aiplus_search.py:93</span> → <span class="path">retrieve.py:130</span> → <span class="path">:79</span>)</td><td><span class="path">aiplus_test2_ndcg5.py:46</span></td></tr>
+      <tr><td>하이브리드 검색 결과를 Reranker에 넣어 관련도를 평가하고 재정렬하는 코드</td><td><span class="path">scripts/aiplus_search.py:114</span> <code>rerank_chunks()</code><br>→ 운영 재랭킹 노드 <span class="path">app/graphs/nodes/rerank.py:90</span> <code>rerank()</code>:<br>· <span class="path">:105</span> 같은 본문 중복 제거<br>· <span class="path">:162</span> [문서명]·[섹션] 머리말 + 본문 (<span class="path">:47</span> <code>_build_rerank_text</code>)<br>· <span class="path">:166</span> <code>reranker.rerank(질의, 청크들)</code> (<span class="path">reranker_client.py:64</span>, vLLM /v1/score) → 관련도 점수 내림차순<br>Reranker 장애·꺼짐 때의 대체 결과는 시험에서 오류로 처리</td><td><span class="path">aiplus_test2_ndcg5.py:49</span></td></tr>
+      <tr><td>재정렬 상위 5개의 관련도·순위를 정답과 비교해 질의별 NDCG@5를 산출하는 코드</td><td><span class="path">app/evaluation/metrics/retrieval_metrics.py:82</span> <code>ndcg_at_k()</code><br>정답 순위 표시: <span class="path">:100</span> <code>gold_ranks()</code></td><td><span class="path">aiplus_test2_ndcg5.py:61</span></td></tr>
+      <tr><td>전체 시험 데이터의 NDCG@5 평균을 산출하는 코드</td><td><span class="path">aiplus_test2_ndcg5.py:76</span> <code>mean_ndcg = ndcg_sum / total</code> — 분모 = 전체 시험 질의 수</td><td><code>run()</code></td></tr>
+      <tr><td>질의별 결과 저장</td><td><span class="path">aiplus_common.py:116</span> <code>write_csv()</code> → <code>test2_ndcg5_items.csv</code></td><td><span class="path">aiplus_test2_ndcg5.py:78</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="panel" id="t4" hidden>
+    <div class="flow">
+      <div class="step"><b>1 데이터</b>load_testset()</div><div class="arrow">→</div>
+      <div class="step"><b>로그인</b>login()</div><div class="arrow">→</div>
+      <div class="step"><b>2 요청</b>ask() 순차 120회</div><div class="arrow">→</div>
+      <div class="step ext"><b>We.RAG 서버</b>검색 → 재랭킹 → 답변 생성</div><div class="arrow">→</div>
+      <div class="step"><b>3 측정</b>첫 token / done</div><div class="arrow">→</div>
+      <div class="step"><b>4·5 저장·평균</b>CSV · stats()</div>
+    </div>
+    <div class="note">답변 생성 평균 반환 시간(ms) = 전체 시험 데이터의 반환 시간 합계 ÷ 전체 시험 데이터 수 · 시작 = 요청을 보내기 직전, 첫 토큰 = 첫 token 이벤트, 최종 완료 = done 이벤트</div>
+    <div class="tbl"><table>
+      <tr><th style="width:24%">확인 항목</th><th>코드 위치와 내용</th><th style="width:20%">호출하는 곳</th></tr>
+      <tr><td>시험 데이터를 불러오는 코드</td><td><span class="path">scripts/aiplus_common.py:63</span> <code>load_testset(with_gold=False)</code></td><td><span class="path">aiplus_test4_latency.py:128</span></td></tr>
+      <tr><td>시험 데이터를 We.RAG에 입력해 질의별 답변 생성을 요청하는 코드</td><td><span class="path">aiplus_test4_latency.py:57</span> <code>ask()</code> — <span class="path">:67</span> <code>POST /api/query/stream</code><br>서버: <span class="path">app/routes/query.py:204</span> <code>rag_query_stream()</code> → <span class="path">app/services/rag_service.py:425</span> <code>_query_stream_from_graph()</code> → <span class="path">:490</span> 운영 그래프 실행 (입력 검증 → 질의 분석·재작성 → 하이브리드 검색 → 재랭킹 → 답변 생성 → 인용 정리)</td><td><span class="path">aiplus_test4_latency.py:146</span><br>(1건씩 순차)</td></tr>
+      <tr><td>첫 토큰 응답 시간과 최종 답변 완료까지의 시간을 측정하는 코드</td><td>시작 <span class="path">:61</span> <code>time.perf_counter()</code> (요청 직전)<br>첫 토큰 <span class="path">:82</span> 첫 token 이벤트 (서버 <span class="path">rag_service.py:514</span>)<br>최종 완료 <span class="path">:93</span> done 이벤트 (서버 <span class="path">rag_service.py:546</span>, 답변·인용·기록이 끝난 뒤)<br>오류·끊김은 <span class="path">:98</span> 그 시점까지 기록</td><td><code>ask()</code></td></tr>
+      <tr><td>질의별 반환 시간(첫 토큰·최종)을 저장하는 코드</td><td><span class="path">aiplus_test4_latency.py:148</span> 행 구성 → <span class="path">:162</span> <code>write_csv()</code> → <code>test4_latency_items.csv</code> (생성 답변 포함)</td><td><code>main()</code></td></tr>
+      <tr><td>전체 시험 데이터의 반환 시간 평균을 산출하는 코드</td><td><span class="path">aiplus_test4_latency.py:157</span> 전체 질의의 최종 완료 시간 → <span class="path">:159</span> <code>stats()</code> (평균·p50·p90·p95·최대)<br>분모 = 전체 시험 데이터 수. 오류 질의도 오류까지 걸린 시간으로 포함. 첫 토큰 평균은 첫 토큰을 받은 질의 기준</td><td><code>main()</code></td></tr>
+    </table></div>
+  </div>
+</section>
+
+<section id="run">
+  <h2>실행 방법</h2>
+  <h3>시험 1·2 — 백엔드 컨테이너에서</h3>
+  <pre><code>docker cp 시험데이터셋_120.xlsx &lt;백엔드 컨테이너&gt;:/tmp/aiplus/
+docker exec -w /app &lt;백엔드 컨테이너&gt; python scripts/aiplus_test1_recall10.py \
+    --file /tmp/aiplus/시험데이터셋_120.xlsx \
+    --collection-map "산업안전보건법=AIE_산업안전보건법,중대재해처벌법=AIE_중대재해처벌법" \
+    --out /tmp/aiplus/result
+docker exec -w /app &lt;백엔드 컨테이너&gt; python scripts/aiplus_test2_ndcg5.py   (인자는 위와 같음)</code></pre>
+  <h3>시험 4 — 시험 PC에서</h3>
+  <p><code>aiplus_test4_latency.py</code>와 <code>aiplus_common.py</code> 두 파일을 같은 폴더에 둡니다. 계정은 환경변수로만 받습니다(명령 인자·결과 파일에 남지 않음).</p>
+  <pre><code>pip install httpx openpyxl
+set AIPLUS_USER_ID=&lt;시험 전용 계정&gt;
+set AIPLUS_PASSWORD=&lt;비밀번호&gt;
+python aiplus_test4_latency.py --base-url &lt;We.RAG 주소&gt; --file 시험데이터셋_120.xlsx \
+    --collection-map "산업안전보건법=AIE_산업안전보건법,중대재해처벌법=AIE_중대재해처벌법" \
+    --warmup-query "안전보건관리책임자의 업무는 무엇인가요" --out ./aiplus_result</code></pre>
+  <div class="tbl"><table>
+    <tr><th>옵션</th><th>뜻</th></tr>
+    <tr><td><code>--verbose</code> (시험 1·2)</td><td>꺼 둔 노드 로그를 함께 출력</td></tr>
+    <tr><td><code>--warmup-query</code> (시험 4)</td><td>시험 데이터가 <b>아닌</b> 질의를 먼저 보내고 평균에서 뺌(여러 번 지정 가능)</td></tr>
+    <tr><td><code>--timeout</code> (시험 4)</td><td>질의 1건 제한 시간(초, 기본 120). 넘으면 오류로 기록하고 걸린 시간을 평균에 포함</td></tr>
+  </table></div>
+  <h3>결과 파일 (<code>--out</code> 폴더)</h3>
+  <div class="tbl"><table>
+    <tr><th>파일</th><th>내용</th></tr>
+    <tr><td><code>test1_recall10_items.csv</code></td><td>질의별 정답 포함(1/0), 정답 첫 순위, 검색 상위 10(청크ID·문서·조항), 검색 시간</td></tr>
+    <tr><td><code>test2_ndcg5_items.csv</code></td><td>질의별 NDCG@5, 정답 순위, 재랭킹 상위 5(청크ID·점수·정답 여부·문서·조항), 검색·재랭킹 시간</td></tr>
+    <tr><td><code>test4_latency_items.csv</code></td><td>질의별 첫 토큰·최종 완료 시간(ms), 답변 글자 수, 인용 수, 생성 답변</td></tr>
+    <tr><td><code>test*_summary.json</code></td><td>전체 값, 법령별 참고 값, 오류 건수, 사용 모델·설정, 시작·종료 시각, 목표 만족 여부</td></tr>
+  </table></div>
+  <p class="legend">CSV는 UTF-8(BOM)이라 Excel에서 바로 열립니다.</p>
+</section>
+
+<section id="demo">
+  <h2>시연 순서</h2>
+  <h3>원칙</h3>
+  <ul class="principles">
+    <li>합의서의 시험 절차 순서(<b>① 평가 데이터 확인 → ② 소스 코드 확인 → ③ 시험 PC에서 스크립트 실행</b>)를 그대로 따릅니다.</li>
+    <li>소스 코드는 스크립트 <code>run()</code>의 주석 번호(1~6)를 위에서 아래로 따라가며, 번호마다 호출되는 운영 코드로 들어갑니다. 이 페이지의 "확인 항목 ↔ 코드" 표를 옆 화면에 띄워 둡니다.</li>
+    <li>실행 후 질의 1건을 골라 결과 CSV에서 그 행을 열어 "코드가 실제로 낸 값"을 보여 줍니다(정답 포함 1건, 미포함·순위 낮은 1건).</li>
+    <li>시험 순서는 <b>1 → 2 → 4</b>입니다. 시험 4는 같은 GPU 서버를 쓰는 다른 실행과 겹치면 시간이 늘어나므로 마지막에 단독으로 돌리고, 도는 15~20분 동안 시험 4 코드를 설명합니다.</li>
+  </ul>
+
+  <h3>사전 준비 (시험 전날·당일 시작 전)</h3>
+  <div class="tbl"><table>
+    <tr><th>준비</th><th>내용</th></tr>
+    <tr><td>문서 고정</td><td>시험 컬렉션 문서 등록·삭제·버전 변경 금지(청크ID가 바뀜)</td></tr>
+    <tr><td>시험 데이터</td><td>합본 시험 데이터셋 xlsx 다운로드 → 백엔드 컨테이너 <code>/tmp/aiplus/</code>에 복사</td></tr>
+    <tr><td>화면 1</td><td>코드 편집기에 <code>aiplus_test1_recall10.py</code>, <code>aiplus_test2_ndcg5.py</code>, <code>aiplus_test4_latency.py</code>, <code>aiplus_search.py</code>, <code>retrieve.py</code>, <code>rerank.py</code>, <code>vector_repository.py</code>, <code>retrieval_metrics.py</code>, <code>rag_service.py</code> 열어 두기</td></tr>
+    <tr><td>화면 2</td><td>이 페이지 — "확인 항목 ↔ 코드" 표</td></tr>
+    <tr><td>터미널</td><td>백엔드 서버 접속 터미널(시험 1·2), 시험 PC 명령 프롬프트(시험 4, 계정 환경변수 설정 완료)</td></tr>
+    <tr><td>리허설</td><td>전날 3개 스크립트를 한 번씩 끝까지 실행해 결과 폴더를 남겨 둠(시연 중 실행이 실패해도 설명 가능)</td></tr>
+    <tr><td>운영 상태</td><td>백엔드 컨테이너 재시작·배포 금지, 다른 평가 실행 없음 확인</td></tr>
+  </table></div>
+
+  <h3>진행표 (약 70분)</h3>
+  <div class="tbl"><table>
+    <tr><th>순서</th><th>시험</th><th>단계</th><th>화면</th><th>시간</th></tr>
+    <tr><td>0</td><td>공통</td><td>시스템 구성·시험 데이터 형식 소개</td><td>"한눈에 보기"·"파일 구성"</td><td>5분</td></tr>
+    <tr><td>1</td><td>시험 1</td><td>① 데이터 확인</td><td>시험 데이터 xlsx <code>질의</code>·<code>정답 근거</code> 시트</td><td>3분</td></tr>
+    <tr><td>2</td><td>시험 1</td><td>② 코드 확인(확인 항목 6개)</td><td>편집기 + 시험 1 표</td><td>10분</td></tr>
+    <tr><td>3</td><td>시험 1</td><td>③ 실행 → 결과 확인</td><td>터미널 출력, <code>test1_recall10_items.csv</code></td><td>5분</td></tr>
+    <tr><td>4</td><td>시험 2</td><td>① 데이터 확인(시험 1과 같은 파일)</td><td>—</td><td>1분</td></tr>
+    <tr><td>5</td><td>시험 2</td><td>② 코드 확인(재랭킹·NDCG 위주)</td><td>편집기 + 시험 2 표</td><td>8분</td></tr>
+    <tr><td>6</td><td>시험 2</td><td>③ 실행 → 결과 확인</td><td>터미널 출력, <code>test2_ndcg5_items.csv</code></td><td>5분</td></tr>
+    <tr><td>7</td><td>시험 4</td><td>① 데이터 확인 → ③ 실행 시작</td><td>시험 PC 명령 프롬프트</td><td>3분</td></tr>
+    <tr><td>8</td><td>시험 4</td><td>② 코드 확인(실행이 도는 동안)</td><td>편집기 + 시험 4 표</td><td>10분</td></tr>
+    <tr><td>9</td><td>시험 4</td><td>실행 완료 → 결과 확인</td><td>터미널 출력, <code>test4_latency_items.csv</code></td><td>5분</td></tr>
+    <tr><td>10</td><td>공통</td><td>질의응답, 결과 파일 전달</td><td><code>--out</code> 폴더</td><td>10분</td></tr>
+  </table></div>
+</section>
+
+<section id="talk">
+  <h2>시연 대본 (간략)</h2>
+  <p class="legend"><span class="line" style="display:inline-flex"><span class="tag say">말하기</span></span> 말할 내용 · <span class="line" style="display:inline-flex"><span class="tag do">화면</span></span> 화면 동작. 괄호 안 수치는 dev 결과이며 시험 당일 값으로 바꿔 읽습니다.</p>
+
+  <details open>
+    <summary>시작</summary>
+    <div class="talk">
+      <div class="line"><span class="tag say">말하기</span><span>"We.RAG의 인공지능 기능 두 가지, 하이브리드 지식 검색·재랭킹과 근거 기반 답변 생성을 합의서 시험 1·2·4 방법대로 확인하겠습니다. 스크립트는 운영 챗봇과 같은 검색·재랭킹 코드를 그대로 호출하고, 답변 시간은 챗봇 화면과 같은 API로 잽니다."</span></div>
+      <div class="line"><span class="tag do">화면</span><span>"파일 구성" 표를 보여 줍니다.</span></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>시험 1 검색 완전성(Recall@10)</summary>
+    <div class="talk">
+      <h4>1. 데이터 확인</h4>
+      <div class="line"><span class="tag do">화면</span><span>시험 데이터 xlsx <code>질의</code> 시트 → <code>정답 근거</code> 시트</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"질의 120건, 법령별 60건입니다. 정답 근거 시트의 청크ID가 검색 결과와 비교할 정답입니다."</span></div>
+      <h4>2. 코드 확인 — <code>aiplus_test1_recall10.py</code>의 <code>run()</code></h4>
+      <div class="line"><span class="tag say">주석 1</span><span>"시험 데이터와 정답을 불러옵니다." <span class="path">aiplus_common.py:63</span></span></div>
+      <div class="line"><span class="tag say">주석 2</span><span>"임베딩 모델과 하이브리드 검색 구성 요소를 불러옵니다. 모델은 GPU 서버에서 서비스되므로 각 서버에 연결하는 클라이언트를 만듭니다. 운영 챗봇과 같은 설정을 씁니다." <span class="path">aiplus_search.py:35</span></span></div>
+      <div class="line"><span class="tag say">주석 3·4</span><span>"운영 검색 함수 retrieve를 그대로 부릅니다. 안에서 질의를 임베딩 벡터로 바꾸고(96행), Kiwi 형태소 분석으로 BM25 키워드 질의를 만든 뒤(99행), Qdrant에 두 검색을 함께 요청합니다." <span class="path">retrieve.py:79</span></span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"Qdrant가 의미 검색과 BM25 검색을 각각 하고, 가중 RRF로 하나의 순위로 합칩니다. 그중 상위 10개를 뽑습니다." <span class="path">vector_repository.py:606·623</span> → <span class="path">aiplus_test1_recall10.py:30</span></span></div>
+      <div class="line"><span class="tag say">주석 5</span><span>"상위 10개에 정답 청크가 하나라도 있으면 포함으로 셉니다." <span class="path">retrieval_metrics.py:39</span></span></div>
+      <div class="line"><span class="tag say">주석 6</span><span>"포함된 질의 수를 전체 120으로 나눕니다. 오류가 난 질의도 분모에 넣습니다." <span class="path">aiplus_test1_recall10.py:79</span></span></div>
+      <h4>3. 실행</h4>
+      <div class="line"><span class="tag do">화면</span><span>터미널에서 시험 1 명령 실행(약 1분)</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"질의마다 포함 여부와 정답 순위가 출력됩니다. 최종 Recall@10은 (97.50%)로 목표 80%를 만족합니다."</span></div>
+      <h4>4. 결과 확인</h4>
+      <div class="line"><span class="tag do">화면</span><span><code>test1_recall10_items.csv</code>에서 정답 1위 질의 1건, 미포함 질의 1건의 <code>검색 상위10</code> 칸을 엽니다.</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"이 질의는 정답 청크가 1위에 있고, 이 질의는 상위 10개에 없어 0으로 계산됐습니다."</span></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>시험 2 검색 최종 정합성(NDCG@5)</summary>
+    <div class="talk">
+      <h4>1. 데이터 확인</h4>
+      <div class="line"><span class="tag say">말하기</span><span>"시험 1과 같은 파일입니다."</span></div>
+      <h4>2. 코드 확인 — <code>aiplus_test2_ndcg5.py</code>의 <code>run()</code></h4>
+      <div class="line"><span class="tag say">주석 1·3</span><span>"데이터 불러오기와 하이브리드 검색은 시험 1과 같은 함수입니다."</span></div>
+      <div class="line"><span class="tag say">주석 2</span><span>"여기서는 Reranker 모델 클라이언트도 함께 불러옵니다. Reranker가 꺼져 있으면 시작하지 않습니다." <span class="path">aiplus_search.py:35</span></span></div>
+      <div class="line"><span class="tag say">주석 4</span><span>"운영 재랭킹 함수 rerank를 그대로 부릅니다. 같은 본문을 지우고, 문서명·조항을 붙여 Reranker에 질의와 함께 넣고, 관련도 점수 순으로 다시 정렬합니다." <span class="path">rerank.py:105·162·166</span></span></div>
+      <div class="line"><span class="tag say">주석 5</span><span>"재정렬 상위 5개에서 정답 청크의 순위로 NDCG@5를 계산합니다. 정답이 1위면 1.0, 2위면 0.63입니다." <span class="path">retrieval_metrics.py:82</span></span></div>
+      <div class="line"><span class="tag say">주석 6</span><span>"120건의 NDCG@5를 더해 120으로 나눕니다." <span class="path">aiplus_test2_ndcg5.py:76</span></span></div>
+      <h4>3. 실행</h4>
+      <div class="line"><span class="tag do">화면</span><span>시험 2 명령 실행(약 1분)</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"최종 NDCG@5는 (0.9444, 94.44%)로 목표 80%를 만족합니다."</span></div>
+      <h4>4. 결과 확인</h4>
+      <div class="line"><span class="tag do">화면</span><span><code>test2_ndcg5_items.csv</code>에서 NDCG 1.0인 질의 1건과 0.63인 질의 1건의 <code>재랭킹 상위5</code> 칸을 엽니다.</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"점수와 정답 표시를 보면 순위가 계산식과 맞는 것을 확인할 수 있습니다."</span></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>시험 4 근거 기반 답변 생성 평균 반환 시간</summary>
+    <div class="talk">
+      <h4>1. 데이터 확인·실행 시작</h4>
+      <div class="line"><span class="tag do">화면</span><span>시험 PC에서 시험 4 명령 실행</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"같은 120건을 챗봇 화면과 같은 스트리밍 API에 한 건씩 순서대로 보냅니다. 15~20분 걸리므로, 도는 동안 코드를 설명하겠습니다."</span></div>
+      <h4>2. 코드 확인 — <code>aiplus_test4_latency.py</code></h4>
+      <div class="line"><span class="tag say">주석 1</span><span>"시험 데이터를 불러옵니다. 이 시험은 정답 데이터를 쓰지 않습니다." <span class="path">:128</span></span></div>
+      <div class="line"><span class="tag say">ask()</span><span>"질의 하나를 We.RAG에 보냅니다." <span class="path">:57·67</span></span></div>
+      <div class="line"><span class="tag say">서버</span><span>"서버에서는 질의 분석, 하이브리드 검색, 재랭킹, 답변 생성, 인용 정리를 운영 그대로 수행합니다." <span class="path">query.py:204</span> → <span class="path">rag_service.py:425·490</span></span></div>
+      <div class="line"><span class="tag say">시간 측정</span><span>"요청을 보내기 직전에 시계를 켭니다(61행). 첫 답변 글자를 받으면 첫 토큰 시간(82행), 답변·인용이 모두 끝났다는 신호를 받으면 최종 완료 시간(93행)으로 기록합니다."</span></div>
+      <div class="line"><span class="tag say">저장·평균</span><span>"질의별 시간과 생성 답변을 CSV로 저장하고, 120건 최종 완료 시간의 평균을 냅니다. 오류가 난 질의도 오류까지 걸린 시간으로 평균에 넣습니다." <span class="path">:148·157·159</span></span></div>
+      <h4>3. 결과 확인</h4>
+      <div class="line"><span class="tag do">화면</span><span>실행이 끝나면 터미널 마지막 줄과 <code>test4_latency_items.csv</code>를 엽니다.</span></div>
+      <div class="line"><span class="tag say">말하기</span><span>"최종 완료 평균은 (　)ms, 첫 토큰 평균은 (　)ms입니다."</span></div>
+    </div>
+  </details>
+
+  <h3>예상 질문과 답</h3>
+  <div class="tbl"><table>
+    <tr><th style="width:28%">질문</th><th>답</th></tr>
+    <tr><td>BM25 검색은 어디서 하나요?</td><td>Kiwi 형태소 분석으로 질의를 BM25 sparse 벡터로 바꾸고(<span class="path">kiwi_bm25_encoder.py:58</span>), Qdrant의 <code>kiwi_bm25</code> 색인에서 검색합니다(<span class="path">vector_repository.py:618</span>). 적재 때 같은 인코더로 색인을 만듭니다.</td></tr>
+    <tr><td>두 검색 결과를 어떻게 합치나요?</td><td>Qdrant 서버에서 가중 RRF로 합칩니다(<span class="path">vector_repository.py:623</span>). 순위 역수에 가중치를 곱해 더하는 방식이고, 가중치는 질의 유형별 표(<span class="path">retrieval_engine.py:25</span> <code>RRF_WEIGHTS</code>)를 따릅니다.</td></tr>
+    <tr><td>운영 챗봇과 같은 결과인가요?</td><td>검색·재랭킹은 운영 함수를 그대로 부릅니다. 차이는 시험 1·2에서 LLM 질의 재작성을 하지 않는 것 하나입니다(합의서 문구 기준). dev에서 산안 NDCG@5가 기존 평가 결과(0.94424)와 같게 나왔습니다.</td></tr>
+    <tr><td>모델을 불러오는 코드가 따로 있나요?</td><td>모델은 GPU 서버에서 자체 서비스합니다. 스크립트는 그 서버에 연결하는 클라이언트를 만듭니다(<span class="path">aiplus_search.py:35</span>). 외부 AI API는 호출하지 않습니다.</td></tr>
+    <tr><td>오류가 난 질의는 어떻게 계산하나요?</td><td>시험 1·2는 0점, 시험 4는 오류까지 걸린 시간으로 넣습니다. 분모는 모두 전체 시험 데이터 수입니다.</td></tr>
+    <tr><td>첫 토큰과 최종 완료 중 어느 값으로 판정하나요?</td><td>합의서 문구는 최종 완료입니다. 스크립트는 두 값을 모두 출력합니다.</td></tr>
+  </table></div>
+</section>
+
+<section id="diff">
+  <h2>운영 경로와의 차이 <span class="badge b-info">시험기관 설명용</span></h2>
+  <div class="tbl"><table>
+    <tr><th>구분</th><th>운영 챗봇</th><th>시험 1·2 스크립트</th><th>시험 4 스크립트</th></tr>
+    <tr><td>LLM 질의 재작성</td><td>함</td><td><b>안 함</b> (원문 질의만)</td><td>함 (운영 그대로)</td></tr>
+    <tr><td>규칙 전처리 (정규화·약어·조문 패턴)</td><td>함</td><td>함</td><td>함</td></tr>
+    <tr><td>하이브리드 검색·재랭킹 코드</td><td>retrieve · rerank 노드</td><td><b>같은 노드 호출</b></td><td>같음</td></tr>
+    <tr><td>권한 필터</td><td>사용자 권한</td><td>없음 (관리자 기준, 공개 법령 컬렉션)</td><td>로그인 계정 권한</td></tr>
+    <tr><td>Reranker 장애 시</td><td>상위 3개 대체 결과로 답변</td><td>오류(0점)로 기록</td><td>운영 그대로</td></tr>
+  </table></div>
+</section>
+
+<section id="prep">
+  <h2>시험 전 준비 사항</h2>
+  <ul class="check">
+    <li><b>시험 환경에서 시험 데이터셋을 다시 만든다.</b> 청크ID가 Qdrant 포인트 ID라 문서를 다시 등록하면 ID가 바뀝니다. 순서: 시험 서버 등록 → 데이터셋 생성·검수·확정 → 합본 → 시험 데이터셋 xlsx 다운로드. 이후 시험이 끝날 때까지 문서 등록·삭제·버전 변경 금지.</li>
+    <li><b>고아 포인트 정리.</b> <code>AIE_산업안전보건법</code> 컬렉션에 DB에 없는 문서의 포인트 647개가 남아 있습니다. 정리하거나 새 컬렉션에 등록합니다(삭제는 되돌릴 수 없어 승인 필요).</li>
+    <li><b>시험 1·2 실행 방식 합의.</b> 시험 PC에서 백엔드 컨테이너에 접속해 실행하는지 확인합니다. 시험 PC에서 직접 돌리려면 백엔드 패키지·.env·Qdrant/임베딩/Reranker 서버 접근이 필요합니다.</li>
+    <li><b>시험 4 전용 계정.</b> 시험 질의가 일반 사용 통계에 섞이므로 전용 계정을 쓰고 통계에서 그 계정을 빼고 봅니다. 대상 컬렉션 2개에 권한을 줍니다.</li>
+    <li><b>시험 4 판정 기준.</b> 합의서 문구는 "최종 답변 생성 완료 시점까지"입니다. 첫 토큰 기준으로 판정하려면 합의서 문구를 고쳐 합의해야 합니다(스크립트는 두 값을 모두 냅니다).</li>
+    <li><b>시험 4 측정 중 다른 작업 금지.</b> 다른 사용자 질의·평가 실행·시험 1·2 스크립트를 동시에 돌리면 같은 GPU 서버를 써서 시간이 늘어납니다.</li>
+  </ul>
+</section>
+
+<section id="issues">
+  <h2>남은 이슈</h2>
+  <ol>
+    <li id="issue-t4">시험 4 최종 완료 평균이 5초를 넘으면 합의서 판정 기준 협의 또는 답변 생성 시간 단축(출력 토큰 상한·답변 길이 등) 결정이 필요합니다.</li>
+    <li>시험 1·2에 LLM 질의 재작성을 넣을지는 현재 "넣지 않음"(합의서 문구 기준)으로 구현했습니다. 넣어야 하면 옵션으로 추가할 수 있습니다(재작성 LLM 호출 때문에 결과가 매번 조금씩 달라질 수 있음).</li>
+    <li>시험 3(LLM-as-a-Judge)용 답변은 시험 4 결과의 <code>생성 답변</code> 열로도 받을 수 있습니다(인용 표식 제거본은 기존 일괄 질의 결과 CSV에 있음).</li>
+  </ol>
+  <p class="legend">마이그레이션 없음 · 기존 코드·설정·화면 변경 없음 · 되돌리기: 새 파일 6개 삭제</p>
+</section>
+
+</main>
+<footer class="wrap">원문: docs/design/reports/aiplus-test-scripts-20261123.md</footer>
+
+<script>
+document.querySelectorAll('.tabs button').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.tabs button').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b === btn));
+      document.getElementById(b.dataset.tab).hidden = b !== btn;
+    });
+  });
+});
+document.querySelectorAll('pre').forEach(function (pre) {
+  var button = document.createElement('button');
+  button.className = 'copy';
+  button.type = 'button';
+  button.textContent = '복사';
+  button.addEventListener('click', function () {
+    var text = pre.querySelector('code').innerText;
+    var done = function () { button.textContent = '복사됨'; setTimeout(function () { button.textContent = '복사'; }, 1200); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+  });
+  pre.appendChild(button);
+});
+</script>
+</body>
+</html>

@@ -85,8 +85,10 @@ export default {
         }
 
         // /admin 하위 경로로의 redirect는 무시하고 /chat으로
+        // 2026.11.20(woojin.jung) 수정 - 부서 운영관리자는 관리 콘솔 경로로 복귀 허용
         const redirect = route.query.redirect;
-        router.push(redirect && !redirect.startsWith('/admin') ? redirect : '/chat');
+        const allowAdminPath = result.role === 'manager';
+        router.push(redirect && (allowAdminPath || !redirect.startsWith('/admin')) ? redirect : '/chat');
       } catch (err) {
         // 2026.07.23(sychoi) 수정 - 422 검증 오류의 detail은 배열이며 제출한 입력값이 echo되어 있다.
         // 그대로 출력하면 원문 JSON과 비밀번호가 화면에 노출되므로 문자열일 때만 사용한다.

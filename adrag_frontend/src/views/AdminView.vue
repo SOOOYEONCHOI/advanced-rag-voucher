@@ -23,8 +23,10 @@
 
       <!-- Content -->
       <div class="admin-content">
+        <!-- 2026.11.23(woojin.jung) 추가 - 비활성 부서: 읽기 전용 안내 + 업로드 카드 숨김(목록의 수정·삭제는 서버 can_edit/can_delete 로 비활성) -->
+        <DepartmentReadOnlyNotice />
         <!-- Upload Card -->
-        <div class="card upload-card">
+        <div v-if="!departmentReadOnly" class="card upload-card">
           <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> 문서 업로드</div>
 
           <!-- Drop Zone -->
@@ -485,7 +487,9 @@
                           :disabled="!doc.can_edit || isVersionPending(doc) || versionRestore.isDocumentBusy(doc)"
                           :title="
                             !doc.can_edit
-                              ? '본인이 업로드한 문서만 새 버전을 등록할 수 있습니다.'
+                              ? departmentReadOnly
+                                ? '소속 부서가 비활성화되어 새 버전을 등록할 수 없습니다.'
+                                : '소속 부서 문서만 새 버전을 등록할 수 있습니다.'
                               : versionRestore.isRestorePending(doc)
                                 ? '다른 버전을 적용하는 중입니다.'
                                 : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
@@ -505,7 +509,9 @@
                           @click="confirmDeleteDoc(doc)"
                           :title="
                             !doc.can_delete
-                              ? '본인이 업로드한 문서만 개별 삭제할 수 있습니다.'
+                              ? departmentReadOnly
+                                ? '소속 부서가 비활성화되어 삭제할 수 없습니다.'
+                                : '소속 부서 문서만 삭제할 수 있습니다.'
                               : versionRestore.isRestorePending(doc)
                                 ? '버전 적용을 처리 중인 문서는 삭제할 수 없습니다.'
                                 : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
@@ -587,21 +593,27 @@
 </template>
 
 <script>
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminSidebar from '../components/AdminSidebar.vue';
 import AppToast from '../components/AppToast.vue';
+import DepartmentReadOnlyNotice from '../components/DepartmentReadOnlyNotice.vue';
 import DocumentVersionHistoryDialog from '../components/DocumentVersionHistoryDialog.vue';
 import DrawingResultDialog from '../components/DrawingResultDialog.vue';
 import SpreadsheetViewer from '../components/SpreadsheetViewer.vue';
 import { useAdminDocuments } from '../composables/useAdminDocuments';
+import { useAuthStore } from '../stores/authStore';
 
 export default {
-  components: { AdminSidebar, AppToast, DocumentVersionHistoryDialog, DrawingResultDialog, SpreadsheetViewer },
+  components: { AdminSidebar, AppToast, DepartmentReadOnlyNotice, DocumentVersionHistoryDialog, DrawingResultDialog, SpreadsheetViewer },
   // 2026.10.19(sooyeon.choi) 추가 - 모델명 수정 입력창이 열리면 바로 입력할 수 있게 포커스
   directives: { focus: { mounted: (el) => el.focus() } },
   setup() {
     const router = useRouter();
-    return useAdminDocuments({ router });
+    const authStore = useAuthStore();
+    // 2026.11.23(woojin.jung) 추가 - 비활성 부서의 운영관리자는 읽기 전용
+    const departmentReadOnly = computed(() => authStore.departmentReadOnly);
+    return { ...useAdminDocuments({ router }), departmentReadOnly };
   },
 };
 </script>

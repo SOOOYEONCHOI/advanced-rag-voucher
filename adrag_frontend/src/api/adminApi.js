@@ -110,8 +110,14 @@ export const adminApi = {
     return http.put(`/admin/departments/${encodeURIComponent(departmentId)}`, payload, adminAuthConfig());
   },
 
-  topics() {
-    return http.get('/admin/topics', adminAuthConfig());
+  // 2026.11.20(woojin.jung) 추가 - 운영관리자 변경(후임 지정 + 기존 운영관리자 처리: demote | deactivate)
+  changeDepartmentManager(departmentId, payload) {
+    return http.post(`/admin/departments/${encodeURIComponent(departmentId)}/manager`, payload, adminAuthConfig());
+  },
+
+  // 2026.11.23(woojin.jung) 수정 - params.department_id 로 부서 대화 주제만 조회
+  topics(params = {}) {
+    return http.get('/admin/topics', adminAuthConfig({ params }));
   },
 
   users(params = {}) {

@@ -75,8 +75,66 @@ def test_build_merged_items_rejects_duplicate_query_ids():
 
     same_prefix = [_source(3, "A", "법A", "Q", [_snapshot_item(1, "a", 1)]),
                    _source(4, "B", "법B", "Q", [_snapshot_item(2, "b", 1)])]
-    with pytest.raises(MergeError, match="Q-001"):
+    with pytest.raises(MergeError, match="Q-001") as excinfo:
         build_merged_items(same_prefix)
+    # 2026.11.23(sooyeon.choi) 추가 - 겹친 데이터셋 이름·접두어 표시
+    assert "A(접두어 Q) · B(접두어 Q)" in str(excinfo.value)
+
+
+# 2026.11.23(sooyeon.choi) 추가 - 접두어 변경 API: 확정 데이터셋 변경 → 다운로드·합본 반영, 합본은 변경 금지
+def test_query_id_prefix_update_api(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.repositories.evaluation_repository import EvalRepository
+    from app.routes.evaluation import router as eval_router
+    from app.utils.security import get_current_admin
+
+    db = database.get_database_manager()
+    repo = EvalRepository()
+    created = []
+    try:
+        first = _seed_source(repo, db, "prefix_api_a", "법A", "", ["가 질문1", "가 질문2"])
+        second = _seed_source(repo, db, "prefix_api_b", "법B", "", ["나 질문1"])
+        created += [first, second]
+        repo.create_goldset(first)
+        repo.create_goldset(second)
+        assert repo.get_dataset(first)["status"] == "finalized"
+
+        app = FastAPI()
+        app.include_router(eval_router, prefix="/api")
+        app.dependency_overrides[get_current_admin] = lambda: {"admin_id": "admin"}
+        client = TestClient(app)
+
+        # 둘 다 기본 접두어 Q → 합본 거부(이름 표시)
+        clash = client.post("/api/eval/datasets/merge", json={"name": "x", "dataset_ids": [first, second]})
+        assert clash.status_code == 400 and "법A 시험(접두어 Q) · 법B 시험(접두어 Q)" in clash.json()["detail"]
+
+        # 확정 데이터셋 접두어 변경(허용 안 되는 문자 제거), 다른 설정은 유지
+        changed = client.patch(f"/api/eval/datasets/{first}/query-id-prefix", json={"query_id_prefix": " 산안! "})
+        assert changed.status_code == 200 and changed.json()["query_id_prefix"] == "산안"
+        config = json.loads(repo.get_dataset(first)["gen_config_json"])
+        assert config["query_id_prefix"] == "산안"
+        assert client.patch(f"/api/eval/datasets/{second}/query-id-prefix", json={"query_id_prefix": "!!"}).status_code == 400
+        assert client.patch("/api/eval/datasets/999999999/query-id-prefix", json={"query_id_prefix": "a"}).status_code == 404
+
+        workbook = load_workbook(BytesIO(client.get(f"/api/eval/datasets/{first}/test-set.xlsx").content))
+        assert [row[0] for row in workbook["질의"].iter_rows(min_row=2, values_only=True)] == ["산안-001", "산안-002"]
+
+        # 이제 합본 가능(산안-… + Q-…)
+        response = client.post("/api/eval/datasets/merge", json={"name": "합본", "dataset_ids": [first, second]})
+        assert response.status_code == 201, response.text
+        merged_id = response.json()["dataset_id"]
+        created.append(merged_id)
+        assert client.patch(f"/api/eval/datasets/{merged_id}/query-id-prefix", json={"query_id_prefix": "z"}).status_code == 409
+
+        # 빈 값 → 기본 Q로 되돌림(설정에서 키 제거)
+        reset = client.patch(f"/api/eval/datasets/{first}/query-id-prefix", json={"query_id_prefix": ""})
+        assert reset.json()["query_id_prefix"] == "Q"
+        assert "query_id_prefix" not in json.loads(repo.get_dataset(first)["gen_config_json"])
+    finally:
+        for dataset_id in created:
+            repo.delete_dataset(dataset_id)
 
 
 # ── 평가 실행: 문항별 컬렉션·법령 세그먼트 ──────────────────────────────────

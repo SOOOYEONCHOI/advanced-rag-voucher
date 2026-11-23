@@ -57,7 +57,7 @@
           <div v-else class="dataset-table-scroll" role="region" aria-label="평가 데이터셋 목록" tabindex="0">
             <table class="data-table">
               <thead>
-                <tr><th v-if="mergeEnabled" class="center" title="합본에 넣을 확정 데이터셋 선택">선택</th><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">최종 수정일</th><th class="center">다운로드</th><th class="center">삭제</th></tr>
+                <tr><th v-if="mergeEnabled" class="center" title="합본에 넣을 확정 데이터셋 선택">선택</th><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center" title="시험 데이터셋 Excel의 질의ID 앞부분(예: 산안 → 산안-001)">질의ID 접두어</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">최종 수정일</th><th class="center">다운로드</th><th class="center">삭제</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(d, index) in datasets" :key="d.dataset_id"
@@ -71,6 +71,18 @@
                   <td class="center">{{ datasets.length - index }}</td>
                   <td class="strong">{{ d.name }} <span v-if="isMerged(d)" class="merged-badge">합본</span></td>
                   <td>{{ collectionLabel(d) }}</td>
+                  <!-- 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 표시·변경(확정 데이터셋 포함, 합본은 원본 질의ID 유지) -->
+                  <td class="center" @click.stop>
+                    <span v-if="isMerged(d)" class="prefix-muted" title="합본은 원본 질의ID를 그대로 씁니다">원본 유지</span>
+                    <template v-else>
+                      <code class="prefix-code">{{ queryIdPrefix(d) }}</code>
+                      <button class="btn-prefix-edit" :disabled="d.status === 'generating'"
+                              :title="d.status === 'generating' ? '생성 중에는 바꿀 수 없습니다' : '질의ID 접두어 변경'"
+                              :aria-label="`${d.name} 질의ID 접두어 변경`" @click="openPrefixModal(d)">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                    </template>
+                  </td>
                   <td class="center"><span class="status-badge" :class="d.status">{{ statusLabel(d.status) }}</span></td>
                   <td class="center">{{ d.approved_count ?? 0 }} / {{ d.item_count ?? 0 }}</td>
                   <td class="center">{{ formatDate(d.created_at) }}</td>
@@ -404,9 +416,15 @@
             <label>합칠 데이터셋 (고른 순서대로 이어 붙임)</label>
             <ol class="merge-list">
               <li v-for="d in mergeSelectedDatasets" :key="d.dataset_id">
-                <b>{{ d.name }}</b> · 최신 확정본 · {{ d.collection_name }}
+                <b>{{ d.name }}</b> · 최신 확정본 · {{ d.collection_name }} · 접두어 <code class="prefix-code">{{ queryIdPrefix(d) }}</code>
               </li>
             </ol>
+            <!-- 2026.11.23(sooyeon.choi) 추가 - 접두어가 같으면 질의ID가 겹쳐 합본이 거부되므로 미리 안내 -->
+            <p v-for="clash in mergePrefixClashes" :key="clash.prefix" class="prefix-clash" role="alert">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              {{ clash.names.join(' · ') }}의 접두어가 모두 <b>{{ clash.prefix }}</b>라 질의ID({{ clash.prefix }}-001 …)가 겹칩니다.
+              목록의 질의ID 접두어 <i class="fa-solid fa-pen"></i> 버튼으로 서로 다르게 바꿔 주세요.
+            </p>
           </div>
           <ul class="merge-rules">
             <li>질의ID는 원본 그대로 유지합니다(겹치면 만들지 않음).</li>
@@ -417,7 +435,7 @@
           </div>
           <div class="modal-actions">
             <button type="button" class="btn-cancel" :disabled="isMerging" @click="showMergeModal = false">취소</button>
-            <button type="submit" class="btn-primary" :disabled="isMerging || !mergeName.trim()">
+            <button type="submit" class="btn-primary" :disabled="isMerging || !mergeName.trim() || mergePrefixClashes.length > 0">
               <i class="fa-solid" :class="isMerging ? 'fa-spinner fa-spin' : 'fa-layer-group'"></i>
               {{ isMerging ? '만드는 중…' : '만들기' }}
             </button>
@@ -427,6 +445,34 @@
     </div>
 
     <!-- 평가 데이터셋 삭제 확인 모달 -->
+    <!-- 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경 모달 -->
+    <div v-if="prefixTarget" class="modal-overlay" @pointerdown.self="closePrefixModal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prefix-title">
+        <div class="modal-head"><h3 id="prefix-title"><i class="fa-solid fa-pen"></i> 질의ID 접두어 변경</h3></div>
+        <form @submit.prevent="savePrefix">
+          <div class="modal-body">
+            <div class="form-row">
+              <label for="prefix-input">{{ prefixTarget.name }} <span class="label-hint">예: 산안 → 산안-001 (비우면 Q)</span></label>
+              <input id="prefix-input" v-model="prefixInput" maxlength="20" placeholder="Q" autofocus />
+            </div>
+            <ul class="merge-rules">
+              <li>한글·영문·숫자·_·- 만 쓸 수 있습니다(최대 20자).</li>
+              <li>문항·확정본(골드셋) 내용은 바뀌지 않고, 질의ID 앞부분만 바뀝니다.</li>
+              <li>새로 내려받는 시험 데이터셋 Excel부터 적용됩니다. 이전에 받은 Excel의 질의ID는 그대로입니다.</li>
+              <li>이미 만든 합본은 만들 때의 질의ID를 유지합니다. 반영하려면 합본을 다시 만들어 주세요.</li>
+            </ul>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" :disabled="isSavingPrefix" @click="closePrefixModal">취소</button>
+            <button type="submit" class="btn-primary" :disabled="isSavingPrefix">
+              <i class="fa-solid" :class="isSavingPrefix ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+              {{ isSavingPrefix ? '저장 중…' : '저장' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div v-if="deleteDatasetTarget" class="modal-overlay delete-dataset-overlay" @pointerdown.self="closeDeleteDatasetModal">
       <div class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-dataset-title">
         <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -477,6 +523,8 @@ const {
   mergeEnabled, mergeSelection, showMergeModal, mergeName, isMerging, mergeSelectedDatasets, mergeItemTotal,
   selectedIsMerged, isMerged, mergedSources, collectionLabel, canMergeSelect, isMergeSelected,
   toggleMergeSelect, clearMergeSelection, openMergeModal, submitMerge,
+  // 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경
+  queryIdPrefix, mergePrefixClashes, prefixTarget, prefixInput, isSavingPrefix, openPrefixModal, closePrefixModal, savePrefix,
 } = useEvalDatasets();
 
 // 2026.07.24(sychoi) 추가 - 평가 전용 OpenAI 키 1회 저장/재사용
@@ -541,6 +589,13 @@ onMounted(loadDatasets);
 .merged-note { background: #f5f3ff; border: 1px dashed #a78bfa; color: #4c1d95; border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0.6rem 0; font-size: 0.8rem; line-height: 1.6; }
 .merge-list { margin: 0.2rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; line-height: 1.7; color: #334155; }
 .merge-rules { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.78rem; line-height: 1.7; color: #64748b; }
+/* 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 */
+.prefix-code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0 0.35rem; font-size: 0.78rem; color: #0f172a; }
+.prefix-muted { color: #94a3b8; font-size: 0.75rem; }
+.btn-prefix-edit { background: none; border: none; color: #64748b; cursor: pointer; padding: 0 0.25rem; font-size: 0.72rem; }
+.btn-prefix-edit:hover:not(:disabled) { color: #2563eb; }
+.btn-prefix-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+.prefix-clash { margin: 0.5rem 0 0; padding: 0.45rem 0.6rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #b91c1c; font-size: 0.78rem; line-height: 1.6; }
 .label-hint { font-weight: 400; color: #94a3b8; font-size: 0.72rem; margin-left: 4px; }
 /* 2026.07.24(sychoi) 추가 - OpenAI 키 저장 UI */
 .key-saved { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #15803d; }

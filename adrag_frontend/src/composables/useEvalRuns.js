@@ -106,6 +106,10 @@ export const useEvalRuns = () => {
     const target = metric.target ?? null;
     const invert = metric.direction === 'le';
     const notMeasured = metric.status === 'not_measured';
+    // 2026.11.23(sooyeon.choi) 수정 - 평가 진행 중에는 값이 없는 필수 지표를 '미측정' 대신 '평가 중'으로 표시
+    if (notMeasured && isRunning.value) {
+      return { ...metric, status: 'measuring', target, invert, pass: null, desc: '평가가 끝나면 집계합니다' };
+    }
     return {
       ...metric,
       status: metric.status === 'incomplete' ? 'incomplete' : notMeasured ? 'not_measured' : metric.evaluated_count > 0
@@ -521,6 +525,7 @@ export const useEvalRuns = () => {
   const formatMetric = (value) => (typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '-');
   const formatMetricState = (metric) => {
     if (!metric) return '-';
+    if (metric.status === 'measuring') return '평가 중'; // 2026.11.23(sooyeon.choi) 추가 - 진행 중 필수 지표
     if (metric.status === 'not_measured') return '미측정'; // 2026.11.19(sooyeon.choi) 추가
     if (metric.status === 'incomplete') return '측정 미완료';
     if (metric.status === 'excluded') return '제외';

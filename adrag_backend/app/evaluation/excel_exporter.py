@@ -231,11 +231,16 @@ def _testset_sort_key(item: dict) -> tuple:
     )
 
 
+# 2026.11.23(sooyeon.choi) 추가 - 접두어 정리 규칙을 접두어 변경 API와 함께 쓰도록 분리
+def normalize_query_id_prefix(raw: Any) -> str:
+    """허용 문자(영문·숫자·한글·_·-)만 남기고 앞뒤 _·- 제거, 최대 20자. 빈 값이면 ''."""
+    return _QUERY_ID_PREFIX.sub("", str(raw or "")).strip("-_")[:20]
+
+
 def testset_query_id_prefix(dataset: dict) -> str:
     config = _parse_json(dataset.get("gen_config_json"), {})
     raw = (config or {}).get("query_id_prefix") if isinstance(config, dict) else None
-    prefix = _QUERY_ID_PREFIX.sub("", str(raw or "")).strip("-_")[:20]
-    return prefix or "Q"
+    return normalize_query_id_prefix(raw) or "Q"
 
 
 def _article_label(meta: dict) -> str:

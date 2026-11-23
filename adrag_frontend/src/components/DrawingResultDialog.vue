@@ -137,7 +137,7 @@ const requiredLabels = { part_no: '품번', part_name: '품명', revision: '개�
 const missingFieldLabels = computed(() => missingFields.value.map((field) => requiredLabels[field] || field));
 const reviewStatus = computed(() => result.value?.review?.status || 'pending');
 const reviewButtonLabel = computed(() => reviewing.value ? '처리 중...' : reviewStatus.value === 'reviewed' ? '검수 취소' : '검수 완료');
-const reviewDisabledTitle = computed(() => result.value?.can_review ? '' : result.value?.is_current === false ? '현재 버전만 검수할 수 있습니다.' : '업로드한 본인 또는 관리자만 검수할 수 있습니다.');
+const reviewDisabledTitle = computed(() => result.value?.can_review ? '' : result.value?.is_current === false ? '현재 버전만 검수할 수 있습니다.' : '소속 부서의 운영관리자만 검수할 수 있습니다.');
 const mainImage = computed(() => resourceId(result.value?.images?.preview || result.value?.images?.full));
 const cropImages = computed(() => [['title_block', '표제란'], ['bom', '부품표'], ['revision', '개정이력']].map(([key, label]) => ({ key, label, resourceId: resourceId(result.value?.images?.crops?.[key]) })).filter((item) => item.resourceId));
 const fieldDefinitions = [['part_no', '품번', true], ['part_name', '품명', true], ['revision', '개정', true], ['date', '날짜'], ['scale', '축척'], ['material', '재질'], ['material_group', '재질 그룹'], ['after_treatment', '후처리'], ['part_spec', 'PART SPEC'], ['drawn', '작성'], ['checked', '검토'], ['approved', '승인']];
