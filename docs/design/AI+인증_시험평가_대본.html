@@ -180,9 +180,9 @@ footer{margin-top:32px;font-size:.82rem;color:var(--muted)}
 
     <li class="item"><div class="item-head"><h3>시험 데이터 및 정답 데이터를 불러오는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
-        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L497</span></td></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L225–226</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–60</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L500</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L238–239</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _execute_run</span>run = repo.get_run(run_id)
 goldset = repo.get_goldset(run["goldset_id"])
@@ -197,8 +197,8 @@ top_k = int(config.get("retrieval_top_n", config.get("top_k", 10)))</pre>
 
     <li class="item"><div class="item-head"><h3>임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수·클래스</th></tr>
-        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L62–68</span></td></tr>
-        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">get_embedding_client</span> <span class="ln">L51</span> · <span class="fn">get_vector_repo</span> <span class="ln">L55</span> · <span class="fn">get_kiwi_bm25_encoder</span> <span class="ln">L64</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L64–72</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">get_embedding_client</span> <span class="ln">L51</span> · <span class="fn">get_vector_repo</span> <span class="ln">L57</span> · <span class="fn">get_kiwi_bm25_encoder</span> <span class="ln">L67</span></td></tr>
         <tr><td>app/clients/embedding_client.py</td><td><span class="fn">EmbeddingClient.__init__</span> <span class="ln">L29</span></td></tr>
         <tr><td>app/clients/kiwi_bm25_encoder.py</td><td><span class="fn">KiwiBm25Encoder.__init__</span> <span class="ln">L19</span></td></tr>
       </table>
@@ -217,10 +217,10 @@ self.api_key = settings.embedding_api_key</pre>
 
     <li class="item"><div class="item-head"><h3>시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L244–249</span></td></tr>
-        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L126</span> · <span class="fn">_build_eval_query_bundle</span> <span class="ln">L42</span></td></tr>
-        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L79–101</span></td></tr>
-        <tr><td>app/clients/embedding_client.py / kiwi_bm25_encoder.py</td><td><span class="fn">embed_query</span> <span class="ln">L169</span> / <span class="fn">encode_query</span> <span class="ln">L58</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L259–265</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L130</span> · <span class="fn">_build_eval_query_bundle</span> <span class="ln">L44</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L83–107</span></td></tr>
+        <tr><td>app/clients/embedding_client.py / kiwi_bm25_encoder.py</td><td><span class="fn">embed_query</span> <span class="ln">L171</span> / <span class="fn">encode_query</span> <span class="ln">L61</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span>for channel in channels:
     if channel == "rrf":
@@ -239,9 +239,9 @@ self.api_key = settings.embedding_api_key</pre>
 
     <li class="item"><div class="item-head"><h3>검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L111–124</span></td></tr>
-        <tr><td>app/repositories/vector_repository.py</td><td><span class="fn">search_hybrid</span> <span class="ln">L572–637</span></td></tr>
-        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L165–166</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L118–131</span></td></tr>
+        <tr><td>app/repositories/vector_repository.py</td><td><span class="fn">search_hybrid</span> <span class="ln">L572–638</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L171–173</span></td></tr>
       </table>
 <pre class="src"><span class="f">vector_repository.py · search_hybrid</span>response = self.client.query_points(
     collection_name=collection,
@@ -261,8 +261,8 @@ self.api_key = settings.embedding_api_key</pre>
 
     <li class="item"><div class="item-head"><h3>상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L250–255</span></td></tr>
-        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L122</span> · <span class="fn">hit_at_k</span> <span class="ln">L39</span> · <span class="fn">_dedup_preserve_order</span> <span class="ln">L13</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L267–272</span></td></tr>
+        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L124</span> · <span class="fn">hit_at_k</span> <span class="ln">L39</span> · <span class="fn">_dedup_preserve_order</span> <span class="ln">L13</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>retrieved_ids = [chunk_id for chunk_id, _, _ in hits]</mark>
 retrieval_k_values = tuple(sorted(set((*_K_VALUES, top_k))))
@@ -279,9 +279,9 @@ retrieval_k_values = tuple(sorted(set((*_K_VALUES, top_k))))
 
     <li class="item"><div class="item-head"><h3>전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L331 · L391–398 · L453–457</span></td></tr>
-        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_RECALL_KEY</span> <span class="ln">L18</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L24</span></td></tr>
-        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">save_run_metrics</span> <span class="ln">L727</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L351 · L411–420 · L478–484</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_RECALL_KEY</span> <span class="ln">L20</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L29</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">save_run_metrics</span> <span class="ln">L734</span></td></tr>
       </table>
 <pre class="src"><span class="f">metric_catalog.py</span><mark>AGREEMENT_RECALL_KEY = "retrieval.rrf.hit@10"</mark>
 ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pre>
@@ -322,9 +322,9 @@ if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
 
     <li class="item"><div class="item-head"><h3>시험 데이터 및 정답 데이터를 불러오는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
-        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L497</span></td></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L225–228</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–60</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L500</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L238–241</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _execute_run</span>goldset = repo.get_goldset(run["goldset_id"])
 <mark>items = json.loads(goldset["items_snapshot_json"])</mark></pre>
@@ -336,9 +336,9 @@ if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
 
     <li class="item"><div class="item-head"><h3>임베딩 모델 및 Reranker 모델을 불러오는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수·클래스</th></tr>
-        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L62–68</span> (임베딩)</td></tr>
-        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">_get_client</span> <span class="ln">L15–19</span> (Reranker)</td></tr>
-        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.__init__</span> <span class="ln">L48–60</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L64–72</span> (임베딩)</td></tr>
+        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">_get_client</span> <span class="ln">L15–20</span> (Reranker)</td></tr>
+        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.__init__</span> <span class="ln">L48–61</span></td></tr>
       </table>
 <pre class="src"><span class="f">retrieval_adapter.py · EvalRetriever</span>self._vector_repo = get_vector_repo()
 <mark>self._embedding_client = get_embedding_client()</mark></pre>
@@ -355,9 +355,9 @@ self.api_url = settings.reranker_api_url.rstrip("/")
 
     <li class="item"><div class="item-head"><h3>시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L264–267</span></td></tr>
-        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L126</span></td></tr>
-        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L79–124</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L282–285</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L130</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L83–131</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>candidate_top_k = max(top_k, int(settings.candidate_top_k))</mark>
 rerank_output_k = max(rerank_top_k, int(settings.reranker_top_k))
@@ -373,10 +373,10 @@ return await asyncio.to_thread((…get_vector_repo()).<mark>search_hybrid</mark>
 
     <li class="item"><div class="item-head"><h3>하이브리드 검색 결과를 Reranker 모델에 입력하여 관련도를 평가하고 재정렬하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L269</span></td></tr>
-        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">EvalReranker.rerank</span> <span class="ln">L25–54</span></td></tr>
-        <tr><td>app/graphs/nodes/rerank.py · app/graphs/utils.py</td><td><span class="fn">_build_rerank_text</span> <span class="ln">L47</span> · <span class="fn">dedup_chunks_by_text</span> <span class="ln">L23</span></td></tr>
-        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.rerank</span> <span class="ln">L64–88</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L288</span></td></tr>
+        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">EvalReranker.rerank</span> <span class="ln">L26–56</span></td></tr>
+        <tr><td>app/graphs/nodes/rerank.py · app/graphs/utils.py</td><td><span class="fn">_build_rerank_text</span> <span class="ln">L48</span> · <span class="fn">dedup_chunks_by_text</span> <span class="ln">L24</span></td></tr>
+        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.rerank</span> <span class="ln">L65–90</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>reranked = await EvalReranker().rerank(question, rrf_hits, top_k=rerank_output_k)</mark></pre>
 <pre class="src"><span class="f">reranker_adapter.py · EvalReranker.rerank</span><mark>chunks = dedup_chunks_by_text([</mark>
@@ -396,8 +396,8 @@ return scored[:k]</pre>
 
     <li class="item"><div class="item-head"><h3>재정렬된 상위 5개의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L270–273</span></td></tr>
-        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L122</span> · <span class="fn">ndcg_at_k</span> <span class="ln">L82–97</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L290–293</span></td></tr>
+        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L124</span> · <span class="fn">ndcg_at_k</span> <span class="ln">L83–99</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>reranked_ids = [chunk_id for chunk_id, _, _ in reranked]</mark>
 rerank_metrics = compute_channel_metrics(
@@ -418,8 +418,8 @@ rerank_metrics = compute_channel_metrics(
 
     <li class="item"><div class="item-head"><h3>전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L331 · L391–398 · L453–457</span></td></tr>
-        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_NDCG_KEY</span> <span class="ln">L19</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L24</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L351 · L411–420 · L478–484</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_NDCG_KEY</span> <span class="ln">L21</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L29</span></td></tr>
       </table>
 <pre class="src"><span class="f">metric_catalog.py</span><mark>AGREEMENT_NDCG_KEY = "retrieval.rerank.ndcg@5"</mark>
 ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pre>
@@ -449,8 +449,8 @@ ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pr
 
     <li class="item"><div class="item-head"><h3>시험 데이터를 불러오는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
-        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L63</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–60</span></td></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L64</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _execute_run</span>goldset = repo.get_goldset(run["goldset_id"])
 <mark>items = json.loads(goldset["items_snapshot_json"])</mark></pre>
@@ -460,9 +460,9 @@ ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pr
 
     <li class="item"><div class="item-head"><h3>시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L68</span> · <span class="fn">_evaluate_item</span> <span class="ln">L119–124</span></td></tr>
-        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L70–75</span></td></tr>
-        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L61–97</span> · <span class="fn">_get_graph</span> <span class="ln">L51</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L72</span> · <span class="fn">_evaluate_item</span> <span class="ln">L127–133</span></td></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L72–77</span></td></tr>
+        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L62–101</span> · <span class="fn">_get_graph</span> <span class="ln">L51</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _execute_run</span><span class="c"># 시험 4: 답변 생성 시간이 포함된 평가는 질의를 순차 실행한다.</span>
 <mark>semaphore = asyncio.Semaphore(1 if run_type in ("full", "end_to_end") else int(config.get("concurrency", 3)))</mark></pre>
@@ -483,8 +483,8 @@ ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pr
 
     <li class="item"><div class="item-head"><h3>요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L93–105</span></td></tr>
-        <tr><td>app/graphs/nodes/generate_answer.py</td><td>답변 생성 노드 <span class="ln">L66–71</span> (첫 토큰 시각)</td></tr>
+        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L95–111</span></td></tr>
+        <tr><td>app/graphs/nodes/generate_answer.py</td><td>답변 생성 노드 <span class="ln">L66–72</span> (첫 토큰 시각)</td></tr>
       </table>
 <pre class="src"><span class="f">rag_pipeline_adapter.py · EvalRagPipeline.run</span><span class="c"># 2026.11.17(sooyeon.choi) 추가 - 응답시간은 그래프 실행(검색→재랭킹→답변 생성)만 측정.</span>
 <mark>started = time.monotonic()</mark>
@@ -502,9 +502,9 @@ timing["first_token_ms"] = (
 
     <li class="item"><div class="item-head"><h3>질의별 답변 생성 반환 시간을 저장하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수</th></tr>
-        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L78–82</span></td></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_item</span> <span class="ln">L126–130</span> · <span class="fn">_timing_metrics</span> <span class="ln">L138</span> · <span class="fn">_execute_run</span> <span class="ln">L79</span></td></tr>
-        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">insert_item_result</span> <span class="ln">L597</span></td></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L80–85</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_item</span> <span class="ln">L135–140</span> · <span class="fn">_timing_metrics</span> <span class="ln">L149</span> · <span class="fn">_execute_run</span> <span class="ln">L84</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">insert_item_result</span> <span class="ln">L601</span></td></tr>
       </table>
 <pre class="src"><span class="f">e2e_evaluator.py · evaluate_end_to_end</span>fields: Dict[str, Any] = {
     <mark>"latency_ms": result.get("latency_ms"),</mark>
@@ -518,9 +518,9 @@ timing["first_token_ms"] = (
 
     <li class="item"><div class="item-head"><h3>전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드</h3></div><div class="item-body">
       <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
-        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L439–452</span></td></tr>
-        <tr><td>app/evaluation/metrics/models.py</td><td><span class="fn">MetricAggregate.from_results</span> <span class="ln">L42–59</span></td></tr>
-        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">RESPONSE_TIME_KEY</span> · <span class="fn">FIRST_TOKEN_KEY</span> <span class="ln">L21–22</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L462–477</span></td></tr>
+        <tr><td>app/evaluation/metrics/models.py</td><td><span class="fn">MetricAggregate.from_results</span> <span class="ln">L42–60</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">RESPONSE_TIME_KEY</span> · <span class="fn">FIRST_TOKEN_KEY</span> <span class="ln">L24–26</span></td></tr>
       </table>
 <pre class="src"><span class="f">eval_runner.py · _aggregate_and_save_metrics</span>if scope in ("full", "end_to_end"):
     for key, result in <mark>_timing_metrics(row.get("latency_ms"), row.get("timing_json"))</mark>.items():
@@ -562,9 +562,9 @@ evaluated = len(values)
     <table class="tbl">
       <tr><th style="width:34%">질문</th><th>답변</th></tr>
       <tr><td>Recall@10인데 왜 <code>hit_at_k</code>인가요?</td><td>합의서 정의가 “정답 근거 청크가 1개 이상 포함된 질의 비율”이기 때문입니다. <code>recall_at_k</code>는 정답 청크 커버율로, 보조 지표로 따로 보여 줍니다.</td></tr>
-      <tr><td>검색·재정렬 평가에서 LLM 질의 재작성을 하나요?</td><td>하지 않습니다. 시험 질의 원문으로 검색합니다(<code>retrieval_adapter.py</code> <code>_build_eval_query_bundle</code> L42). 전체 RAG 평가는 운영과 같이 재작성까지 포함합니다.</td></tr>
+      <tr><td>검색·재정렬 평가에서 LLM 질의 재작성을 하나요?</td><td>하지 않습니다. 시험 질의 원문으로 검색합니다(<code>retrieval_adapter.py</code> <code>_build_eval_query_bundle</code> L44). 전체 RAG 평가는 운영과 같이 재작성까지 포함합니다.</td></tr>
       <tr><td>같은 청크가 여러 번 나오면?</td><td>중복을 제거한 순위로 계산합니다(<code>retrieval_metrics.py</code> <code>_dedup_preserve_order</code> L13).</td></tr>
-      <tr><td>오류 난 질의는 어떻게 세나요?</td><td>Recall@10·NDCG@5는 0으로 세고 분모는 전체 질의 수입니다(<code>eval_runner.py</code> L453–457).</td></tr>
+      <tr><td>오류 난 질의는 어떻게 세나요?</td><td>Recall@10·NDCG@5는 0으로 세고 분모는 전체 질의 수입니다(<code>eval_runner.py</code> L478–484).</td></tr>
       <tr><td>반환 시간에 네트워크 시간이 포함되나요?</td><td>서버 안에서 RAG 그래프를 실행한 시간이라 네트워크 전송 시간은 포함되지 않습니다.</td></tr>
       <tr><td>주요 지표 4는 첫 토큰 기준인데 합의서는 최종 완료 기준 아닌가요?</td><td>화면 주요 카드는 첫 토큰 평균이고, 합의서 정의(최종 답변 완료)는 보조 지표 “전체 반환 시간”으로 함께 보여 줍니다.</td></tr>
     </table>
