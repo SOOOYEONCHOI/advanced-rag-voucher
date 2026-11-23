@@ -173,6 +173,8 @@ class EmbeddingClient:
         검색 쿼리를 임베딩 벡터로 변환합니다.
         Qwen3-Embedding 권장 instruct prefix를 자동 적용합니다.
         """
+        # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (질의 → 임베딩 벡터, 의미 검색용)
+        # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (질의 → 임베딩 벡터, 의미 검색용)
         instructed = self.instruct_template.format(query=query)
         embeddings = await self._request_embeddings([instructed])
         return self._normalize(embeddings)[0]

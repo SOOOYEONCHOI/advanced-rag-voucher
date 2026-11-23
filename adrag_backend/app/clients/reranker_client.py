@@ -92,6 +92,7 @@ class RerankerClient:
     # ── 내부 HTTP 호출 ────────────────────────────────────
 
     # 2026.04.21(sooyeon.choi) 수정 - vLLM /v1/score 엔드포인트 호출 메서드 추가
+    # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (vLLM score API로 질의-청크 관련도 점수 요청)
     async def _call_score_api(
         self,
         query: str,

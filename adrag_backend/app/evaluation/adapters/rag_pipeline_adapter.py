@@ -51,6 +51,7 @@ async def _repair_missing_citations(result: Dict[str, Any], initial_state: Dict[
 def _get_graph():
     global _graph
     if _graph is None:
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (운영 RAG 그래프 생성)
         _graph = build_rag_graph()
     return _graph
 
@@ -70,6 +71,7 @@ class EvalRagPipeline:
     ) -> Dict[str, Any]:
         settings = get_settings()
 
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (시험 질의로 RAG 그래프 입력 구성)
         initial_state = make_initial_state(
             user_id="eval_runner",
             session_id=None,               # 세션 미사용 (멀티턴 컨텍스트 배제)
@@ -102,6 +104,7 @@ class EvalRagPipeline:
         # 2026.11.18(sooyeon.choi) 추가 - 첫 토큰 시간(ms) = 그래프 시작 → LLM 첫 답변 토큰. timing_json에 함께 저장
         timing = dict(result.get("timing") or {})
         first_token_at = timing.pop(FIRST_TOKEN_AT_KEY, None)
+        # [AI+ 시험] 반환 시간 - 3) 질의별 답변 생성 요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드 (참고: 첫 토큰 시간 ms 계산)
         timing["first_token_ms"] = (
             round((first_token_at - started_wall) * 1000, 1)
             if isinstance(first_token_at, (int, float)) else None

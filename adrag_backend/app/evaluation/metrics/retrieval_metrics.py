@@ -133,8 +133,10 @@ def compute_channel_metrics(
     metrics: Dict[str, Any] = {}
     for k in k_values:
         # 2026.11.17(sooyeon.choi) 수정 - fail@k 삭제(1 - hit@k와 같은 값의 중복 지표)
+        # [AI+ 시험] Recall@10 - 5) 상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드 (hit@10 계산 호출)
         metrics[f"hit@{k}"] = hit_at_k(retrieved_ids, gold_ids, k)
         metrics[f"recall@{k}"] = recall_at_k(retrieved_ids, gold_ids, k)
+        # [AI+ 시험] NDCG@5 - 5) 재정렬된 상위 5개 문서 청크의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드 (ndcg@5 계산 호출)
         metrics[f"ndcg@{k}"] = ndcg_at_k(retrieved_ids, gold_ids, k)
         # MRR을 K별로 산출한다. 기존 단일 rr은 max_k 고정(=MRR@10)이라 화면의
         # "MRR@5" 라벨과 불일치했다. rr@5 등 K별 값을 명시적으로 제공한다.

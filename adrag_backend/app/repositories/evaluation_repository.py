@@ -494,6 +494,9 @@ class EvalRepository:
             raise
         return {"dataset_id": dataset_id, "goldset_id": goldset_id, "item_count": len(items)}
 
+    # [AI+ 시험] Recall@10 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (DB에서 골드셋(시험 데이터셋) 조회)
+    # [AI+ 시험] NDCG@5 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (DB에서 골드셋(시험 데이터셋) 조회)
+    # [AI+ 시험] 반환 시간 - 1) 시험 데이터를 불러오는 코드 (DB에서 골드셋(시험 데이터셋) 조회)
     def get_goldset(self, goldset_id: int) -> Optional[Dict[str, Any]]:
         rows = self._db.execute_query(
             """SELECT g.*, d.name AS dataset_name, d.collection_id,
@@ -594,6 +597,7 @@ class EvalRepository:
 
     # ── 항목별 결과 ──────────────────────────────────────────────────────
 
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (문항별 결과 DB 저장)
     def insert_item_result(self, run_id: int, qa_id: int, **fields) -> int:
         json_fields = {
             "retrieval_json", "judge_json",
@@ -724,6 +728,9 @@ class EvalRepository:
 
     # ── 지표 집계 ────────────────────────────────────────────────────────
 
+    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (전체 집계 결과 DB 저장)
+    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (전체 집계 결과 DB 저장)
+    # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (전체 집계 결과 DB 저장)
     def save_run_metrics(self, run_id: int, metrics: Dict[str, Dict[str, Any]]) -> None:
         """집계 저장. 구형 float와 신규 aggregate dict 입력을 모두 허용한다."""
         params_list = [

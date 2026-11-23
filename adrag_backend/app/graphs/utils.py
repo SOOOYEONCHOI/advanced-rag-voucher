@@ -20,6 +20,7 @@ logger = LoggingLogger().getLogger(__name__)
 #   기존: rerank.py(_dedup_chunks)와 assemble_context.py에 동일 로직이 중복 구현됨
 #   동일 본문 청크 중 score가 가장 높은 청크를 유지한다 (첫 등장 위치 보존).
 #   SHA256 사용: 재시작·분산 환경에서도 결정적.
+# [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (Reranker 입력 전 같은 본문 중복 제거)
 def dedup_chunks_by_text(chunks: List[Dict]) -> List[Dict]:
     """텍스트 해시 기반 중복 제거 — 동일 본문 중 score 최고 청크 유지."""
     seen: Dict[str, int] = {}  # text_hash → result 인덱스

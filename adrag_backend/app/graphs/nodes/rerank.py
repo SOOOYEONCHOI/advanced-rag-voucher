@@ -44,6 +44,7 @@ def get_reranker_client() -> Reranker:
 # 2026.07.07(sooyeon.choi) 수정 - 메타데이터 prefix 포함 reranker 입력 구성
 # 문서명·섹션 정보를 prefix로 붙이면 CE 모델이 맥락을 파악해 관련성 점수 품질이 향상됨
 # 단, 이 포맷 변경 후 relevance_threshold를 평가셋 기준으로 재보정 필요
+# [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (Reranker 입력: [문서명]·[섹션] 머리말 + 본문)
 def _build_rerank_text(chunk: Dict) -> str:
     """reranker 입력용 텍스트: 문서명·섹션 prefix + 본문."""
     metadata = chunk.get("metadata", {})

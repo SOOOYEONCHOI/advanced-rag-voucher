@@ -97,6 +97,9 @@ async def _execute_run(run_id: int) -> None:
             repo.update_run_status(run_id, "cancelled")
             logger.info(f"[eval] run {run_id} 취소됨")
         else:
+            # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (전체 집계 시작)
+            # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (전체 집계 시작)
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (전체 집계 시작)
             _aggregate_and_save_metrics(repo, run_id, items)
             repo.update_run_status(run_id, "completed")
             logger.info(f"[eval] run {run_id} 완료")
@@ -142,6 +145,7 @@ def _number(value: Any) -> Any:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
+# [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (질의별 반환 시간·첫 토큰 시간을 지표 값으로 정리)
 def _timing_metrics(latency_ms: Any, timing: Any) -> Dict[str, MetricResult]:
     """2026.11.19(sooyeon.choi) 추가 - 시험 4 답변 생성 반환 시간(ms)·첫 토큰 시간(ms) 항목 지표."""
     if isinstance(timing, str):
@@ -467,6 +471,7 @@ def _aggregate_and_save_metrics(
             aggregate = MetricAggregate.from_results(results_for_key)
             value = aggregate.as_dict()
             # 시험 4: 측정 누락을 제외한 부분 평균을 공식 평균으로 표시하지 않는다.
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (측정 누락 시 공식 평균 미표시)
             if key == RESPONSE_TIME_KEY and aggregate.evaluated_count != aggregate.total_count:
                 value["value"] = None
                 value["std"] = None
@@ -492,4 +497,7 @@ def _aggregate_and_save_metrics(
     total = len(results)
     if total:
         metrics.setdefault("all", {})["run.error_rate"] = error_count / total
+    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (집계 결과 저장)
+    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (집계 결과 저장)
+    # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (집계 결과 저장)
     repo.save_run_metrics(run_id, metrics)

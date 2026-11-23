@@ -20,7 +20,9 @@ from typing import Any
 AGREEMENT_RECALL_KEY = "retrieval.rrf.hit@10"
 AGREEMENT_NDCG_KEY = "retrieval.rerank.ndcg@5"
 JUDGE_ACCURACY_KEY = "answer.judge_accuracy"
+# [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (지표 키: 최종 답변 완료 기준)
 RESPONSE_TIME_KEY = "answer.response_time_ms"
+# [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (지표 키: 첫 토큰 기준, 화면 주요 지표 4)
 FIRST_TOKEN_KEY = "answer.first_token_ms"
 # 합의서 계산식: 분모 = 전체 시험 질의 수(실행 오류·정답 없음은 0으로 센다)
 # [AI+ 시험] Recall@10 - 6), NDCG@5 - 6) 분모 = 전체 시험 질의 수(오류·정답 없음 질의는 0)

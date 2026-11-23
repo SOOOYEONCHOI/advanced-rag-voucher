@@ -39,6 +39,8 @@ from app.utils.kiwi_tokenizer import normalize_query
 _KIWI_EVAL_LOCK = asyncio.Lock()
 
 
+# [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (시험 질의 원문으로 검색 입력 구성)
+# [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (시험 질의 원문으로 검색 입력 구성)
 def _build_eval_query_bundle(query: str) -> QueryBundle:
     """재작성 없이 원 질의만으로 QueryBundle을 구성한다."""
     normalized = normalize_query(query)

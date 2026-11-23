@@ -49,10 +49,13 @@ logger = LoggingLogger().getLogger(__name__)
 #   구현 교체는 컨테이너에서 수행한다.
 
 def get_embedding_client() -> EmbeddingProvider:
+    # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (임베딩 모델 클라이언트 반환)
+    # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (임베딩 모델 클라이언트 반환)
     return get_container().embedding
 
 
 def get_vector_repo() -> VectorStore:
+    # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (Qdrant 벡터 DB 반환)
     return get_container().vector_store
 
 
@@ -63,6 +66,7 @@ def get_sparse_encoder() -> SparseEncoder:
 # 2026.07.07(sooyeon.choi) 수정 - Qdrant hybrid query용 Kiwi BM25 query 생성
 def get_kiwi_bm25_encoder() -> KiwiBm25Encoder:
     """Qdrant BM25 적재/검색 정책을 공유하는 인코더 싱글톤 반환."""
+    # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (BM25 인코더 반환)
     return get_container().kiwi_bm25_encoder
 
 

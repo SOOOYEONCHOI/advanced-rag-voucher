@@ -38,7 +38,10 @@ from app.utils.log.log import LoggingLogger
 
 logger = LoggingLogger().getLogger(__name__)
 
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (임베딩 모델 클라이언트 생성)
+# [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (임베딩 모델 클라이언트 생성)
 _EMBEDDING_FACTORIES = {"vllm": lambda settings: EmbeddingClient(settings)}
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (Qdrant 벡터 DB 연결 생성)
 _VECTOR_STORE_FACTORIES = {
     "qdrant": lambda settings: VectorRepository(
         host=settings.qdrant_host,
@@ -89,6 +92,7 @@ class PipelineContainer:
     @cached_property
     def kiwi_bm25_encoder(self) -> KiwiBm25Encoder:
         """Qdrant BM25 적재/검색 정책을 공유하는 Kiwi 인코더."""
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (BM25 인코더 생성)
         return KiwiBm25Encoder(self.settings)
 
     @cached_property

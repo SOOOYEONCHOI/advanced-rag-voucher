@@ -56,6 +56,8 @@ class KiwiBm25Encoder:
             options=self._options(),
         )
 
+    # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (질의 → Kiwi 형태소 BM25 질의, 키워드 검색용)
+    # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (질의 → Kiwi 형태소 BM25 질의, 키워드 검색용)
     def encode_query(self, text: str) -> Document:
         return Document(
             text=self.normalize_query(text),
