@@ -60,6 +60,8 @@ class EvalRetriever:
     """RetrieverPort 구현 — 채널별 독립 검색 + 운영 방식과 동일한 병합 검색."""
 
     def __init__(self) -> None:
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (임베딩 모델)
         self._vector_repo = get_vector_repo()
         self._embedding_client = get_embedding_client()
         self._channels = {
@@ -140,6 +142,8 @@ class EvalRetriever:
         query_type = classify_query_type({})  # 평가는 전처리 없이 기본 분류 사용
 
         if settings.retrieval_engine == "qdrant_hybrid":
+            # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드
+            # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드
             merged = await _search_qdrant_hybrid(
                 query_bundle=bundle,
                 collection_name=collection_name,
@@ -163,4 +167,5 @@ class EvalRetriever:
             )
 
         boosted = apply_soft_boost(merged, {"keywords": []})
+        # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드
         return boosted[:top_k]

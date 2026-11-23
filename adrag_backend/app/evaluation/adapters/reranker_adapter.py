@@ -15,6 +15,7 @@ _reranker_client: RerankerClient | None = None
 def _get_client() -> RerankerClient:
     global _reranker_client
     if _reranker_client is None:
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (Reranker 모델)
         _reranker_client = RerankerClient(get_settings())
     return _reranker_client
 
@@ -41,6 +42,7 @@ class EvalReranker:
         from app.graphs.nodes.rerank import _build_rerank_text
         from app.graphs.utils import dedup_chunks_by_text
 
+        # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드
         chunks = dedup_chunks_by_text([
             {"chunk_id": chunk_id, "document_id": payload.get("document_id", ""),
              "text": payload.get("text", ""), "score": score, "metadata": payload}

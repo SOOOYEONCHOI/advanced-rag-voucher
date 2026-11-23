@@ -601,6 +601,7 @@ class VectorRepository:
         else:
             vector_weights = [per_dense_weight for _ in dense_vectors]
         try:
+            # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드 (Dense·BM25 결과를 가중 RRF로 통합, limit=top_k)
             response = self.client.query_points(
                 collection_name=collection,
                 prefetch=[

@@ -44,6 +44,7 @@ def hit_at_k(
     if not gold_ids:
         return None
     deduped = _dedup_preserve_order(retrieved_ids)
+    # [AI+ 시험] Recall@10 - 5) 상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드 (상위 k개 안 정답 포함 시 1)
     return 1.0 if any(cid in gold_ids for cid in deduped[:k]) else 0.0
 
 
@@ -87,6 +88,7 @@ def ndcg_at_k(
     if not gold_ids:
         return None
     deduped = _dedup_preserve_order(retrieved_ids)
+    # [AI+ 시험] NDCG@5 - 5) 재정렬된 상위 5개 문서 청크의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드 (DCG ÷ IDCG)
     dcg = sum(
         1.0 / math.log2(rank + 1)
         for rank, cid in enumerate(deduped[:k], start=1)

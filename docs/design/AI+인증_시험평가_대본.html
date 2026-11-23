@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI+ 시험 평가 대본</title>
+<style>
+:root{
+  --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f1f4f8; --text:#1b2330; --muted:#5d6b7e; --line:#dfe4ea;
+  --accent:#2457c5; --accent-soft:#e7eefc; --on-accent:#ffffff;
+  --say:#0f766e; --say-soft:#e3f4f1; --run:#7c3aed; --run-soft:#f0eafd;
+  --warn:#b45309; --warn-soft:#fdf3e2; --code-bg:#f3f5f8; --code-line:#e3e7ed; --cmt:#6b7a8c;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11151b; --surface:#181e26; --surface-2:#1f2731; --text:#e6eaf0; --muted:#9aa7b8; --line:#2c3642;
+    --accent:#7ea4f5; --accent-soft:#1d2a44; --on-accent:#0d1420;
+    --say:#4fd1bf; --say-soft:#15302d; --run:#b79af7; --run-soft:#2a2140;
+    --warn:#f2b45c; --warn-soft:#33270f; --code-bg:#141a21; --code-line:#26303b; --cmt:#7f8da0;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11151b; --surface:#181e26; --surface-2:#1f2731; --text:#e6eaf0; --muted:#9aa7b8; --line:#2c3642;
+  --accent:#7ea4f5; --accent-soft:#1d2a44; --on-accent:#0d1420;
+  --say:#4fd1bf; --say-soft:#15302d; --run:#b79af7; --run-soft:#2a2140;
+  --warn:#f2b45c; --warn-soft:#33270f; --code-bg:#141a21; --code-line:#26303b; --cmt:#7f8da0;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:1.6rem;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:1.25rem;margin:0 0 6px}
+h3{font-size:1rem;margin:0 0 6px}
+p{margin:.4em 0}
+.muted{color:var(--muted)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em;background:var(--surface-2);padding:1px 5px;border-radius:4px;word-break:break-all}
+
+nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin:20px -16px 24px;padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap}
+nav.tabs button{border:1px solid var(--line);background:var(--surface);color:var(--text);padding:7px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:.92rem}
+nav.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+section.panel{display:none}
+section.panel.active{display:block}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:820px){.grid3{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:999px;vertical-align:middle;background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.kpi .formula{background:var(--surface-2);border-radius:8px;padding:10px 12px;margin:10px 0;font-size:.9rem}
+.kpi .target{font-weight:600}
+
+.say,.run,.show{border-radius:10px;padding:10px 14px;margin:10px 0;font-size:.94rem;display:flex;gap:10px}
+.say{background:var(--say-soft)}
+.run{background:var(--run-soft)}
+.show{background:var(--surface-2)}
+.tag{flex:none;font-weight:700;font-size:.78rem;padding-top:2px;min-width:44px}
+.say .tag{color:var(--say)} .run .tag{color:var(--run)} .show .tag{color:var(--muted)}
+.say p,.run p,.show p{margin:0}
+.run ol{margin:0;padding-left:18px}
+
+.part{display:flex;align-items:center;gap:10px;margin:26px 0 12px}
+.part .badge{background:var(--text);color:var(--bg);font-weight:700;font-size:.8rem;padding:3px 10px;border-radius:6px}
+.part h2{margin:0}
+
+/* sub-item */
+.items{list-style:none;margin:0;padding:0;counter-reset:s}
+.item{counter-increment:s;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.item-head{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.item-head::before{content:counter(s);flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:.9rem}
+.item-head h3{margin:3px 0 0;font-size:1.02rem}
+.item-body{padding:14px 18px}
+.where{width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:10px}
+.where th,.where td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.where th{color:var(--muted);font-weight:600;font-size:.78rem}
+.where td:first-child{word-break:break-all}
+.where .fn{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em;font-weight:600}
+.where .ln{color:var(--muted);font-size:.8em;white-space:nowrap}
+pre.src{background:var(--code-bg);border:1px solid var(--code-line);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:8px 0;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text)}
+pre.src .f{display:block;color:var(--muted);font-size:11.5px;margin-bottom:4px;border-bottom:1px dashed var(--code-line);padding-bottom:4px}
+pre.src .c{color:var(--cmt)}
+pre.src mark{background:var(--accent-soft);color:inherit;border-radius:3px;padding:0 2px}
+.scroll{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem}
+.tbl th,.tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{color:var(--muted);font-weight:600;font-size:.8rem}
+.checklist{list-style:none;padding:0;margin:0}
+.checklist li{padding:6px 0 6px 28px;position:relative;font-size:.94rem}
+.checklist li::before{content:"";position:absolute;left:2px;top:10px;width:14px;height:14px;border:2px solid var(--muted);border-radius:4px}
+.caution{border-left:4px solid var(--warn);background:var(--warn-soft)}
+.caution h3{color:var(--warn)}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:12px 0}
+.flow .node{flex:1 1 130px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:.84rem}
+.flow .node b{display:block;font-size:.9rem;margin-bottom:2px}
+.flow .arrow{align-self:center;color:var(--muted)}
+@media (max-width:820px){.flow .arrow{display:none}}
+footer{margin-top:32px;font-size:.82rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>AI+ 인증 시험 평가 대본</h1>
+  <p class="muted">합의서의 지표별 소스 코드 확인 항목마다 <b>파일·함수 → 실제 코드 발췌 → 설명 멘트</b> 순서로 정리했습니다. 평가는 관리자 평가 화면에서 실행합니다.</p>
+  <p class="muted" style="font-size:.85rem">관련 ID: R8-7, 시험합의서 시험 1·2·4 · <code>app/…</code> = <code>adrag_backend/app/…</code>, <code>src/…</code> = <code>adrag_frontend/src/…</code> · 줄 번호는 2026-11-23 작업본 기준 · 코드 발췌의 <code>…</code>는 생략 부분</p>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="prep" aria-selected="true">0. 준비·도입</button>
+  <button role="tab" data-tab="recall" aria-selected="false">1. Recall@10</button>
+  <button role="tab" data-tab="ndcg" aria-selected="false">2. NDCG@5</button>
+  <button role="tab" data-tab="latency" aria-selected="false">3. 반환 시간</button>
+  <button role="tab" data-tab="wrap" aria-selected="false">마무리·예상 질문</button>
+</nav>
+
+<!-- ===================================================== 준비·도입 -->
+<section class="panel active" id="prep">
+  <div class="grid3">
+    <div class="card kpi">
+      <span class="pill">시험 1</span>
+      <h3 style="margin-top:6px">검색 완전성 Recall@10</h3>
+      <div class="formula">상위 10개에 정답 근거 청크가 <b>1개 이상</b> 포함된 질의 수 ÷ 전체 시험 질의 수</div>
+      <p class="target">목표 80% 이상</p>
+      <p class="muted" style="font-size:.85rem">화면 평가 범위: 검색·재정렬 평가</p>
+    </div>
+    <div class="card kpi">
+      <span class="pill">시험 2</span>
+      <h3 style="margin-top:6px">검색 최종 정합성 NDCG@5</h3>
+      <div class="formula">재랭킹 상위 5개의 질의별 NDCG@5 합 ÷ 전체 시험 질의 수</div>
+      <p class="target">목표 0.80 이상</p>
+      <p class="muted" style="font-size:.85rem">화면 평가 범위: 검색·재정렬 평가</p>
+    </div>
+    <div class="card kpi">
+      <span class="pill">시험 4</span>
+      <h3 style="margin-top:6px">답변 생성 평균 반환 시간</h3>
+      <div class="formula">질의별 (요청 시작 → 최종 답변 완료) 시간 합 ÷ 전체 시험 질의 수</div>
+      <p class="target">판정 기준 사전 합의 <span class="pill warn">확인 필요</span></p>
+      <p class="muted" style="font-size:.85rem">화면 평가 범위: 전체 RAG 평가</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>사전 준비</h2>
+    <ul class="checklist">
+      <li>관리자 &gt; 평가 &gt; 데이터셋: 시험 데이터셋 문항 승인 후 <b>확정</b>(골드셋 생성)</li>
+      <li>리허설: "검색·재정렬 평가" 1회, "전체 RAG 평가" 1회 실행해서 완료되는지 확인</li>
+      <li>에디터에 파일 탭 미리 열기: <code>app/evaluation/runner/eval_runner.py</code>, <code>app/evaluation/adapters/retrieval_adapter.py</code>, <code>reranker_adapter.py</code>, <code>rag_pipeline_adapter.py</code>, <code>app/evaluation/runner/e2e_evaluator.py</code>, <code>app/evaluation/metrics/retrieval_metrics.py</code>, <code>app/evaluation/metric_catalog.py</code>, <code>app/graphs/nodes/retrieve.py</code>, <code>app/repositories/vector_repository.py</code>, <code>app/clients/reranker_client.py</code></li>
+    </ul>
+  </div>
+
+  <div class="card caution">
+    <h3>반환 시간 판정 기준을 미리 합의하세요</h3>
+    <p style="font-size:.92rem">화면 주요 지표 4는 <b>첫 토큰 평균 ≤ 5초</b>로 판정합니다. 합의서 정의(요청 → 최종 답변 완료)는 보조 지표 <b>“전체 반환 시간”</b>(목표 15초)으로 표시됩니다. 시험에서 어느 값을 볼지 담당자와 먼저 정해 두세요.</p>
+  </div>
+
+  <div class="card">
+    <h2>도입 (1분)</h2>
+    <div class="say"><span class="tag">말하기</span><p>“관리자 평가 화면에서 시험 데이터셋으로 평가를 실행하고, 시험 1 검색 완전성(Recall@10), 시험 2 검색 최종 정합성(NDCG@5), 시험 4 답변 생성 평균 반환 시간을 확인하겠습니다. 지표마다 합의서의 소스 코드 확인 항목을 순서대로 보여 드린 뒤, 평가 결과를 확인하겠습니다.”</p></div>
+    <h3 style="margin-top:18px">화면에서 평가가 시작되는 경로 (한 번만 설명)</h3>
+    <div class="flow">
+      <div class="node"><b>실행 버튼</b><code>EvalRunView.vue</code> L38–55</div><div class="arrow">→</div>
+      <div class="node"><b>요청</b><code>useEvalRuns.startRun</code> L201</div><div class="arrow">→</div>
+      <div class="node"><b>API</b><code>POST /api/eval/runs</code><br><code>create_run</code> L542</div><div class="arrow">→</div>
+      <div class="node"><b>백그라운드 실행</b><code>eval_runner.start_run</code> L43</div><div class="arrow">→</div>
+      <div class="node"><b>결과 화면</b><code>get_run</code> L623 →<br><code>present_run_metrics</code></div>
+    </div>
+    <div class="say"><span class="tag">말하기</span><p>“평가 범위는 두 가지입니다. ‘검색·재정렬 평가’는 답변 없이 검색과 재정렬만 평가하고(시험 1·2), ‘전체 RAG 평가’는 운영 챗봇과 같이 답변까지 생성해 시간을 잽니다(시험 4).”</p></div>
+  </div>
+</section>
+
+<!-- ===================================================== Recall@10 -->
+<section class="panel" id="recall">
+  <div class="card">
+    <h2>시험 1 · 검색 완전성 Recall@10</h2>
+    <div class="say"><span class="tag">말하기</span><p>“질의마다 하이브리드 검색 상위 10개에 정답 근거 청크가 하나라도 있으면 포함으로 셉니다. 포함된 질의 수를 전체 질의 수로 나눈 값이고, 목표는 80% 이상입니다.”</p></div>
+  </div>
+
+  <div class="part"><span class="badge">1</span><h2>소스 코드 확인</h2></div>
+  <ol class="items">
+
+    <li class="item"><div class="item-head"><h3>시험 데이터 및 정답 데이터를 불러오는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L497</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L225–226</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _execute_run</span>run = repo.get_run(run_id)
+goldset = repo.get_goldset(run["goldset_id"])
+<mark>items = json.loads(goldset["items_snapshot_json"])</mark>
+config = json.loads(run["config_json"])
+collection_name = goldset.get("qdrant_name")</pre>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>question = item["question"]</mark>
+<mark>gold_ids: Set[str] = set(_parse_json_list(item.get("gold_chunk_ids")))</mark>
+top_k = int(config.get("retrieval_top_n", config.get("top_k", 10)))</pre>
+      <div class="say"><span class="tag">말하기</span><p>“화면에서 고른 골드셋(확정된 시험 데이터셋)을 DB 테이블 <code>tb_eval_goldsets</code>에서 읽습니다. 문항마다 질의문(<code>question</code>)과 정답 근거 청크ID 목록(<code>gold_chunk_ids</code>)이 들어 있습니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수·클래스</th></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L62–68</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">get_embedding_client</span> <span class="ln">L51</span> · <span class="fn">get_vector_repo</span> <span class="ln">L55</span> · <span class="fn">get_kiwi_bm25_encoder</span> <span class="ln">L64</span></td></tr>
+        <tr><td>app/clients/embedding_client.py</td><td><span class="fn">EmbeddingClient.__init__</span> <span class="ln">L29</span></td></tr>
+        <tr><td>app/clients/kiwi_bm25_encoder.py</td><td><span class="fn">KiwiBm25Encoder.__init__</span> <span class="ln">L19</span></td></tr>
+      </table>
+<pre class="src"><span class="f">retrieval_adapter.py · EvalRetriever</span>def __init__(self) -> None:
+    <mark>self._vector_repo = get_vector_repo()</mark>
+    <mark>self._embedding_client = get_embedding_client()</mark>
+    self._channels = {
+        "dense": DenseChannel(self._vector_repo, self._embedding_client),
+        "kiwi_bm25": KiwiBm25Channel(self._vector_repo),
+    }</pre>
+<pre class="src"><span class="f">embedding_client.py · EmbeddingClient.__init__</span>self.base_url = settings.embedding_api_url.rstrip("/")
+<mark>self.model = settings.embedding_model_name</mark>
+self.api_key = settings.embedding_api_key</pre>
+      <div class="say"><span class="tag">말하기</span><p>“검색에 필요한 세 가지를 준비합니다. 임베딩 모델 클라이언트(GPU 서버의 임베딩 모델), Kiwi 형태소 분석 기반 BM25 인코더, 그리고 두 검색을 수행하는 Qdrant 벡터 DB입니다. 운영 챗봇과 같은 함수(<code>retrieve.py</code>의 getter)로 만듭니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L244–249</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L126</span> · <span class="fn">_build_eval_query_bundle</span> <span class="ln">L42</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L79–101</span></td></tr>
+        <tr><td>app/clients/embedding_client.py / kiwi_bm25_encoder.py</td><td><span class="fn">embed_query</span> <span class="ln">L169</span> / <span class="fn">encode_query</span> <span class="ln">L58</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span>for channel in channels:
+    if channel == "rrf":
+        <mark>hits = await retriever.search_rrf(question, top_k, collection_name)</mark></pre>
+<pre class="src"><span class="f">retrieve.py · _search_qdrant_hybrid</span>dense_queries = query_bundle.dense_queries
+…
+    <mark>dense_vectors = await asyncio.gather(</mark>
+        *[(container.embedding if container else get_embedding_client()).<mark>embed_query</mark>(query) for query in dense_queries]
+    )
+<mark>sparse_query = await asyncio.to_thread(</mark>
+    (container.kiwi_bm25_encoder if container else get_kiwi_bm25_encoder()).<mark>encode_query</mark>,
+    query_bundle.kiwi_bm25_query,
+)</pre>
+      <div class="say"><span class="tag">말하기</span><p>“시험 질의문을 그대로 넣습니다. <code>embed_query</code>가 질의를 임베딩 벡터로 바꿔 의미 검색에 쓰고, <code>encode_query</code>가 Kiwi 형태소 분석으로 BM25 키워드 질의를 만듭니다. 이 함수는 운영 챗봇 검색과 같은 함수입니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L111–124</span></td></tr>
+        <tr><td>app/repositories/vector_repository.py</td><td><span class="fn">search_hybrid</span> <span class="ln">L572–637</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L165–166</span></td></tr>
+      </table>
+<pre class="src"><span class="f">vector_repository.py · search_hybrid</span>response = self.client.query_points(
+    collection_name=collection,
+    prefetch=[
+        *[<mark>Prefetch(query=dense_vector, using="dense"</mark>, limit=dense_prefetch_k, filter=query_filter)
+          for dense_vector in dense_vectors],
+        <mark>Prefetch(query=sparse_query, using=self.kiwi_bm25_vector_name</mark>, limit=sparse_prefetch_k, filter=query_filter),
+    ],
+    <mark>query=RrfQuery(rrf=Rrf(k=rrf_k, weights=[*vector_weights, sparse_weight]))</mark>,
+    <mark>limit=top_k</mark>,
+    with_payload=True,
+)</pre>
+<pre class="src"><span class="f">retrieval_adapter.py · search_rrf</span>boosted = apply_soft_boost(merged, {"keywords": []})
+<mark>return boosted[:top_k]</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“의미 검색 결과와 BM25 결과를 Qdrant가 가중 RRF(Reciprocal Rank Fusion)로 하나의 순위로 통합합니다. 그중 상위 <code>top_k</code>개를 잘라내는데, 화면에서 검색 후보 수 N = 10으로 실행하므로 질의별 상위 10개 청크가 됩니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L250–255</span></td></tr>
+        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L122</span> · <span class="fn">hit_at_k</span> <span class="ln">L39</span> · <span class="fn">_dedup_preserve_order</span> <span class="ln">L13</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>retrieved_ids = [chunk_id for chunk_id, _, _ in hits]</mark>
+retrieval_k_values = tuple(sorted(set((*_K_VALUES, top_k))))
+<mark>result[channel] = compute_channel_metrics(retrieved_ids, gold_ids, retrieval_k_values)</mark></pre>
+<pre class="src"><span class="f">retrieval_metrics.py · hit_at_k</span>def hit_at_k(retrieved_ids, gold_ids, k):
+    """상위 k개(중복 제거 후) 안에 정답이 1개라도 있으면 1.0, 아니면 0.0."""
+    _validate_cutoff(k)
+    if not gold_ids:
+        return None
+    deduped = _dedup_preserve_order(retrieved_ids)
+    <mark>return 1.0 if any(cid in gold_ids for cid in deduped[:k]) else 0.0</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“검색된 청크ID 목록과 정답 청크ID 집합을 비교합니다. 상위 10개 안에 정답이 하나라도 있으면 1, 없으면 0입니다. 합의서 정의가 ‘포함된 질의 비율’이라 <code>hit_at_k</code>로 계산하고, 같은 청크가 두 번 나오면 중복을 빼고 순위를 봅니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L331 · L391–398 · L453–457</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_RECALL_KEY</span> <span class="ln">L18</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L24</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">save_run_metrics</span> <span class="ln">L727</span></td></tr>
+      </table>
+<pre class="src"><span class="f">metric_catalog.py</span><mark>AGREEMENT_RECALL_KEY = "retrieval.rrf.hit@10"</mark>
+ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pre>
+<pre class="src"><span class="f">eval_runner.py · _aggregate_and_save_metrics</span>for key, value in metrics.items():
+    …
+    metric_key = f"retrieval.{channel}.{key}"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        <mark>add(segments, metric_key, MetricResult(float(value), "evaluated"))</mark>
+…
+<span class="c"># 2026.11.19(sooyeon.choi) 추가 - 합의서 시험 1·2 계산식: 분모 = 전체 시험 질의 수.</span>
+if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
+    evaluated_sum = sum(float(r.value) for r in results_for_key if r.status == "evaluated")
+    <mark>value["value"] = evaluated_sum / aggregate.total_count</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“문항별 포함 여부(1/0)를 모두 모아 합계를 전체 시험 질의 수로 나눕니다. 검색 오류나 정답이 없는 질의도 분모에 들어가 0으로 계산됩니다. 결과는 실행 이력에 저장되고 화면 카드로 보입니다.”</p></div>
+    </div></li>
+  </ol>
+
+  <div class="part"><span class="badge">2</span><h2>평가 실행 및 결과 확인</h2></div>
+  <div class="card">
+    <div class="run"><span class="tag">실행</span><ol>
+      <li>평가 &gt; 평가 실행: 골드셋 = 시험 데이터셋</li>
+      <li>평가 범위 = <b>검색·재정렬 평가</b>, 검색 후보 수 N = 10, 최종 문서 수 K = 5</li>
+      <li><b>실행 시작</b> → 진행률 120/120 확인</li>
+    </ol></div>
+    <div class="show"><span class="tag">보여주기</span><p>“검색 품질 (지표 1·2)” 카드의 <b>검색 완전성 Recall@10</b> 값과 만족/불만족 표시. (선택) 문항 1건을 열어 <b>채널별 검색 결과</b>와 <b>정답 근거 청크 원문</b>을 대조</p></div>
+  </div>
+</section>
+
+<!-- ===================================================== NDCG@5 -->
+<section class="panel" id="ndcg">
+  <div class="card">
+    <h2>시험 2 · 검색 최종 정합성 NDCG@5</h2>
+    <div class="say"><span class="tag">말하기</span><p>“하이브리드 검색 결과를 Reranker 모델로 다시 정렬하고, 상위 5개 안에 정답이 얼마나 높은 순위로 있는지 NDCG@5로 계산합니다. 질의별 값을 평균하고, 목표는 0.8 이상입니다.”</p></div>
+  </div>
+
+  <div class="part"><span class="badge">1</span><h2>소스 코드 확인</h2></div>
+  <ol class="items">
+
+    <li class="item"><div class="item-head"><h3>시험 데이터 및 정답 데이터를 불러오는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">get_goldset</span> <span class="ln">L497</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L225–228</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _execute_run</span>goldset = repo.get_goldset(run["goldset_id"])
+<mark>items = json.loads(goldset["items_snapshot_json"])</mark></pre>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>question = item["question"]</mark>
+<mark>gold_ids: Set[str] = set(_parse_json_list(item.get("gold_chunk_ids")))</mark>
+<mark>rerank_top_k = int(config.get("rerank_top_k", 5))</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“확정된 시험 데이터셋에서 질의문과 정답 근거 청크ID를 읽습니다. 화면에서 지정한 최종 문서 수 K = 5도 함께 읽습니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>임베딩 모델 및 Reranker 모델을 불러오는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수·클래스</th></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.__init__</span> <span class="ln">L62–68</span> (임베딩)</td></tr>
+        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">_get_client</span> <span class="ln">L15–19</span> (Reranker)</td></tr>
+        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.__init__</span> <span class="ln">L48–60</span></td></tr>
+      </table>
+<pre class="src"><span class="f">retrieval_adapter.py · EvalRetriever</span>self._vector_repo = get_vector_repo()
+<mark>self._embedding_client = get_embedding_client()</mark></pre>
+<pre class="src"><span class="f">reranker_adapter.py · _get_client</span>def _get_client() -> RerankerClient:
+    global _reranker_client
+    if _reranker_client is None:
+        <mark>_reranker_client = RerankerClient(get_settings())</mark>
+    return _reranker_client</pre>
+<pre class="src"><span class="f">reranker_client.py · RerankerClient.__init__</span>self.top_k = settings.reranker_top_k
+self.api_url = settings.reranker_api_url.rstrip("/")
+<mark>self.model_name = settings.reranker_model_name</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“검색용 임베딩 모델 클라이언트와, 재정렬용 Reranker 모델 클라이언트를 만듭니다. 모델은 GPU 서버에서 서비스되고, 모델 이름·주소는 운영과 같은 설정값을 씁니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L264–267</span></td></tr>
+        <tr><td>app/evaluation/adapters/retrieval_adapter.py</td><td><span class="fn">EvalRetriever.search_rrf</span> <span class="ln">L126</span></td></tr>
+        <tr><td>app/graphs/nodes/retrieve.py</td><td><span class="fn">_search_qdrant_hybrid</span> <span class="ln">L79–124</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>candidate_top_k = max(top_k, int(settings.candidate_top_k))</mark>
+rerank_output_k = max(rerank_top_k, int(settings.reranker_top_k))
+if rrf_hits is None or len(rrf_hits) &lt; candidate_top_k:
+    <mark>rrf_hits = await retriever.search_rrf(question, candidate_top_k, collection_name)</mark></pre>
+<pre class="src"><span class="f">retrieve.py · _search_qdrant_hybrid</span>dense_vectors = await asyncio.gather(
+    *[(…get_embedding_client()).<mark>embed_query</mark>(query) for query in dense_queries])
+sparse_query = await asyncio.to_thread(
+    (…get_kiwi_bm25_encoder()).<mark>encode_query</mark>, query_bundle.kiwi_bm25_query)
+return await asyncio.to_thread((…get_vector_repo()).<mark>search_hybrid</mark>, …)</pre>
+      <div class="say"><span class="tag">말하기</span><p>“Recall@10과 같은 하이브리드 검색 함수를 씁니다. 다만 Reranker에 넘길 후보는 운영 챗봇과 같은 수(<code>candidate_top_k</code>)만큼 가져옵니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>하이브리드 검색 결과를 Reranker 모델에 입력하여 관련도를 평가하고 재정렬하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L269</span></td></tr>
+        <tr><td>app/evaluation/adapters/reranker_adapter.py</td><td><span class="fn">EvalReranker.rerank</span> <span class="ln">L25–54</span></td></tr>
+        <tr><td>app/graphs/nodes/rerank.py · app/graphs/utils.py</td><td><span class="fn">_build_rerank_text</span> <span class="ln">L47</span> · <span class="fn">dedup_chunks_by_text</span> <span class="ln">L23</span></td></tr>
+        <tr><td>app/clients/reranker_client.py</td><td><span class="fn">RerankerClient.rerank</span> <span class="ln">L64–88</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>reranked = await EvalReranker().rerank(question, rrf_hits, top_k=rerank_output_k)</mark></pre>
+<pre class="src"><span class="f">reranker_adapter.py · EvalReranker.rerank</span><mark>chunks = dedup_chunks_by_text([</mark>
+    {"chunk_id": chunk_id, "document_id": payload.get("document_id", ""),
+     "text": payload.get("text", ""), "score": score, "metadata": payload}
+    for chunk_id, score, payload in hits
+])
+<mark>documents = [_build_rerank_text(chunk) for chunk in chunks]</mark>
+<mark>reranked = await _get_client().rerank(query, documents, top_k=top_k)</mark>
+return [(chunks[idx]["chunk_id"], score, chunks[idx]["metadata"]) for idx, score in reranked]</pre>
+<pre class="src"><span class="f">reranker_client.py · RerankerClient.rerank</span><mark>scores = await self._call_score_api(query, documents)</mark>
+scored = list(enumerate(scores))
+<mark>scored.sort(key=lambda x: x[1], reverse=True)</mark>
+return scored[:k]</pre>
+      <div class="say"><span class="tag">말하기</span><p>“검색 후보에서 같은 본문을 빼고, 운영 챗봇과 같이 문서명·섹션 머리말을 붙인 텍스트를 만듭니다. Reranker 모델이 질의와 각 청크의 관련도 점수를 매기고, 점수가 높은 순으로 다시 정렬합니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>재정렬된 상위 5개의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_retrieval</span> <span class="ln">L270–273</span></td></tr>
+        <tr><td>app/evaluation/metrics/retrieval_metrics.py</td><td><span class="fn">compute_channel_metrics</span> <span class="ln">L122</span> · <span class="fn">ndcg_at_k</span> <span class="ln">L82–97</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_retrieval</span><mark>reranked_ids = [chunk_id for chunk_id, _, _ in reranked]</mark>
+rerank_metrics = compute_channel_metrics(
+    <mark>reranked_ids, gold_ids, tuple(sorted({*_K_VALUES, rerank_top_k}))</mark>
+)</pre>
+<pre class="src"><span class="f">retrieval_metrics.py · ndcg_at_k</span>def ndcg_at_k(retrieved_ids, gold_ids, k):
+    """이진 관련도(rel=1) NDCG@k. 중복 제거 후 계산해 DCG 이중 계산을 방지한다."""
+    …
+    deduped = _dedup_preserve_order(retrieved_ids)
+    <mark>dcg = sum(1.0 / math.log2(rank + 1)</mark>
+              for rank, cid in enumerate(deduped[:k], start=1)
+              <mark>if cid in gold_ids)</mark>
+    ideal_hits = min(len(gold_ids), k)
+    <mark>idcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))</mark>
+    <mark>return dcg / idcg if idcg > 0 else 0.0</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“재정렬 결과 상위 5개에서 정답 청크면 관련도 1, 아니면 0으로 봅니다. 순위 i의 정답마다 1/log₂(i+1)을 더한 값이 DCG이고, 정답이 1위부터 채워진 이상적인 경우(IDCG)로 나눈 값이 질의별 NDCG@5입니다. 정답이 높은 순위에 있을수록 1에 가깝습니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L331 · L391–398 · L453–457</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">AGREEMENT_NDCG_KEY</span> <span class="ln">L19</span> · <span class="fn">ALL_DENOMINATOR_KEYS</span> <span class="ln">L24</span></td></tr>
+      </table>
+<pre class="src"><span class="f">metric_catalog.py</span><mark>AGREEMENT_NDCG_KEY = "retrieval.rerank.ndcg@5"</mark>
+ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})</pre>
+<pre class="src"><span class="f">eval_runner.py · _aggregate_and_save_metrics</span>if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
+    <mark>evaluated_sum = sum(float(r.value) for r in results_for_key if r.status == "evaluated")</mark>
+    <mark>value["value"] = evaluated_sum / aggregate.total_count</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“질의별 NDCG@5를 모두 더해 전체 시험 질의 수로 나눕니다. 재랭킹 오류나 정답이 없는 질의도 분모에 들어가 0으로 계산됩니다.”</p></div>
+    </div></li>
+  </ol>
+
+  <div class="part"><span class="badge">2</span><h2>평가 실행 및 결과 확인</h2></div>
+  <div class="card">
+    <div class="show"><span class="tag">보여주기</span><p>시험 1과 <b>같은 “검색·재정렬 평가” 실행 결과</b>에서 <b>검색 최종 정합성 NDCG@5</b> 카드 값과 만족/불만족 표시. (선택) 문항 1건을 열어 재랭킹 순위와 정답 청크를 대조</p></div>
+    <div class="say"><span class="tag">말하기</span><p>“한 번의 검색·재정렬 평가에서 Recall@10과 NDCG@5가 함께 계산됩니다.”</p></div>
+  </div>
+</section>
+
+<!-- ===================================================== 반환 시간 -->
+<section class="panel" id="latency">
+  <div class="card">
+    <h2>시험 4 · 답변 생성 평균 반환 시간</h2>
+    <div class="say"><span class="tag">말하기</span><p>“운영 챗봇과 같은 RAG 파이프라인으로 질의를 1건씩 순서대로 실행합니다. 질의마다 답변 생성 요청을 시작한 시점부터 문서 검색, 재랭킹, 최종 답변 생성이 끝날 때까지 시간을 재고 평균을 냅니다.”</p></div>
+  </div>
+
+  <div class="part"><span class="badge">1</span><h2>소스 코드 확인</h2></div>
+  <ol class="items">
+
+    <li class="item"><div class="item-head"><h3>시험 데이터를 불러오는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L49–57</span></td></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L63</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _execute_run</span>goldset = repo.get_goldset(run["goldset_id"])
+<mark>items = json.loads(goldset["items_snapshot_json"])</mark></pre>
+<pre class="src"><span class="f">e2e_evaluator.py · evaluate_end_to_end</span><mark>question = item["question"]</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“확정된 시험 데이터셋에서 질의문을 읽습니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_execute_run</span> <span class="ln">L68</span> · <span class="fn">_evaluate_item</span> <span class="ln">L119–124</span></td></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L70–75</span></td></tr>
+        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L61–97</span> · <span class="fn">_get_graph</span> <span class="ln">L51</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _execute_run</span><span class="c"># 시험 4: 답변 생성 시간이 포함된 평가는 질의를 순차 실행한다.</span>
+<mark>semaphore = asyncio.Semaphore(1 if run_type in ("full", "end_to_end") else int(config.get("concurrency", 3)))</mark></pre>
+<pre class="src"><span class="f">eval_runner.py · _evaluate_item</span>if run_type in ("end_to_end", "full"):
+    <span class="c"># 운영 RAG 1회 실행 결과로 검색·답변·Citation을 함께 평가한다.</span>
+    from app.evaluation.runner.e2e_evaluator import evaluate_end_to_end
+    <mark>e2e_fields = await evaluate_end_to_end(item, config, collection_name)</mark></pre>
+<pre class="src"><span class="f">rag_pipeline_adapter.py · EvalRagPipeline.run</span>initial_state = make_initial_state(
+    user_id="eval_runner",
+    session_id=None,
+    <mark>original_query=query,</mark>
+    collection_name=collection_name,
+    …)
+…
+<mark>result = await _get_graph().ainvoke(initial_state)</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“질의 1건마다 운영 챗봇이 쓰는 RAG 그래프(<code>build_rag_graph</code>)를 그대로 실행합니다. 그래프 안에서 질의 분석 → 문서 검색 → 재랭킹 → 답변 생성이 이어집니다. 답변 시간이 서로 영향을 주지 않도록 <code>Semaphore(1)</code>로 한 번에 1건씩만 실행합니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/adapters/rag_pipeline_adapter.py</td><td><span class="fn">EvalRagPipeline.run</span> <span class="ln">L93–105</span></td></tr>
+        <tr><td>app/graphs/nodes/generate_answer.py</td><td>답변 생성 노드 <span class="ln">L66–71</span> (첫 토큰 시각)</td></tr>
+      </table>
+<pre class="src"><span class="f">rag_pipeline_adapter.py · EvalRagPipeline.run</span><span class="c"># 2026.11.17(sooyeon.choi) 추가 - 응답시간은 그래프 실행(검색→재랭킹→답변 생성)만 측정.</span>
+<mark>started = time.monotonic()</mark>
+started_wall = time.time()
+<mark>result = await _get_graph().ainvoke(initial_state)</mark>
+<mark>latency_ms = int((time.monotonic() - started) * 1000)</mark>
+timing = dict(result.get("timing") or {})
+first_token_at = timing.pop(FIRST_TOKEN_AT_KEY, None)
+timing["first_token_ms"] = (
+    round((first_token_at - started_wall) * 1000, 1)
+    if isinstance(first_token_at, (int, float)) else None
+)</pre>
+      <div class="say"><span class="tag">말하기</span><p>“그래프 실행 직전에 시작 시각을 찍고, 검색·재랭킹·답변 생성이 모두 끝나 그래프가 반환된 직후에 종료 시각을 찍어 그 차이를 ms로 계산합니다. 첫 답변 글자가 나온 시각도 함께 기록합니다. 그 뒤에 하는 지표 계산 시간은 들어가지 않습니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>질의별 답변 생성 반환 시간을 저장하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수</th></tr>
+        <tr><td>app/evaluation/runner/e2e_evaluator.py</td><td><span class="fn">evaluate_end_to_end</span> <span class="ln">L78–82</span></td></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_evaluate_item</span> <span class="ln">L126–130</span> · <span class="fn">_timing_metrics</span> <span class="ln">L138</span> · <span class="fn">_execute_run</span> <span class="ln">L79</span></td></tr>
+        <tr><td>app/repositories/evaluation_repository.py</td><td><span class="fn">insert_item_result</span> <span class="ln">L597</span></td></tr>
+      </table>
+<pre class="src"><span class="f">e2e_evaluator.py · evaluate_end_to_end</span>fields: Dict[str, Any] = {
+    <mark>"latency_ms": result.get("latency_ms"),</mark>
+    "answer_text": system_answer,
+    <mark>"timing_json": result["timing"],</mark>
+    …</pre>
+<pre class="src"><span class="f">eval_runner.py · _execute_run → _process</span>fields = await _evaluate_item(item, run_type, config, item_collection(item, collection_name))
+<mark>repo.insert_item_result(run_id, qa_id, **fields)</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“질의별 반환 시간(<code>latency_ms</code>)과 첫 토큰 시간(<code>timing_json</code>)을 문항 결과 테이블 <code>tb_eval_item_results</code>에 한 행씩 저장합니다. 화면 문항 표의 시간 열이 이 값입니다.”</p></div>
+    </div></li>
+
+    <li class="item"><div class="item-head"><h3>전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드</h3></div><div class="item-body">
+      <table class="where"><tr><th>파일</th><th>함수·상수</th></tr>
+        <tr><td>app/evaluation/runner/eval_runner.py</td><td><span class="fn">_aggregate_and_save_metrics</span> <span class="ln">L439–452</span></td></tr>
+        <tr><td>app/evaluation/metrics/models.py</td><td><span class="fn">MetricAggregate.from_results</span> <span class="ln">L42–59</span></td></tr>
+        <tr><td>app/evaluation/metric_catalog.py</td><td><span class="fn">RESPONSE_TIME_KEY</span> · <span class="fn">FIRST_TOKEN_KEY</span> <span class="ln">L21–22</span></td></tr>
+      </table>
+<pre class="src"><span class="f">eval_runner.py · _aggregate_and_save_metrics</span>if scope in ("full", "end_to_end"):
+    for key, result in <mark>_timing_metrics(row.get("latency_ms"), row.get("timing_json"))</mark>.items():
+        add(segments, key, result)
+…
+<mark>aggregate = MetricAggregate.from_results(results_for_key)</mark>
+<span class="c"># 시험 4: 측정 누락을 제외한 부분 평균을 공식 평균으로 표시하지 않는다.</span>
+if key == RESPONSE_TIME_KEY and aggregate.evaluated_count != aggregate.total_count:
+    value["value"] = None</pre>
+<pre class="src"><span class="f">models.py · MetricAggregate.from_results</span>values = [float(result.value) for result in results if result.status == "evaluated"]
+evaluated = len(values)
+<mark>mean = sum(values) / evaluated if evaluated else None</mark></pre>
+      <div class="say"><span class="tag">말하기</span><p>“모든 질의의 반환 시간을 모아 합계를 질의 수로 나눈 평균을 냅니다. 한 건이라도 측정이 빠지면 일부만의 평균을 공식 값으로 보여 주지 않도록 막아 두었습니다. 같은 방식으로 첫 토큰 평균도 계산합니다.”</p></div>
+    </div></li>
+  </ol>
+
+  <div class="part"><span class="badge">2</span><h2>평가 실행 및 결과 확인</h2></div>
+  <div class="card">
+    <div class="run"><span class="tag">실행</span><ol>
+      <li>평가 &gt; 평가 실행: 골드셋 = 시험 데이터셋</li>
+      <li>평가 범위 = <b>전체 RAG 평가</b></li>
+      <li><b>실행 시작</b> → 진행률 120/120 확인 (1건씩 순차 실행이라 시간이 걸림)</li>
+    </ol></div>
+    <div class="show"><span class="tag">보여주기</span><p>“답변 품질” 카드의 <b>답변 생성 평균 반환 시간</b>(첫 토큰 기준), 보조 지표의 <b>전체 반환 시간</b>(최종 완료 기준), 문항 표의 시간 열(첫 토큰 / 전체)</p></div>
+  </div>
+</section>
+
+<!-- ===================================================== 마무리 -->
+<section class="panel" id="wrap">
+  <div class="card">
+    <h2>마무리 (1분)</h2>
+    <div class="show"><span class="tag">보여주기</span><p>실행 이력의 <b>평가 결과 Excel 다운로드</b> → 질의별 지표·시간 확인<br>코드: <code>app/routes/evaluation.py</code> → <code>GET /eval/runs/{run_id}/results.xlsx</code>(L640), <code>app/evaluation/excel_exporter.py</code></p></div>
+    <div class="say"><span class="tag">말하기</span><p>“세 지표 결과는 실행 이력으로 저장돼 다시 열어 볼 수 있고, 질의별 결과는 Excel로 받을 수 있습니다.”</p></div>
+  </div>
+
+  <div class="card">
+    <h2>예상 질문 대응</h2>
+    <div class="scroll">
+    <table class="tbl">
+      <tr><th style="width:34%">질문</th><th>답변</th></tr>
+      <tr><td>Recall@10인데 왜 <code>hit_at_k</code>인가요?</td><td>합의서 정의가 “정답 근거 청크가 1개 이상 포함된 질의 비율”이기 때문입니다. <code>recall_at_k</code>는 정답 청크 커버율로, 보조 지표로 따로 보여 줍니다.</td></tr>
+      <tr><td>검색·재정렬 평가에서 LLM 질의 재작성을 하나요?</td><td>하지 않습니다. 시험 질의 원문으로 검색합니다(<code>retrieval_adapter.py</code> <code>_build_eval_query_bundle</code> L42). 전체 RAG 평가는 운영과 같이 재작성까지 포함합니다.</td></tr>
+      <tr><td>같은 청크가 여러 번 나오면?</td><td>중복을 제거한 순위로 계산합니다(<code>retrieval_metrics.py</code> <code>_dedup_preserve_order</code> L13).</td></tr>
+      <tr><td>오류 난 질의는 어떻게 세나요?</td><td>Recall@10·NDCG@5는 0으로 세고 분모는 전체 질의 수입니다(<code>eval_runner.py</code> L453–457).</td></tr>
+      <tr><td>반환 시간에 네트워크 시간이 포함되나요?</td><td>서버 안에서 RAG 그래프를 실행한 시간이라 네트워크 전송 시간은 포함되지 않습니다.</td></tr>
+      <tr><td>주요 지표 4는 첫 토큰 기준인데 합의서는 최종 완료 기준 아닌가요?</td><td>화면 주요 카드는 첫 토큰 평균이고, 합의서 정의(최종 답변 완료)는 보조 지표 “전체 반환 시간”으로 함께 보여 줍니다.</td></tr>
+    </table>
+    </div>
+  </div>
+</section>
+
+<footer>원본: docs/design/AI+인증_시험평가_대본.md · 코드 발췌는 2026-11-23 작업본에서 옮긴 것으로 긴 인자는 줄바꿈을 정리하거나 …로 줄였고, 줄 번호는 코드 수정 시 달라질 수 있습니다.</footer>
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('nav.tabs button');
+  var panels = document.querySelectorAll('section.panel');
+  function show(id, push){
+    tabs.forEach(function(b){ b.setAttribute('aria-selected', b.dataset.tab === id ? 'true' : 'false'); });
+    panels.forEach(function(p){ p.classList.toggle('active', p.id === id); });
+    if (push) { try { history.replaceState(null, '', '#' + id); } catch(e){} }
+    window.scrollTo({top:0});
+  }
+  tabs.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.tab, true); }); });
+  var initial = (location.hash || '').slice(1);
+  if (initial && document.getElementById(initial)) show(initial, false);
+})();
+</script>
+</body>
+</html>

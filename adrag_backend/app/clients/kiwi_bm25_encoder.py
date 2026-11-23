@@ -17,6 +17,7 @@ class KiwiBm25Encoder:
 
     # 2026.07.07(sooyeon.choi) 수정 - 후보 400개 재계산 대신 Qdrant BM25 sparse vector 사용
     def __init__(self, settings: "Settings") -> None:
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (BM25 인코더)
         self.k1 = settings.bm25_k1
         self.b = settings.bm25_b
         self.avg_len = settings.bm25_avg_len

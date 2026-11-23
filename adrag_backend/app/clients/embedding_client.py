@@ -28,6 +28,8 @@ class EmbeddingClient:
 
     def __init__(self, settings: Settings) -> None:
         self.base_url = settings.embedding_api_url.rstrip("/")
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (임베딩 모델)
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (임베딩 모델)
         self.model = settings.embedding_model_name
         self.api_key = settings.embedding_api_key
         self.timeout = settings.embedding_timeout

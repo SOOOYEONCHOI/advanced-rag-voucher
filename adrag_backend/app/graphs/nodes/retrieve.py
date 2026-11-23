@@ -87,6 +87,8 @@ async def _search_qdrant_hybrid(
 ):
     """Dense와 Kiwi BM25를 Qdrant 서버에서 weighted RRF로 병합한다."""
     # 2026.07.08(sooyeon.choi) 수정 - 첫 rewrite만 사용하던 누락을 제거하고 전체 Dense query 반영
+    # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (임베딩 의미 검색 질의 벡터 · BM25 질의)
+    # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (임베딩 의미 검색 질의 벡터 · BM25 질의)
     dense_queries = query_bundle.dense_queries
     embeddings = query_bundle.rewritten_query_embeddings
     if embeddings:
@@ -100,6 +102,7 @@ async def _search_qdrant_hybrid(
         query_bundle.kiwi_bm25_query,
     )
     # 2026.11.11(sooyeon.choi) 수정 - 가중치는 QUERY_TYPE_PROFILE 표에서, Dense는 원문 질의 비중을 반영해 질의별로 나눈다
+    # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드 (Qdrant 가중 RRF 통합 호출)
     weights = get_rrf_weights(query_type, settings)
     dense_weight = weights.get("dense", 1.0)
     share = getattr(settings, "dense_original_query_share", None)

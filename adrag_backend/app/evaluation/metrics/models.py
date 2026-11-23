@@ -44,6 +44,7 @@ class MetricAggregate:
         evaluated = len(values)
         excluded = sum(result.status == "excluded" for result in results)
         errors = sum(result.status == "error" for result in results)
+        # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (평균 = 합계 ÷ 건수)
         mean = sum(values) / evaluated if evaluated else None
         variance = (
             sum((value - mean) ** 2 for value in values) / evaluated

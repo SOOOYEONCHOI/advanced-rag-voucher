@@ -52,6 +52,9 @@ async def _execute_run(run_id: int) -> None:
         run = repo.get_run(run_id)
         if not run:
             return
+        # [AI+ 시험] Recall@10 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드
+        # [AI+ 시험] NDCG@5 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드
+        # [AI+ 시험] 반환 시간 - 1) 시험 데이터를 불러오는 코드
         goldset = repo.get_goldset(run["goldset_id"])
         items = json.loads(goldset["items_snapshot_json"])
         config = json.loads(run["config_json"])
@@ -65,6 +68,7 @@ async def _execute_run(run_id: int) -> None:
 
         run_type = run["run_type"]
         # 시험 4: 답변 생성 시간이 포함된 평가는 질의를 순차 실행한다.
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드
         semaphore = asyncio.Semaphore(1 if run_type in ("full", "end_to_end") else int(config.get("concurrency", 3)))
 
         async def _process(item: Dict[str, Any]) -> None:
@@ -76,6 +80,7 @@ async def _execute_run(run_id: int) -> None:
                 try:
                     # 2026.11.20(sooyeon.choi) 수정 - 합본 문항은 원본 컬렉션에서 검색(없으면 골드셋 컬렉션, 기존 동작)
                     fields = await _evaluate_item(item, run_type, config, item_collection(item, collection_name))
+                    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드
                     repo.insert_item_result(run_id, qa_id, **fields)
                 except Exception as e:
                     logger.error(f"[eval] run {run_id} qa {qa_id} 실패: {e}")
@@ -120,10 +125,12 @@ async def _evaluate_item(
         # 운영 RAG 1회 실행 결과로 검색·답변·Citation을 함께 평가한다.
         from app.evaluation.runner.e2e_evaluator import evaluate_end_to_end
         # 운영 RAG 파이프라인 실행
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드
         e2e_fields = await evaluate_end_to_end(item, config, collection_name)
         fields.update(e2e_fields)
 
     # 2026.11.17(sooyeon.choi) 수정 - full은 그래프 실행 시간(어댑터 측정)을 쓰고, 없을 때만 항목 전체 시간
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드
     if fields.get("latency_ms") is None:
         fields["latency_ms"] = int((time.monotonic() - started) * 1000)
     # 2026.11.19(sooyeon.choi) 수정 - 반환 시간 지표(시험 4)를 넣기 위해 latency_ms 확정 뒤에 정규화
@@ -222,6 +229,8 @@ async def _evaluate_retrieval(
     from app.evaluation.adapters.retrieval_adapter import EvalRetriever
     from app.evaluation.adapters.reranker_adapter import EvalReranker
 
+    # [AI+ 시험] Recall@10 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드
+    # [AI+ 시험] NDCG@5 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드
     question = item["question"]
     gold_ids: Set[str] = set(_parse_json_list(item.get("gold_chunk_ids")))
     top_k = int(config.get("retrieval_top_n", config.get("top_k", 10)))
@@ -237,16 +246,20 @@ async def _evaluate_retrieval(
             for channel in [*channels, *(["rerank"] if config.get("enable_rerank", True) else [])]
         }
 
+    # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드
+    # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (임베딩 모델)
     retriever = EvalRetriever()
     result: Dict[str, Any] = {}
     rrf_hits = None
 
     for channel in channels:
         if channel == "rrf":
+            # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드
             hits = await retriever.search_rrf(question, top_k, collection_name)
             rrf_hits = hits
         else:
             hits = await retriever.search_channel(channel, question, top_k, collection_name)
+        # [AI+ 시험] Recall@10 - 5) 상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드
         retrieved_ids = [chunk_id for chunk_id, _, _ in hits]
         retrieval_k_values = tuple(sorted(set((*_K_VALUES, top_k))))
         # 2026.11.17(sooyeon.choi) 삭제 - 문서 단위(document_*) 지표(청크 정답 기준과 이중 집계)
@@ -261,12 +274,15 @@ async def _evaluate_retrieval(
         # 2026.11.17(sooyeon.choi) 수정 - 재랭킹 입력·출력 수를 운영과 맞춤
         #   기존: RRF 상위 N(10)개만 재랭킹해 상위 K(5)개 → 운영(후보 candidate_top_k개 → reranker_top_k개)보다
         #   후보가 적어 NDCG@5가 운영과 다르게 나왔다. 지표 cutoff는 1,3,5,10 + K로 통일(full 평가와 동일).
+        # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드
         candidate_top_k = max(top_k, int(settings.candidate_top_k))
         rerank_output_k = max(rerank_top_k, int(settings.reranker_top_k))
         if rrf_hits is None or len(rrf_hits) < candidate_top_k:
             rrf_hits = await retriever.search_rrf(question, candidate_top_k, collection_name)
         try:
+            # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드
             reranked = await EvalReranker().rerank(question, rrf_hits, top_k=rerank_output_k)
+            # [AI+ 시험] NDCG@5 - 5) 재정렬된 상위 5개 문서 청크의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드
             reranked_ids = [chunk_id for chunk_id, _, _ in reranked]
             rerank_metrics = compute_channel_metrics(
                 reranked_ids, gold_ids, tuple(sorted({*_K_VALUES, rerank_top_k}))
@@ -393,6 +409,8 @@ def _aggregate_and_save_metrics(
                     #   rerank mrr@k 별칭 삭제
                     if not is_aggregated_retrieval_metric(key):
                         continue
+                    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (질의별 값 수집)
+                    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (질의별 값 수집)
                     metric_key = f"retrieval.{channel}.{key}"
                     if isinstance(value, (int, float)) and not isinstance(value, bool):
                         add(segments, metric_key, MetricResult(float(value), "evaluated"))
@@ -436,6 +454,7 @@ def _aggregate_and_save_metrics(
             add_bool_rate(segments, "answer.refusal_correct_rate", guardrail.get("refusal_correct"))
 
         # 2026.11.19(sooyeon.choi) 추가 - 시험 4 답변 생성 평균 반환 시간(ms)·첫 토큰 시간(전체 RAG 평가만)
+        # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (질의별 반환 시간 수집)
         if scope in ("full", "end_to_end"):
             for key, result in _timing_metrics(row.get("latency_ms"), row.get("timing_json")).items():
                 add(segments, key, result)
@@ -444,6 +463,7 @@ def _aggregate_and_save_metrics(
     for seg, kv in buckets.items():
         seg_metrics: Dict[str, Any] = {}
         for key, results_for_key in kv.items():
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (평균 계산)
             aggregate = MetricAggregate.from_results(results_for_key)
             value = aggregate.as_dict()
             # 시험 4: 측정 누락을 제외한 부분 평균을 공식 평균으로 표시하지 않는다.
@@ -452,6 +472,8 @@ def _aggregate_and_save_metrics(
                 value["std"] = None
             # 2026.11.19(sooyeon.choi) 추가 - 합의서 시험 1·2 계산식: 분모 = 전체 시험 질의 수.
             #   실행 오류·정답 없음(제외) 질의는 0으로 센다(평가 건수·제외·오류 건수는 그대로 표시)
+            # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (합계 ÷ 전체 질의 수)
+            # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (합계 ÷ 전체 질의 수)
             if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
                 evaluated_sum = sum(float(r.value) for r in results_for_key if r.status == "evaluated")
                 value["value"] = evaluated_sum / aggregate.total_count

@@ -68,6 +68,7 @@ async def generate_answer(state: PipelineState, deps: GraphDependencies | None =
             timing.pop(FIRST_TOKEN_AT_KEY, None)
         async for token in llm_service.chat_stream(messages, usage_sink=usage):
             if not answer_parts and isinstance(timing, dict):
+                # [AI+ 시험] 반환 시간 - 3) 질의별 답변 생성 요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드 (참고: 첫 답변 토큰 시각)
                 timing[FIRST_TOKEN_AT_KEY] = time.time()
             answer_parts.append(token)
             await adispatch_custom_event("rag_token", {"token": token})

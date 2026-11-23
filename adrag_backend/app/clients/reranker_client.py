@@ -51,6 +51,7 @@ class RerankerClient:
         # 2026.04.21(sooyeon.choi) 수정 - 로컬 모델 로드 제거, vLLM API URL/모델명 사용
         self.api_url = settings.reranker_api_url.rstrip("/")
         self.api_key = settings.reranker_api_key
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (Reranker 모델)
         self.model_name = settings.reranker_model_name
         self.timeout = settings.reranker_timeout
         # 2026.07.07(sooyeon.choi) 수정 - 모델 입력 한도 초과 시 vLLM 기본 truncation 사용
@@ -80,6 +81,7 @@ class RerankerClient:
         if not documents:
             return []
 
+        # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (관련도 점수 계산 · 내림차순 정렬)
         scores = await self._call_score_api(query, documents)
 
         scored = list(enumerate(scores))

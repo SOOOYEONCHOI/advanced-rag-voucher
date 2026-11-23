@@ -92,9 +92,12 @@ class EvalRagPipeline:
 
         # 2026.11.17(sooyeon.choi) 추가 - 응답시간은 그래프 실행(검색→재랭킹→답변 생성)만 측정.
         #   아래 평가 전용 인용 보정 LLM 호출과 지표 계산 시간은 제외한다.
+        # [AI+ 시험] 반환 시간 - 3) 질의별 답변 생성 요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드 (시작 시점)
         started = time.monotonic()
         started_wall = time.time()  # 2026.11.18(sooyeon.choi) 추가 - 첫 토큰 시각(epoch)과 같은 기준
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (운영 RAG 그래프 실행: 검색 → 재랭킹 → 답변 생성)
         result = await _get_graph().ainvoke(initial_state)
+        # [AI+ 시험] 반환 시간 - 3) 질의별 답변 생성 요청 시작 시점부터 문서 검색, 재랭킹 및 최종 답변 생성 완료 시점까지의 소요 시간을 측정하는 코드 (완료 시점 - 시작 시점, ms)
         latency_ms = int((time.monotonic() - started) * 1000)
         # 2026.11.18(sooyeon.choi) 추가 - 첫 토큰 시간(ms) = 그래프 시작 → LLM 첫 답변 토큰. timing_json에 함께 저장
         timing = dict(result.get("timing") or {})

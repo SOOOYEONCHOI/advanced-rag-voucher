@@ -60,6 +60,7 @@ async def evaluate_end_to_end(
     collection_name: str,
 ) -> Dict[str, Any]:
     """QA 1건의 end-to-end 평가 결과 필드를 반환한다."""
+    # [AI+ 시험] 반환 시간 - 1) 시험 데이터를 불러오는 코드
     question = item["question"]
     gold_answer = item.get("gold_answer", "")
     gold_chunk_ids: Set[str] = set(_parse_list(item.get("gold_chunk_ids")))
@@ -67,6 +68,7 @@ async def evaluate_end_to_end(
     expected_behavior = item.get("expected_behavior", "answer")
 
     # 1) RAG 전체 실행 (그래프 직접 호출 — reranked_chunks에 chunk_id 포함)
+    # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드
     result = await _get_pipeline().run(
         query=question,
         collection_name=collection_name,
@@ -77,6 +79,7 @@ async def evaluate_end_to_end(
     system_answer = result["answer"]
     fields: Dict[str, Any] = {
         # 2026.11.17(sooyeon.choi) 추가 - 응답시간은 그래프 실행(검색→재랭킹→답변 생성)만 측정
+        # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드
         "latency_ms": result.get("latency_ms"),
         "answer_text": system_answer,
         "timing_json": result["timing"],

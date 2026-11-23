@@ -15,12 +15,15 @@
 
 from typing import Any
 
+# [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (지표 키)
+# [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (지표 키: AGREEMENT_NDCG_KEY)
 AGREEMENT_RECALL_KEY = "retrieval.rrf.hit@10"
 AGREEMENT_NDCG_KEY = "retrieval.rerank.ndcg@5"
 JUDGE_ACCURACY_KEY = "answer.judge_accuracy"
 RESPONSE_TIME_KEY = "answer.response_time_ms"
 FIRST_TOKEN_KEY = "answer.first_token_ms"
 # 합의서 계산식: 분모 = 전체 시험 질의 수(실행 오류·정답 없음은 0으로 센다)
+# [AI+ 시험] Recall@10 - 6), NDCG@5 - 6) 분모 = 전체 시험 질의 수(오류·정답 없음 질의는 0)
 ALL_DENOMINATOR_KEYS = frozenset({AGREEMENT_RECALL_KEY, AGREEMENT_NDCG_KEY})
 RESPONSE_TIME_TARGET_MS = 15_000
 # 2026.11.19(sooyeon.choi) 수정 - 평가 화면 지표 4 판정 기준을 첫 토큰 반환 시간 평균 ≤ 5초로 변경(사용자 결정).
