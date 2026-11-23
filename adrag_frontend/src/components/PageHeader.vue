@@ -114,4 +114,14 @@ p {
     display: none;
   }
 }
+
+/* 2026.11.23(woojin.jung) 수정 - 반응형 점검 보완 */
+@media (max-width: 768px) {
+  .page-header-menu {
+    min-width: 36px;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+  }
+}
 </style>

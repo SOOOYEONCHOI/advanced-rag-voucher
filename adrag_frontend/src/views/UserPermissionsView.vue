@@ -59,7 +59,11 @@
                 부서
                 <button type="button" @click="openDepartmentModal()"><i class="fa-solid fa-plus"></i> 부서 추가</button>
               </div>
-              <input v-model="departmentSearchQuery" class="input" type="search" placeholder="부서 검색" />
+              <!-- 2026.11.23(woojin.jung) 수정 - 검색칸에 돋보기 아이콘 -->
+              <div class="dept-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input v-model="departmentSearchQuery" class="input" type="search" placeholder="부서 검색" aria-label="부서 검색" />
+              </div>
             </div>
             <ul class="dept-list">
               <li>
@@ -117,12 +121,10 @@
                   <span v-if="!selectedDepartment.active" class="status inactive">미사용</span>
                 </h3>
                 <div v-if="isAdminMode" class="dept-head-actions">
-                  <template v-if="selectedDepartment.manager">
-                    <button class="btn btn-primary btn-sm" type="button" :disabled="!selectedDepartment.active" @click="openAddModal(selectedDepartment.id)">
-                      <i class="fa-solid fa-user-plus"></i> 사용자 추가
-                    </button>
-                    <button class="btn btn-outline btn-sm" type="button" @click="openChangeManagerModal(selectedDepartment)"><i class="fa-solid fa-user-gear"></i> 운영관리자 변경</button>
-                  </template>
+                  <!-- 2026.11.23(woojin.jung) 수정 - [사용자 추가]는 페이지 상단 버튼 하나로 통일(선택한 부서가 미리 선택되어 열림) -->
+                  <button v-if="selectedDepartment.manager" class="btn btn-outline btn-sm" type="button" @click="openChangeManagerModal(selectedDepartment)">
+                    <i class="fa-solid fa-user-gear"></i> 운영관리자 변경
+                  </button>
                   <button v-else class="btn btn-primary btn-sm" type="button" :disabled="!selectedDepartment.active" @click="openManagerRegistration(selectedDepartment.id)">
                     <i class="fa-solid fa-user-gear"></i> 운영관리자 등록
                   </button>
@@ -796,8 +798,16 @@ export default {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* 2026.11.23(woojin.jung) 수정 - 사용자 표 높이를 고정하고 넘치는 행은 안에서 스크롤, 머리글은 상단 고정 */
 .table-wrap {
-  overflow-x: auto;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 table {
@@ -1479,6 +1489,10 @@ button:disabled {
   }
 
   /* 2026.11.23(woojin.jung) 추가 - 휴대폰 너비: 사용자 표를 카드로 쌓아 가로 스크롤 없이 [권한 설정]까지 보이게 */
+  .table-wrap {
+    max-height: none;
+  }
+
   .table-wrap table {
     min-width: 0;
   }
@@ -1578,33 +1592,71 @@ button:disabled {
   align-items: start;
 }
 
+/* 2026.11.23(woojin.jung) 수정 - 부서 패널 다듬기: 제목 행과 검색칸 간격, 검색 아이콘, 목록 간격, 오른쪽 카드와 같은 그림자 */
 .dept-panel {
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .dept-panel-head {
-  padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dept-search {
+  position: relative;
+}
+
+.dept-search i {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  color: #94a3b8;
+  font-size: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .dept-panel-head .input {
   width: 100%;
+  height: 36px;
+  padding-left: 31px;
 }
 
 .dept-panel-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   color: #0f172a;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
-.dept-panel-title button,
+/* 2026.11.23(woojin.jung) 수정 - [부서 추가]가 글자 링크처럼 묻혀 보여 테두리 있는 작은 버튼으로 */
+.dept-panel-title button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dept-panel-title button:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
 .link-btn {
   padding: 0;
   border: 0;
@@ -1617,8 +1669,10 @@ button:disabled {
 }
 
 .dept-list {
+  display: grid;
+  gap: 2px;
   margin: 0;
-  padding: 6px;
+  padding: 8px;
   list-style: none;
 }
 
@@ -1756,7 +1810,11 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* 2026.11.23(woojin.jung) 수정 - 부서마다 주제 수가 달라 카드 높이가 바뀌지 않도록 높이 고정, 넘치면 카드 안에서 스크롤 */
 .dept-fact {
+  box-sizing: border-box;
+  height: 92px;
+  overflow-y: auto;
   padding: 10px 12px;
   border-radius: 8px;
   color: #64748b;
@@ -2025,6 +2083,49 @@ button.role-choice-item {
 @media (max-width: 768px) {
   .role-choice {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 2026.11.23(woojin.jung) 수정 - 반응형 점검 보완 */
+@media (max-width: 1024px) {
+  .dept-panel {
+    display: block;
+  }
+
+  .dept-panel-head {
+    border-bottom: 0;
+  }
+
+  .dept-panel-head .input,
+  .dept-list {
+    display: none;
+  }
+
+  .dept-panel-title {
+    margin-bottom: 0;
+  }
+
+  .dept-panel-title button {
+    min-height: 32px;
+  }
+
+  .dept-fact {
+    height: auto;
+    max-height: 140px;
+  }
+
+  .card-head {
+    flex-wrap: wrap;
+  }
+
+  .card-title {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .step-list li.current em {
+    white-space: nowrap;
   }
 }
 </style>
