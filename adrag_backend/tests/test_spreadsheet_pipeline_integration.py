@@ -210,7 +210,7 @@ def _service(tmp_path, *, embedding_fail=False, upsert_fail=False):
         resource_staging_ttl_hours=24,
     )
     service.db = database
-    service.doc_repo = DocumentRepository(str(db_path))
+    service.doc_repo = DocumentRepository()
     service.collection_repo = _FakeCollectionRepository()
     service.embedding_client = _FakeEmbeddingClient(fail=embedding_fail)
     service.kiwi_bm25_encoder = _FakeKiwiEncoder()

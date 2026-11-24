@@ -102,10 +102,9 @@ def make_ingest_service(resource_root: Path, chunk_dir: Path, *, collection: str
     service.db = db
     # 2026.10.16 수정 - test_stats_api 등이 수집 시 sys.modules의 document_repository를 stub(object)으로
     #   바꿔 끼우므로, stub이면 원본 파일에서 직접 읽는다(전체 실행 순서 의존 방지).
-    #   경로 인자를 주면 (stub일 수 있는) 설정 모듈을 읽지 않는다 — DB 계층은 경로를 무시한다.
     service.doc_repo = _real_class(
         "app/repositories/document_repository.py", "DocumentRepository", DocumentRepository
-    )(db_path="unused")
+    )()
     service.record_repo = IngestRecordRepository(db=db)
     config = CollectionConfig(
         collection_id=collection_id, display_name=collection, qdrant_name=collection, is_active=True

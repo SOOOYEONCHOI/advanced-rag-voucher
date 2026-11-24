@@ -21,7 +21,7 @@ def reset_database_singletons():
 # 2026.06.30(sooyeon.choi) 추가 - 신규 DB에 부서명 스냅샷 저장 검증
 def test_record_stores_department_snapshot(tmp_path):
     db_path = str(tmp_path / "login-history.db")
-    repo = LoginHistoryRepository(db_path)
+    repo = LoginHistoryRepository()
 
     repo.record(
         attempted_user_id="adrag",

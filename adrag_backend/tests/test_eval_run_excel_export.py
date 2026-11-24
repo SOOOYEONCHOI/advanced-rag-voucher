@@ -62,8 +62,9 @@ def _metrics():
 
 def test_workbook_has_two_sheets_summary_tables_and_numeric_percentages():
     primary, secondary = _metrics()
+    # 2026.11.17(sooyeon.choi) 수정 - 검색 열 Recall@N → 검색 완전성 Hit@N
     item_metrics = {
-        "retrieval.rrf.recall@12": {"value": 1.0, "status": "evaluated"},
+        "retrieval.rrf.hit@12": {"value": 1.0, "status": "evaluated"},
         "retrieval.rerank.ndcg@4": {"value": .75, "status": "evaluated"},
         "answer.correctness": {"value": .8, "status": "evaluated"},
         "citation.completeness": {"value": .9, "status": "evaluated"},
@@ -72,6 +73,8 @@ def test_workbook_has_two_sheets_summary_tables_and_numeric_percentages():
         "result_id": 1, "dataset_sequence": 2, "question_type": "multihop",
         "question": "작업발판과 안전대의 기준은 무엇인가요?", "status": "ok",
         "metric_status_json": json.dumps(item_metrics),
+        # 2026.11.18(sooyeon.choi) 추가 - 응답시간·첫 토큰 시간
+        "latency_ms": 9000, "timing_json": json.dumps({"first_token_ms": 2500.0}),
     }]
 
     workbook = load_workbook(build_run_result_workbook(_run(), primary, secondary, items))
@@ -82,14 +85,17 @@ def test_workbook_has_two_sheets_summary_tables_and_numeric_percentages():
     assert summary["B16"].value == pytest.approx(.92)
     assert summary["B16"].number_format == "0.0%"
     results = workbook["항목별 결과"]
+    # 2026.11.20(sooyeon.choi) 수정 - 질의ID·정답 답변·생성 답변·인용 출처 열 추가(지표 열은 뒤로 4칸 이동)
     assert [cell.value for cell in results[1]] == [
-        "번호", "유형", "질문", "Retriever Recall@12", "Reranked NDCG@4",
-        "Answer Correctness", "Citation Completeness",
+        "번호", "질의ID", "유형", "질문", "정답 답변", "생성 답변", "인용 출처",
+        "검색 완전성 Hit@12", "Reranked NDCG@4",
+        "Answer Correctness (F2)", "Citation Completeness", "전체 응답시간(s)", "첫 토큰(s)",
     ]
-    assert [results.cell(2, column).value for column in range(1, 8)] == [
-        2, "멀티홉", "작업발판과 안전대의 기준은 무엇인가요?", 1.0, .75, .8, .9,
+    assert [results.cell(2, column).value for column in range(1, 14)] == [
+        2, None, "멀티홉", "작업발판과 안전대의 기준은 무엇인가요?", None, None, None, 1.0, .75, .8, .9, 9.0, 2.5,
     ]
-    assert results["D2"].number_format == "0.0%"
+    assert results["L2"].number_format == "0.00"
+    assert results["H2"].number_format == "0.0%"
 
 
 def test_retrieval_run_uses_status_text_and_legacy_metrics():
@@ -97,16 +103,19 @@ def test_retrieval_run_uses_status_text_and_legacy_metrics():
     items = [{
         "result_id": 1, "dataset_sequence": 1, "question_type": "factual", "question": "질문입니다.",
         "status": "ok",
-        "retrieval_json": json.dumps({"rrf": {"recall@12": .5}, "rerank": {"ndcg@4": None}}),
+        "retrieval_json": json.dumps({"rrf": {"hit@12": .5}, "rerank": {"ndcg@4": None}}),
         "metric_status_json": json.dumps({"retrieval.rerank.ndcg@4": {"value": None, "status": "excluded"}}),
     }]
     workbook = load_workbook(build_run_result_workbook(run, [], [], items))
-    row = [workbook["항목별 결과"].cell(2, column).value for column in range(4, 8)]
-    assert row == [.5, "제외", "해당 없음", "해당 없음"]
+    # 2026.11.20(sooyeon.choi) 수정 - 지표 열 위치 4칸 이동(질의ID·정답 답변·생성 답변·인용 출처)
+    row = [workbook["항목별 결과"].cell(2, column).value for column in range(8, 14)]
+    assert row == [.5, "제외", "해당 없음", "해당 없음", "해당 없음", "해당 없음"]
+    # 검색·재정렬 평가는 답변을 생성하지 않으므로 응답 시간 표가 없다
+    assert not any(cell.value == "응답 시간" for cell in workbook["지표 요약"]["A"])
 
 
 def test_repository_export_returns_all_results_in_dataset_order(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "run-export.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("컬렉션", "run_export"),
@@ -141,7 +150,7 @@ def test_run_filename_is_sanitized():
 
 @pytest.fixture
 def client(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "run-api.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("평가용 컬렉션", "run_excel_api"),
@@ -203,7 +212,8 @@ def test_download_run_api_returns_two_sheet_workbook_and_headers(client):
     assert response.headers["cache-control"] == "no-store"
     workbook = load_workbook(filename=BytesIO(response.content))
     assert workbook.sheetnames == ["지표 요약", "항목별 결과"]
-    assert workbook["항목별 결과"]["C2"].value == "안전난간 높이 기준은 무엇인가요?"
+    # 2026.11.20(sooyeon.choi) 수정 - 질의ID 열 추가로 질문은 D열
+    assert workbook["항목별 결과"]["D2"].value == "안전난간 높이 기준은 무엇인가요?"
 
 
 def test_download_run_api_rejects_missing_incomplete_and_empty_results(client):
@@ -226,3 +236,46 @@ def test_download_run_api_requires_admin_authentication():
     app.include_router(eval_router, prefix="/api")
     response = TestClient(app).get("/api/eval/runs/1/results.xlsx")
     assert response.status_code == 401
+
+
+
+def test_full_run_summary_has_response_and_first_token_timing_table():
+    # 2026.11.18(sooyeon.choi) 추가 - 답변 생성 평균 응답시간·첫 토큰 반환 시간(정상 항목만)
+    from app.evaluation.excel_exporter import run_timing_stats
+
+    items = [
+        {"status": "ok", "latency_ms": 8000, "timing_json": json.dumps({"first_token_ms": 2000.0})},
+        {"status": "ok", "latency_ms": 10000, "timing_json": json.dumps({"first_token_ms": 3000.0})},
+        {"status": "ok", "latency_ms": 500, "timing_json": json.dumps({"first_token_ms": None})},  # 차단 등
+        {"status": "error", "latency_ms": 99999, "timing_json": None},
+    ]
+    stats = run_timing_stats(items)
+    assert stats["response_ms"]["count"] == 4 and stats["response_ms"]["mean"] == pytest.approx(29624.8)
+    assert stats["first_token_ms"]["count"] == 2 and stats["first_token_ms"]["mean"] == pytest.approx(2500.0)
+
+    workbook = load_workbook(build_run_result_workbook(_run(), *_metrics(), items))
+    summary = workbook["지표 요약"]
+    labels = {row[0].value: [c.value for c in row[1:7]] for row in summary.iter_rows()}
+    assert "응답 시간" in labels
+    assert labels["답변 생성 응답시간(전체)"][0] == pytest.approx(29.62)  # 오류 포함, 초 단위 표시
+    assert labels["첫 토큰 반환 시간"][:2] == [2.5, 2.5]
+    assert labels["첫 토큰 반환 시간"][5] == 2
+
+
+def test_missing_latency_is_not_exported_as_partial_average():
+    from app.evaluation.excel_exporter import run_timing_stats, _metric_summary_value
+    from app.evaluation.metric_catalog import present_run_metrics, RESPONSE_TIME_KEY
+
+    stats = run_timing_stats([
+        {"status": "ok", "latency_ms": 1000}, {"status": "error", "latency_ms": None},
+    ])
+    assert stats["response_ms"] is None
+    assert stats["response_time_missing"] == 1
+    metrics = present_run_metrics("full", {}, [{
+        "segment": "all", "metric_key": RESPONSE_TIME_KEY, "metric_value": None,
+        "evaluated_count": 1, "excluded_count": 1, "total_count": 2,
+    }])
+    # 2026.11.19(sooyeon.choi) 수정 - 전체 반환 시간은 보조 지표(지표 4 판정은 첫 토큰 기준)
+    metric = next(m for m in metrics["secondary_metrics"] if m["key"] == RESPONSE_TIME_KEY)
+    assert metric["status"] == "incomplete"
+    assert _metric_summary_value(metric) == "측정 미완료"

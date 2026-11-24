@@ -24,6 +24,32 @@ def _row_to_dict(row) -> Dict[str, Any]:
     }
 
 
+# 2026.11.20(woojin.jung) 추가 - 부서 화면(왼쪽 부서 목록·부서 요약)용 운영관리자·인원 집계
+#   user_count 는 관리자 계정을 뺀 부서 소속 계정 수(운영관리자 포함)
+_DEPT_SELECT = """
+    SELECT d.*,
+      (SELECT COUNT(*) FROM tb_users u
+        WHERE u.department_id = d.department_id AND u.role IN ('manager', 'user')) AS user_count,
+      (SELECT COUNT(*) FROM tb_users u
+        WHERE u.department_id = d.department_id AND u.role IN ('manager', 'user') AND u.is_active) AS active_user_count,
+      (SELECT COUNT(*) FROM tb_users u
+        WHERE u.department_id = d.department_id AND u.role IN ('manager', 'user')
+          AND jsonb_array_length(COALESCE(u.blocked_topics, '[]'::jsonb)) > 0) AS blocked_user_count,
+      m.user_id AS manager_id, m.user_name AS manager_name
+    FROM tb_departments d
+    LEFT JOIN tb_users m ON m.department_id = d.department_id AND m.role = 'manager'
+"""
+
+
+def _row_with_stats(row) -> Dict[str, Any]:
+    d = _row_to_dict(row)
+    d["user_count"] = row["user_count"]
+    d["active_user_count"] = row["active_user_count"]
+    d["blocked_user_count"] = row["blocked_user_count"]
+    d["manager"] = {"id": row["manager_id"], "name": row["manager_name"]} if row["manager_id"] else None
+    return d
+
+
 class DepartmentRepository:
     """tb_departments CRUD Repository."""
 
@@ -64,40 +90,16 @@ class DepartmentRepository:
         """전체 부서 목록. search가 주어지면 department_name LIKE 필터 적용."""
         if search:
             rows = self.db.execute_query(
-                "SELECT d.*, "
-                "  (SELECT COUNT(*) FROM tb_users u WHERE u.department_id = d.department_id) AS user_count "
-                "FROM tb_departments d "
-                "WHERE d.department_name ILIKE ? "
-                "ORDER BY d.department_id",
+                f"{_DEPT_SELECT} WHERE d.department_name ILIKE ? ORDER BY d.department_id",
                 (f"%{search}%",),
             )
         else:
-            rows = self.db.execute_query(
-                "SELECT d.*, "
-                "  (SELECT COUNT(*) FROM tb_users u WHERE u.department_id = d.department_id) AS user_count "
-                "FROM tb_departments d "
-                "ORDER BY d.department_id",
-            )
-        result = []
-        for r in rows:
-            d = _row_to_dict(r)
-            d["user_count"] = r["user_count"]
-            result.append(d)
-        return result
+            rows = self.db.execute_query(f"{_DEPT_SELECT} ORDER BY d.department_id")
+        return [_row_with_stats(r) for r in rows]
 
     def get_by_id(self, department_id: str) -> Optional[Dict[str, Any]]:
-        rows = self.db.execute_query(
-            "SELECT d.*, "
-            "  (SELECT COUNT(*) FROM tb_users u WHERE u.department_id = d.department_id) AS user_count "
-            "FROM tb_departments d "
-            "WHERE d.department_id = ?",
-            (department_id,),
-        )
-        if not rows:
-            return None
-        d = _row_to_dict(rows[0])
-        d["user_count"] = rows[0]["user_count"]
-        return d
+        rows = self.db.execute_query(f"{_DEPT_SELECT} WHERE d.department_id = ?", (department_id,))
+        return _row_with_stats(rows[0]) if rows else None
 
     def get_by_name(self, department_name: str) -> Optional[Dict[str, Any]]:
         rows = self.db.execute_query(
@@ -207,11 +209,16 @@ class DepartmentRepository:
 
     # ── 대화 주제 목록 ────────────────────────────────────────────────────────
 
-    def get_all_topics(self) -> List[str]:
-        """시스템 전체 대화 주제 목록 (tb_collections.topic_name DISTINCT)."""
-        rows = self.db.execute_query(
-            "SELECT DISTINCT topic_name FROM tb_collections "
-            "WHERE topic_name IS NOT NULL AND topic_name != '' "
-            "ORDER BY topic_name"
-        )
+    def get_all_topics(self, department_id: Optional[str] = None) -> List[str]:
+        """대화 주제 목록 (tb_collections.topic_name DISTINCT).
+
+        2026.11.23(woojin.jung) 수정 - department_id 를 주면 그 부서 대화 주제만
+        (채팅 검색은 사용자 부서의 대화 주제만 쓰므로 다른 부서 주제를 허용해도 효과가 없다)
+        """
+        sql = "SELECT DISTINCT topic_name FROM tb_collections WHERE topic_name IS NOT NULL AND topic_name != ''"
+        params: tuple = ()
+        if department_id:
+            sql += " AND department_id = ?"
+            params = (department_id,)
+        rows = self.db.execute_query(sql + " ORDER BY topic_name", params)
         return [r["topic_name"] for r in rows]

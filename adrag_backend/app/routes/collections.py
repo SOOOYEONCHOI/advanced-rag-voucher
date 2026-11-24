@@ -33,7 +33,14 @@ from app.repositories.vector_repository import VectorRepository
 from app.repositories.database import get_database_manager
 from app.core.config import get_settings
 from app.utils.datetime import format_kst_datetime
-from app.utils.security import get_current_principal
+from app.utils.security import (
+    can_manage_department,
+    get_current_principal,
+    is_manager,
+    require_content_manager,
+    require_department_manager,
+    require_department_scope,
+)
 
 # 로거 초기화
 # 2026.07.16(sooyeon.choi) 수정 - 모듈별 named logger 적용
@@ -85,23 +92,22 @@ class StartQuestionSettingsRequest(BaseModel):
     hidden: List[str] = Field(default_factory=list, max_length=100)
 
 
-# 2026.06.30(sooyeon.choi) 추가 - 컬렉션 수정·삭제는 생성자 또는 관리자만 허용
+# 2026.06.30(sooyeon.choi) 추가 - 컬렉션 수정·삭제 권한 검증
+# 2026.11.20(woojin.jung) 수정 - 생성자 기준 → 부서 기준(소속 부서 운영관리자 또는 관리자)
 def _require_collection_manager(
     collection_id: int,
     principal: dict,
     repo: CollectionRepository,
+    read_only: bool = False,
 ):
     collection = repo.get_by_id(collection_id)
     if collection is None:
         raise HTTPException(status_code=404, detail="대화 주제를 찾을 수 없습니다.")
-    if (
-        not principal.get("is_admin")
-        and collection.created_by != principal["user_id"]
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="본인이 생성한 대화 주제만 수정하거나 삭제할 수 있습니다.",
-        )
+    # 2026.11.23(woojin.jung) 수정 - 조회는 비활성 부서 운영관리자도 허용(읽기 전용)
+    if read_only:
+        require_department_scope(principal, collection.department_id)
+    else:
+        require_department_manager(principal, collection.department_id)
     return collection
 
 
@@ -118,6 +124,8 @@ async def create_collection(
     - _add_to_user_accessible() 제거 (컬렉션 권한은 topic 기반으로 자동 결정됨)
     - topic_name이 주어진 경우 effective_topics 범위 내인지 검증
     """
+    # 2026.11.20(woojin.jung) 추가 - 대화 주제 생성은 부서 운영관리자(또는 관리자)만
+    require_content_manager(principal)
     try:
         topic_name = request.topic_name or None
         department_id: Optional[str] = None
@@ -202,6 +210,9 @@ async def list_collections(
         # 2026.06.30(sooyeon.choi) 추가 - 일반 사용자는 실질 접근 컬렉션만 조회
         if principal.get("is_admin"):
             collections = repo.get_all() if include_all else repo.get_by_owner(principal["user_id"])
+        # 2026.11.20(woojin.jung) 추가 - 부서 운영관리자는 자기 부서 대화 주제 전체(관리 대상)
+        elif is_manager(principal) and not include_all:
+            collections = repo.get_by_department(principal["department_id"])
         else:
             if include_all:
                 raise HTTPException(
@@ -250,7 +261,8 @@ async def list_collections(
                 pass
             # 2026.06.30(sooyeon.choi) 추가 - 현재 사용자가 수행 가능한 기능
             owned_by_me = col.created_by == principal["user_id"]
-            can_manage = bool(principal.get("is_admin") or owned_by_me)
+            # 2026.11.20(woojin.jung) 수정 - 수정·삭제 권한은 부서 기준
+            can_manage = can_manage_department(principal, col.department_id)
             result.append(CollectionConfigResponse(
                 collection_id=col.collection_id,
                 collection_name=col.display_name,
@@ -324,8 +336,8 @@ async def get_start_question_settings(
     collection_id: int,
     principal: dict = Depends(get_current_principal),
 ):
-    """대화 주제의 채팅 시작 화면 질문 설정을 조회한다 (생성자 또는 관리자)."""
-    _require_collection_manager(collection_id, principal, CollectionRepository())
+    """대화 주제의 채팅 시작 화면 질문 설정을 조회한다 (소속 부서 운영관리자 또는 관리자)."""
+    _require_collection_manager(collection_id, principal, CollectionRepository(), read_only=True)
     try:
         return StartQuestionService().get_settings(collection_id)
     except Exception as e:
@@ -340,7 +352,7 @@ async def save_start_question_settings(
     request: StartQuestionSettingsRequest,
     principal: dict = Depends(get_current_principal),
 ):
-    """추천 질문(등록 순서 = 노출 순서)과 숨긴 질문을 통째로 교체 저장한다 (생성자 또는 관리자)."""
+    """추천 질문(등록 순서 = 노출 순서)과 숨긴 질문을 통째로 교체 저장한다 (소속 부서 운영관리자 또는 관리자)."""
     _require_collection_manager(collection_id, principal, CollectionRepository())
     try:
         result = StartQuestionService().save_settings(

@@ -18,8 +18,8 @@ from app.utils.security import get_current_principal
 
 def upload_settings(tmp_path, **overrides):
     values = dict(
-        # 2026.10.16 Phase 1.5: 업로드 큐 폴더가 sqlite_db_path 기준(routes/ingest.py)이라 tmp 아래로 둔다
-        sqlite_db_path=str(tmp_path / "instance" / "db" / "unused.db"), instance_dir=str(tmp_path / "instance"),
+        # 2026.10.16 Phase 1.5: 업로드 큐 폴더를 tmp 아래로 둔다
+        uploaded_files_base_dir=str(tmp_path / "instance" / "data"), instance_dir=str(tmp_path / "instance"),
         excel_parse_mode="docling",
         ingest_rate_limit_per_minute=0,
         ingest_max_active_jobs_per_user=0,

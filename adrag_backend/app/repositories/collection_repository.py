@@ -141,6 +141,14 @@ class CollectionRepository:
         )
         return [_row_to_config(r) for r in rows]
 
+    # 2026.11.20(woojin.jung) 추가 - 부서 운영관리자 관리 대상(수정 권한은 부서 기준)
+    def get_by_department(self, department_id: str) -> List[CollectionConfig]:
+        rows = self.db.execute_query(
+            f"{_SELECT} WHERE department_id = ? AND is_active = TRUE ORDER BY created_at",
+            (department_id,),
+        )
+        return [_row_to_config(r) for r in rows]
+
     # 2026.06.30(sooyeon.choi) 추가 - 부서 허용 주제와 개인 차단 기준의 실질 접근 컬렉션 조회
     def get_accessible_by_user(self, user_id: str) -> List[CollectionConfig]:
         rows = self.db.execute_query(

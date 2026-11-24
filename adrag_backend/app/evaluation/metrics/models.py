@@ -40,6 +40,8 @@ class MetricAggregate:
 
     @classmethod
     def from_results(cls, results: Sequence[MetricResult]) -> "MetricAggregate":
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (④ 측정된 값만 모아 합계 ÷ 건수로 평균 계산)
         values = [float(result.value) for result in results if result.status == "evaluated"]
         evaluated = len(values)
         excluded = sum(result.status == "excluded" for result in results)

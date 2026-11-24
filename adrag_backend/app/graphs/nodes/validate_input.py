@@ -70,6 +70,8 @@ async def validate_input(state: PipelineState, deps: GraphDependencies | None = 
         "error": None,
         "error_message_type": None,  # 2026.11.11(sooyeon.choi) 추가 - 이전 실행 잔류 방지
         "outcome_code": "unknown",
+        "retrieval_status": "not_run",
+        "rerank_status": "not_run",
         "retry_count": 0,
         "top_k": state.get("top_k"),
         # 2026.07.16(sooyeon.choi) 추가 - override 필드 초기화 (이전 실행 잔류 방지)

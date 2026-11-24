@@ -10,7 +10,7 @@
           <button class="btn-hamburger" @click="sidebarOpen = true"><i class="fa-solid fa-bars"></i></button>
           <div class="header-text">
             <h1>평가 실행 <span class="admin-badge">관리자</span></h1>
-            <p>골드셋으로 RAG 파이프라인을 평가하고 핵심 성과지표(목표 80%)를 확인합니다.</p>
+            <p>골드셋으로 RAG 파이프라인을 평가하고 인증 지표와 내부 참고 지표를 확인합니다.</p>
           </div>
         </div>
       </header>
@@ -27,10 +27,14 @@
               <select v-model="runForm.goldset_id" :disabled="!goldsets.length">
                 <option v-if="!goldsets.length" value="" disabled>생성된 골드셋이 없습니다</option>
                 <option v-for="g in goldsets" :key="g.goldset_id" :value="g.goldset_id">
-                  {{ g.dataset_name || g.collection_name }} v{{ g.version }} ({{ g.item_count }}건)
+                  {{ g.dataset_name || g.collection_name }} v{{ g.version }} ({{ g.item_count }}건){{ g.dataset_kind === 'merged' ? ' [합본]' : '' }}
                 </option>
               </select>
             </div>
+            <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 골드셋 안내 -->
+            <p v-if="goldsets.find((g) => g.goldset_id === runForm.goldset_id)?.dataset_kind === 'merged'" class="merged-run-hint">
+              <i class="fa-solid fa-layer-group"></i> 합본: 문항마다 원래 법령 컬렉션에서 검색하고, 지표는 단독 평가와 같은 식으로 항목별 계산 후 전체로 집계합니다.
+            </p>
             <div class="form-row">
               <label>평가 범위</label>
               <select v-model="runForm.scope">
@@ -74,6 +78,7 @@
                   <td class="center">{{ runs.length - index }}</td>
                   <td class="ds-cell">
                     <span class="strong">{{ r.dataset_name || r.collection_name || '-' }}</span>
+                    <span v-if="r.dataset_kind === 'merged'" class="merged-badge">합본</span>
                     <span v-if="r.goldset_version" class="ver">v{{ r.goldset_version }}</span>
                   </td>
                   <td class="center">{{ runTypeLabel(r.run_type) }}</td>
@@ -134,18 +139,23 @@
 
             <div class="primary-metric-groups">
             <div class="primary-metric-group" v-if="hasSearchKpis">
-              <div class="primary-metric-title">검색 품질</div>
+              <!-- 2026.11.19(sooyeon.choi) 수정 - AI+ 인증 시험 합의서 시험 1·2 (화면 표기는 '지표') -->
+              <div class="primary-metric-title">검색 품질 (지표 1·2)</div>
               <p class="metric-section-desc">
-                검색기가 정답 근거를 후보에 확보하고 재정렬 결과 상위에 배치하는 능력을 평가합니다.
+                하이브리드 검색 상위 10개에 정답 근거가 포함되는지(Recall@10), 재랭킹 상위 5개의 순위 정합성(NDCG@5)을 평가합니다. 분모는 전체 시험 질의 수입니다.
               </p>
               <div class="kpi-grid">
                 <div v-for="kpi in searchKpis" :key="kpi.key" class="kpi-card"
                      :class="{ pass: kpi.pass === true, fail: kpi.pass === false }" :title="kpi.desc">
                   <div class="kpi-label">{{ kpi.label }}</div>
                   <div class="kpi-value">{{ formatMetricState(kpi) }}</div>
-                  <div class="kpi-std" v-if="kpi.value != null && kpi.std != null">표준편차 ± {{ (kpi.std * 100).toFixed(1) }}%p</div>
+                  <div class="kpi-std" v-if="kpi.value != null && kpi.std != null">{{ formatKpiStd(kpi) }}</div>
                   <div class="kpi-desc">{{ kpi.desc }}</div>
-                  <div class="kpi-target">목표 {{ kpi.invert ? '≤' : '≥' }}{{ (kpi.target * 100).toFixed(0) }}%</div>
+                  <div class="kpi-target" v-if="kpi.target != null">{{ formatKpiTarget(kpi) }}</div>
+                  <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 실행 법령별 값(참고, 판정은 전체 값) -->
+                  <div class="kpi-law" v-if="isMergedRun && lawBreakdown(kpi)" title="같은 실행의 항목을 법령별로 나눠 같은 식으로 집계한 참고 값">
+                    <span>법령별</span> {{ lawBreakdown(kpi) }}
+                  </div>
                   <div class="kpi-status" v-if="kpi.pass !== null">
                     {{ kpi.pass ? '달성' : '미달' }}
                   </div>
@@ -155,18 +165,31 @@
 
             <div class="primary-metric-group primary-metric-divider" v-if="hasAnswerKpis"
                  :class="{ divided: hasSearchKpis }">
-              <div class="primary-metric-title">답변 및 인용 품질</div>
+              <!-- 2026.11.19(sooyeon.choi) 수정 - AI+ 인증 시험 합의서 시험 3·4 (화면 표기는 '지표') -->
+              <div class="primary-metric-title">답변 생성 (지표 3·4)</div>
               <p class="metric-section-desc">
-                생성 답변의 의미 유사도와 답변에 제시된 인용 근거의 정확성·충분성을 평가합니다.
+                3종 LLM 심사의 답변 생성 정확도와, 답변 생성 요청부터 완료까지의 평균 반환 시간을 평가합니다.
               </p>
               <div class="kpi-grid">
                 <div v-for="kpi in answerKpis" :key="kpi.key" class="kpi-card"
                      :class="{ pass: kpi.pass === true, fail: kpi.pass === false }" :title="kpi.desc">
                   <div class="kpi-label">{{ kpi.label }}</div>
                   <div class="kpi-value">{{ formatMetricState(kpi) }}</div>
-                  <div class="kpi-std" v-if="kpi.value != null && kpi.std != null">표준편차 ± {{ (kpi.std * 100).toFixed(1) }}%p</div>
-                  <div class="kpi-desc">{{ kpi.desc }}</div>
-                  <div class="kpi-target">목표 {{ kpi.invert ? '≤' : '≥' }}{{ (kpi.target * 100).toFixed(0) }}%</div>
+                  <!-- 2026.11.19(sooyeon.choi) 수정 - 지표 4: 표준편차를 첫 토큰·전체 반환 시간 위에 두고,
+                       평가·제외·오류 건수와 목표치는 표시하지 않는다(달성·미달 판정은 유지) -->
+                  <div class="kpi-std" v-if="kpi.value != null && kpi.std != null">{{ formatKpiStd(kpi) }}</div>
+                  <div class="kpi-breakdown" v-if="kpi.companion">
+                    <div><span>첫 토큰 반환 시간 (판정 기준)</span><b>{{ formatMetricState(kpi) }}</b></div>
+                    <div><span>{{ kpi.companion.label }}</span><b>{{ formatMetricState(kpi.companion) }}</b></div>
+                  </div>
+                  <template v-if="!kpi.companion">
+                    <div class="kpi-desc">{{ kpi.desc }}</div>
+                    <div class="kpi-target" v-if="kpi.target != null">{{ formatKpiTarget(kpi) }}</div>
+                  </template>
+                  <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 실행 법령별 값(참고) -->
+                  <div class="kpi-law" v-if="isMergedRun && lawBreakdown(kpi)" title="같은 실행의 항목을 법령별로 나눠 같은 식으로 집계한 참고 값">
+                    <span>법령별</span> {{ lawBreakdown(kpi) }}
+                  </div>
                   <div class="kpi-status" v-if="kpi.pass !== null">
                     {{ kpi.pass ? '달성' : '미달' }}
                   </div>
@@ -178,17 +201,18 @@
 
           <details class="card secondary-metrics" v-if="secondaryKpis.length">
             <summary class="card-title">
-              <span><i class="fa-solid fa-chart-line"></i> 보조 지표 {{ secondaryKpis.length }}개 보기</span>
+              <span><i class="fa-solid fa-chart-line"></i> 보조 지표 (내부 참고) {{ secondaryKpis.length }}개 보기</span>
               <span class="secondary-metrics-hint">
                 클릭하여 펼쳐 보세요
                 <i class="fa-solid fa-chevron-down secondary-metrics-chevron"></i>
               </span>
             </summary>
+            <p class="metric-section-desc">F2·인용·MRR·첫 토큰 시간 등은 내부 참고 지표이며 인증 합격 판정에 사용하지 않습니다.</p>
             <div class="kpi-grid">
               <div v-for="kpi in secondaryKpis" :key="kpi.key" class="kpi-card" :title="kpi.desc">
                 <div class="kpi-label">{{ kpi.label }}</div>
                 <div class="kpi-value">{{ formatMetricState(kpi) }}</div>
-                <div class="kpi-std" v-if="kpi.std != null">± {{ (kpi.std * 100).toFixed(1) }}%p</div>
+                <div class="kpi-std" v-if="kpi.std != null">{{ formatKpiStd(kpi) }}</div>
                 <div class="kpi-target">{{ kpi.desc }}</div>
               </div>
             </div>
@@ -200,12 +224,20 @@
               <i class="fa-solid fa-list-check"></i> 항목별 결과 ({{ resultsTotal }}건)
               <span class="filters">
                 <label><input type="checkbox" v-model="resultsFailedOnly" /> 문제 항목만</label>
+                <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 실행 법령 필터 -->
+                <select v-if="isMergedRun" v-model="resultsLawFilter" aria-label="법령 필터">
+                  <option value="">전체 법령</option>
+                  <option v-for="law in lawOptions" :key="law" :value="law">{{ law }}</option>
+                </select>
                 <select v-model="resultsTypeFilter">
                   <option value="">전체 유형</option>
                   <option value="factual">사실형</option>
                   <option value="procedural">절차형</option>
                   <option value="comparative">비교형</option>
                   <option value="multihop">멀티홉</option>
+                  <!-- 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성 문항 -->
+                  <option value="law">법령</option>
+                  <option value="general">일반</option>
                 </select>
                 <!-- 2026.07.24(sychoi) 추가 - 정렬 선택 -->
                 <select v-model="resultsSortBy">
@@ -219,21 +251,28 @@
             <table class="data-table results-table">
               <colgroup>
                 <col class="col-qa" />
+                <!-- 2026.11.20(sooyeon.choi) 수정 - 질의ID·(합본)법령 열 -->
+                <col class="col-qid" />
+                <col v-if="isMergedRun" class="col-law" />
                 <col class="col-type" />
                 <col class="col-question" />
               </colgroup>
               <thead>
                 <tr>
-                  <th>번호</th><th class="center">유형</th><th class="question-header" title="오른쪽 경계를 드래그해 너비 조절">질문</th>
-                  <th class="center">Retriever Recall</th><th class="center">Reranked NDCG</th>
-                  <th v-if="isFullRun" class="center">Answer Correctness</th>
-                  <th v-if="isFullRun" class="center">Citation Completeness</th>
-                  <th class="center">평가 소요 시간</th><th class="center">상세보기</th>
+                  <th>번호</th><th>질의ID</th><th v-if="isMergedRun" class="center">법령</th><th class="center">유형</th><th class="question-header" title="오른쪽 경계를 드래그해 너비 조절">질문</th>
+                  <!-- 2026.11.19(sooyeon.choi) 수정 - 주요 지표만 표시(인용 완전성·F2 유사도 등 보조 지표 제외) -->
+                  <th class="center" title="재랭킹 전 하이브리드 검색 상위 10개에 정답 근거 청크 포함 여부">지표 1 Recall@10</th>
+                  <th class="center" title="재랭킹 상위 5개 기준 NDCG">지표 2 NDCG@5</th>
+                  <th v-if="isFullRun" class="center" title="3종 LLM 심사(미구현)">지표 3 답변 정확도</th>
+                  <th v-if="isFullRun" class="center" title="첫 토큰 반환 시간(판정 기준) / 전체 반환 시간">지표 4 반환 시간</th>
+                  <th class="center">상세보기</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="item in displayResults" :key="item.result_id">
                   <td :title="`내부 QA ID: ${item.qa_id}`">{{ item.dataset_sequence ?? '-' }}</td>
+                  <td class="nowrap">{{ item.query_id || '-' }}</td>
+                  <td v-if="isMergedRun" class="center"><span class="merged-badge" :title="item.law_label">{{ lawShortLabel(item.law_label) || '-' }}</span></td>
                   <td class="center"><span class="type-badge">{{ questionTypeLabel(item.question_type) }}</span></td>
                   <td class="q-cell" :class="{ expanded: isQuestionExpanded(item.result_id) }"
                       title="더블클릭하여 질문 전체 보기/접기" @dblclick="toggleQuestion(item.result_id)">
@@ -243,18 +282,22 @@
                       <i class="fa-solid fa-circle-exclamation"></i> 평가 오류
                     </span>
                     <span v-else-if="item._issueType === 'metric_error'" class="evaluation-error-badge">지표 오류</span>
-                    <template v-else-if="item._issueType === 'diagnostic_issue'">
-                      <span v-for="issue in item.citationIssues" :key="issue.type"
-                            class="evaluation-error-badge" :title="issue.detail">
-                        {{ issue.label }}
-                      </span>
-                    </template>
                   </td>
-                  <td class="center"><span class="mini-badge" :class="metricBadgeClass(item.recallN, PRIMARY_THRESHOLDS.retrieverRecall)">{{ formatMetricState(item.recallMetric) }}</span></td>
-                  <td class="center"><span class="mini-badge" :class="metricBadgeClass(item.rerankedNdcg, PRIMARY_THRESHOLDS.rerankedNdcg)">{{ formatMetricState(item.rerankedNdcgMetric) }}</span></td>
-                  <td v-if="isFullRun" class="center"><span class="mini-badge" :class="metricBadgeClass(item.correctness, PRIMARY_THRESHOLDS.answerCorrectness)">{{ formatMetricState(item.correctnessMetric) }}</span></td>
-                  <td v-if="isFullRun" class="center"><span class="mini-badge" :class="metricBadgeClass(item.citationCompleteness, PRIMARY_THRESHOLDS.citationCompleteness)">{{ formatMetricState(item.citationCompletenessMetric) }}</span></td>
-                  <td class="center latency-cell">{{ formatLatency(item.latency_ms) }}</td>
+                  <td class="center">
+                    <span class="mini-badge" :class="item.hit10Metric?.value === 1 ? 'good' : item.hit10Metric?.value === 0 ? 'bad' : 'na'">
+                      {{ formatHit(item.hit10Metric) }}
+                    </span>
+                  </td>
+                  <td class="center">
+                    <span class="mini-badge" :class="item.ndcg5Metric?.value == null ? 'na' : item.ndcg5Metric.value >= 0.8 ? 'good' : item.ndcg5Metric.value > 0 ? 'warn' : 'bad'">
+                      {{ formatMetricState(item.ndcg5Metric) }}
+                    </span>
+                  </td>
+                  <td v-if="isFullRun" class="center"><span class="mini-badge na">미측정</span></td>
+                  <td v-if="isFullRun" class="center latency-cell">
+                    <span :class="{ 'latency-over': item.firstTokenMs != null && item.firstTokenMs > 5000 }">{{ formatSeconds(item.firstTokenMs) }}</span>
+                    <span class="latency-total"> / {{ formatSeconds(item.latency_ms) }}</span>
+                  </td>
                   <td class="center"><button class="btn-detail" @click="showDetail(item)">상세</button></td>
                 </tr>
               </tbody>
@@ -358,7 +401,7 @@
           <div v-if="detailItem.correctnessV2F2Metric" class="detail-section">
             <h4><i class="fa-solid fa-flask"></i> Answer Correctness v2 F2 Shadow</h4>
             <div class="citation-metric-row">
-              <span class="mini-badge" :class="badgeClass(detailItem.correctnessV2F2Metric.value)">
+              <span class="mini-badge na">
                 종합 {{ formatMetricState(detailItem.correctnessV2F2Metric) }}
               </span>
               <span class="mini-badge">
@@ -394,7 +437,7 @@
           <div v-if="detailItem.citation" class="detail-section">
             <h4><i class="fa-solid fa-quote-left"></i> 근거인용 비교</h4>
             <div class="citation-metric-row">
-              <span class="mini-badge" :class="badgeClass(detailItem.citation.completeness)">
+              <span class="mini-badge na">
                 Citation Completeness {{ formatMetric(detailItem.citation.completeness) }}
               </span>
             </div>
@@ -500,14 +543,16 @@ const {
   goldsets, runs, selectedRun, displayResults, resultsTotal,
   resultsPage, resultsTotalPages, goToResultsPage,
   resultsTypeFilter, resultsFailedOnly, resultsSortBy, detailItem,
+  // 2026.11.20(sooyeon.choi) 수정 - 합본 실행
+  resultsLawFilter, isMergedRun, lawOptions, lawShortLabel, lawBreakdown,
   deleteRunId, isDeletingRun, downloadingRunId,
   runForm, isRunning, isFullRun, progressPercent, runCutoffs,
-  searchKpis, hasSearchKpis, secondaryKpis, answerKpis, hasAnswerKpis,
+  searchKpis, hasSearchKpis, secondaryKpis, answerKpis, hasAnswerKpis, formatKpiTarget, formatKpiStd,
   loadGoldsets, loadRuns, startRun, selectRun, cancelRun, downloadRunExcel, deleteRun,
   closeDeleteRunModal, confirmDeleteRun,
   showDetail, closeDetail, logout,
-  formatMetric, formatLatency, questionTypeLabel,
-  statusLabel, runTypeLabel, formatDate, badgeClass, metricBadgeClass, PRIMARY_THRESHOLDS,
+  formatMetric, formatLatency, formatHit, formatSeconds, questionTypeLabel,
+  statusLabel, runTypeLabel, formatDate,
   channelLabel, goldRefs, systemRefs, openDocument, prettyJson, formatMetricState,
 } = useEvalRuns();
 
@@ -649,6 +694,13 @@ input[type="checkbox"] { width: auto; padding: 0; border: none; flex-shrink: 0; 
 .results-table { min-width: calc(var(--question-column-width, 280px) + 920px); table-layout: fixed; }
 .results-table .col-qa { width: 64px; }
 .results-table .col-type { width: 78px; }
+/* 2026.11.20(sooyeon.choi) 수정 - 질의ID·법령 열, 합본 표시 */
+.results-table .col-qid { width: 84px; }
+.results-table .col-law { width: 120px; }
+.merged-badge { display: inline-block; background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 999px; padding: 0 0.45rem; font-size: 0.72rem; font-weight: 600; margin-left: 0.25rem; white-space: nowrap; }
+.merged-run-hint { color: #6d28d9; font-size: 0.78rem; margin: 0.2rem 0 0.6rem; }
+.kpi-law { margin: 0.2rem 0 0; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0; font-size: 0.72rem; color: #475569; }
+.kpi-law span { color: #7c3aed; font-weight: 700; margin-right: 0.2rem; }
 .results-table .col-question { width: var(--question-column-width, 280px); }
 .results-table .question-header { position: relative; cursor: col-resize; user-select: none; padding-right: 1.6rem; }
 .results-table .question-header::after { content: '\2194'; position: absolute; top: 0; right: 0; bottom: 0; width: 18px;
@@ -663,6 +715,9 @@ input[type="checkbox"] { width: auto; padding: 0; border: none; flex-shrink: 0; 
   border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 0.68rem; font-weight: 700; white-space: nowrap; vertical-align: middle; }
 .type-badge { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 10px; background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
 .latency-cell { color: #64748b; white-space: nowrap; }
+/* 2026.11.19(sooyeon.choi) 추가 - 지표 4: 첫 토큰(판정) / 전체 반환 시간 */
+.latency-cell .latency-total { color: #94a3b8; font-size: 0.75rem; }
+.latency-cell .latency-over { color: #b91c1c; font-weight: 600; }
 .btn-detail { padding: 6px 14px; border: 1px solid #dbe3ed; border-radius: 8px; background: #fff; color: #334155; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
 .btn-detail:hover { border-color: #94a3b8; background: #f8fafc; color: #0f172a; }
 .status-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #e2e8f0; color: #475569; }
@@ -673,6 +728,16 @@ input[type="checkbox"] { width: auto; padding: 0; border: none; flex-shrink: 0; 
 .primary-metrics > .card-title { margin-bottom: 1rem; }
 .primary-metric-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
 .primary-metric-group { min-width: 0; }
+/* 2026.11.19(sooyeon.choi) 수정 - 지표 1·2와 지표 3·4 카드 4개 높이를 같게.
+   두 묶음의 제목·설명·카드 줄을 같은 격자 줄(subgrid)에 맞춰, 설명 길이가 달라도 카드 줄 높이가 같다 */
+.primary-metrics .primary-metric-groups { grid-template-rows: auto auto 1fr; }
+.primary-metrics .primary-metric-group { display: grid; grid-row: span 3; grid-template-rows: subgrid; }
+.primary-metrics .primary-metric-group .kpi-grid { grid-auto-rows: 1fr; align-self: stretch; }
+.primary-metrics .kpi-card { display: flex; flex-direction: column; }
+/* 2026.11.19(sooyeon.choi) 수정 - 주요 지표 카드 높이 축소(설명 최소 높이 해제, 여백 축소) */
+.primary-metrics .kpi-card .kpi-desc { min-height: 0; margin: 0.1rem 0; }
+.primary-metrics .kpi-card .kpi-value { margin: 0.1rem 0; }
+.primary-metrics .kpi-card .kpi-status { margin-top: auto; align-self: center; }
 .primary-metric-title { margin-bottom: 0.25rem; color: #334155; font-size: 0.9rem; font-weight: 700; }
 .metric-section-desc { margin: 0 0 0.75rem; color: #64748b; font-size: 0.78rem; line-height: 1.45; }
 .primary-metric-divider.divided { margin-left: 1.25rem; padding-left: 1.25rem; border-left: 1px solid #e2e8f0; }
@@ -687,6 +752,10 @@ input[type="checkbox"] { width: auto; padding: 0; border: none; flex-shrink: 0; 
 .kpi-label { font-size: 0.75rem; color: #475569; line-height: 1.3; }
 .kpi-value { font-size: 1.5rem; font-weight: 800; margin: 0.15rem 0; }
 .kpi-std { font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.1rem; }
+/* 2026.11.19(sooyeon.choi) 추가 - 지표 4 전체·첫 토큰 반환 시간 */
+.kpi-breakdown { margin: 0.25rem 0; font-size: 0.74rem; color: #475569; }
+.kpi-breakdown > div { display: flex; justify-content: space-between; gap: 0.5rem; }
+.kpi-breakdown b { color: #1e293b; font-weight: 600; }
 .kpi-desc { min-height: 2em; margin: 0.2rem 0; color: #64748b; font-size: 0.72rem; line-height: 1.35; }
 .kpi-target { display: inline-block; margin-right: 0.45rem; color: #64748b; font-size: 0.7rem; }
 .kpi-status { display: inline-block; padding: 0.08rem 0.65rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }

@@ -33,6 +33,23 @@
             <i class="fa-solid fa-circle-info"></i>
             위 목록에서 데이터셋 행을 클릭하면 QA 검토(승인·수정·반려)와 골드셋 버전 확정을 진행할 수 있습니다.
           </p>
+          <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋: 확정 데이터셋 2개 이상 체크 → [합본 데이터셋 만들기] -->
+          <div v-if="datasets.length && mergeEnabled && mergeSelection.length" class="merge-bar" aria-live="polite">
+            <b>{{ mergeSelection.length }}개 선택</b>
+            <span class="merge-sum">
+              {{ mergeSelection.length >= 2
+                ? mergeSelectedDatasets.map((d) => `${d.name} ${d.approved_count ?? 0}`).join(' + ') + ` = ${mergeItemTotal}문항`
+                : '2개 이상 골라야 합칠 수 있습니다' }}
+            </span>
+            <span class="merge-spacer"></span>
+            <button class="btn-secondary" @click="clearMergeSelection">선택 해제</button>
+            <button class="btn-merge" :disabled="mergeSelection.length < 2" @click="openMergeModal">
+              <i class="fa-solid fa-layer-group"></i> 합본 데이터셋 만들기
+            </button>
+          </div>
+          <p v-else-if="datasets.length && mergeEnabled" class="merge-hint">
+            <i class="fa-solid fa-layer-group"></i> 확정된 데이터셋 2개 이상을 체크하면 한 데이터셋(합본)으로 합쳐 한 번에 평가할 수 있습니다.
+          </p>
           <div v-if="!datasets.length" class="empty-state">
             <i class="fa-regular fa-folder-open"></i>
             <p>생성된 데이터셋이 없습니다. "테스트셋 생성"으로 시작하세요.</p>
@@ -40,25 +57,44 @@
           <div v-else class="dataset-table-scroll" role="region" aria-label="평가 데이터셋 목록" tabindex="0">
             <table class="data-table">
               <thead>
-                <tr><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">최종 수정일</th><th class="center">다운로드</th><th class="center">삭제</th></tr>
+                <tr><th v-if="mergeEnabled" class="center" title="합본에 넣을 확정 데이터셋 선택">선택</th><th class="center">순번</th><th>이름</th><th>컬렉션</th><th class="center" title="시험 데이터셋 Excel의 질의ID 앞부분(예: 산안 → 산안-001)">질의ID 접두어</th><th class="center">상태</th><th class="center">QA (승인/전체)</th><th class="center">생성일</th><th class="center">최종 수정일</th><th class="center">다운로드</th><th class="center">삭제</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(d, index) in datasets" :key="d.dataset_id"
                     :class="{ selected: selectedDataset && selectedDataset.dataset_id === d.dataset_id }"
                     @click="selectDataset(d)">
+                  <td v-if="mergeEnabled" class="center" @click.stop>
+                    <input type="checkbox" :checked="isMergeSelected(d)" :disabled="!canMergeSelect(d)"
+                           :title="isMerged(d) ? '합본은 다시 합칠 수 없습니다' : (canMergeSelect(d) ? '합본에 넣기' : '확정(골드셋)된 데이터셋만 합칠 수 있습니다')"
+                           :aria-label="`${d.name} 합본 선택`" @change="toggleMergeSelect(d)" />
+                  </td>
                   <td class="center">{{ datasets.length - index }}</td>
-                  <td class="strong">{{ d.name }}</td>
-                  <td>{{ d.collection_name }}</td>
+                  <td class="strong">{{ d.name }} <span v-if="isMerged(d)" class="merged-badge">합본</span></td>
+                  <td>{{ collectionLabel(d) }}</td>
+                  <!-- 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 표시·변경(확정 데이터셋 포함, 합본은 원본 질의ID 유지) -->
+                  <td class="center" @click.stop>
+                    <span v-if="isMerged(d)" class="prefix-muted" title="합본은 원본 질의ID를 그대로 씁니다">원본 유지</span>
+                    <template v-else>
+                      <code class="prefix-code">{{ queryIdPrefix(d) }}</code>
+                      <button class="btn-prefix-edit" :disabled="d.status === 'generating'"
+                              :title="d.status === 'generating' ? '생성 중에는 바꿀 수 없습니다' : '질의ID 접두어 변경'"
+                              :aria-label="`${d.name} 질의ID 접두어 변경`" @click="openPrefixModal(d)">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                    </template>
+                  </td>
                   <td class="center"><span class="status-badge" :class="d.status">{{ statusLabel(d.status) }}</span></td>
                   <td class="center">{{ d.approved_count ?? 0 }} / {{ d.item_count ?? 0 }}</td>
                   <td class="center">{{ formatDate(d.created_at) }}</td>
                   <!-- 최종 수정일 (생성 진행/상태 변경 + QA 검수 시 갱신) -->
                   <td class="center">{{ formatDate(d.updated_at) }}</td>
                   <td class="center">
+                    <!-- 2026.11.19(sooyeon.choi) 수정 - 다운로드를 하나로 통합(질의·정답 근거·검수 정보·요약).
+                         승인 QA Excel 버튼은 내용이 겹쳐 숨김(API approved-items.xlsx는 유지) -->
                     <button class="btn-download-excel"
                             :disabled="(d.approved_count ?? 0) < 1 || downloadingDatasetId !== null"
-                            :title="(d.approved_count ?? 0) < 1 ? '승인된 QA가 없습니다' : '승인 QA Excel 다운로드'"
-                            @click.stop="downloadApprovedExcel(d)">
+                            :title="(d.approved_count ?? 0) < 1 ? '승인된 QA가 없습니다' : '데이터셋 다운로드(질의·정답 근거·검수 정보)'"
+                            @click.stop="downloadTestsetExcel(d)">
                       <i class="fa-solid"
                          :class="downloadingDatasetId === d.dataset_id ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
                     </button>
@@ -91,8 +127,9 @@
               <div class="card-title"><i class="fa-solid fa-list-check"></i> QA 검토 — {{ selectedDataset.name }}</div>
               <div class="counts">
                 승인 <b>{{ approvedCount }}</b> / {{ datasetItemCount }}
+                <!-- 2026.11.19(sooyeon.choi) 수정 - '미검출' → '검색 확인 필요' -->
                 <span v-if="undetectedCount" class="warn-inline">
-                  · 미검출 <b>{{ undetectedCount }}</b>
+                  · 검색 확인 필요 <b>{{ undetectedCount }}</b>
                 </span>
               </div>
             </div>
@@ -111,12 +148,16 @@
                 <option value="procedural">절차형</option>
                 <option value="comparative">비교형</option>
                 <option value="multihop">멀티홉</option>
+                <!-- 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성 문항 -->
+                <option value="law">법령</option>
+                <option value="general">일반</option>
               </select>
-              <label class="chk" title="생성 질문으로 검색했을 때 원본 청크가 상위 10위 내에 없던 항목">
-                <input type="checkbox" v-model="undetectedOnly" @change="applyFilters" /> 검색 미검출만
+              <label class="chk" title="생성 직후 사전 검색에서 원본 근거가 상위 10위 밖이었던 문항(검수 참고용)">
+                <input type="checkbox" v-model="undetectedOnly" @change="applyFilters" /> 검색 확인 필요만
               </label>
               <span class="spacer"></span>
               <button
+                v-if="!selectedIsMerged"
                 class="btn-secondary"
                 :disabled="!displayQaItems.length || isSelectingAll"
                 @click="toggleSelectAll"
@@ -124,26 +165,40 @@
                 <i class="fa-solid" :class="isSelectingAll ? 'fa-spinner fa-spin' : (isAllSelected ? 'fa-square-minus' : 'fa-square-check')"></i>
                 {{ isSelectingAll ? '선택 중…' : (isAllSelected ? '전체 해제' : '전체 선택') }}
               </button>
-              <button class="btn-secondary" :disabled="!selectedQaIds.length" @click="bulkApprove">
-                <i class="fa-solid fa-check-double"></i> 일괄 승인 ({{ selectedQaIds.length }})
-              </button>
-              <button class="btn-secondary danger" :disabled="!selectedQaIds.length" @click="bulkReject">일괄 반려</button>
+              <template v-if="!selectedIsMerged">
+                <button class="btn-secondary" :disabled="!selectedQaIds.length" @click="bulkApprove">
+                  <i class="fa-solid fa-check-double"></i> 일괄 승인 ({{ selectedQaIds.length }})
+                </button>
+                <button class="btn-secondary danger" :disabled="!selectedQaIds.length" @click="bulkReject">일괄 반려</button>
+              </template>
+            </div>
+            <!-- 2026.11.20(sooyeon.choi) 수정 - 합본은 읽기 전용(수정은 원본에서 → 확정 → 합본 다시 만들기) -->
+            <div v-if="selectedIsMerged" class="merged-note">
+              <i class="fa-solid fa-layer-group"></i>
+              구성:
+              <template v-for="(source, i) in mergedSources(selectedDataset)" :key="source.dataset_id">
+                <b>{{ source.dataset_name }}</b> 확정 v{{ source.goldset_version }} ({{ source.item_count }}문항)<template v-if="i < mergedSources(selectedDataset).length - 1"> + </template>
+              </template>
+              <br />문항은 읽기 전용입니다. 고칠 문항이 있으면 원본에서 수정·확정한 뒤 합본을 다시 만들어 주세요.
             </div>
 
             <div v-if="!displayQaItems.length" class="empty-state">
-              <p>{{ undetectedOnly ? '검색 미검출 항목이 없습니다.' : 'QA 항목이 없습니다.' }}</p>
+              <p>{{ undetectedOnly ? '검색 확인이 필요한 항목이 없습니다.' : 'QA 항목이 없습니다.' }}</p>
             </div>
             <div v-else class="qa-list">
               <article v-for="item in displayQaItems" :key="item.qa_id" class="qa-item" :class="item.review_status">
                 <div class="qa-row">
-                  <input type="checkbox" :value="item.qa_id" v-model="selectedQaIds" />
+                  <input v-if="!selectedIsMerged" type="checkbox" :value="item.qa_id" v-model="selectedQaIds" />
                   <div class="qa-body" @click="toggleExpand(item)">
                     <div class="qa-meta">
+                      <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 문항의 질의ID·법령 -->
+                      <span v-if="item.source_meta?.query_id" class="type-badge">{{ item.source_meta.query_id }}</span>
+                      <span v-if="item.source_meta?.law_label" class="merged-badge">{{ item.source_meta.law_label }}</span>
                       <span class="type-badge">{{ typeLabel(item.question_type) }}</span>
                       <span class="status-badge" :class="item.review_status">{{ reviewLabel(item.review_status) }}</span>
                       <span v-if="item.self_valid_rank == null" class="warn-badge"
-                            title="생성 질문으로 검색 시 원본 청크가 상위 10위 내 미검출 — 검색기 약점 후보">
-                        <i class="fa-solid fa-triangle-exclamation"></i> 검색 미검출
+                            title="생성 직후 사전 검색에서 원본 근거가 상위 10위 밖이었던 문항(검수 참고용)">
+                        <i class="fa-solid fa-triangle-exclamation"></i> 검색 확인 필요
                       </span>
                       <span v-else class="rank-badge">검색 순위 {{ item.self_valid_rank }}위</span>
                       <span v-if="item.expected_behavior && item.expected_behavior !== 'answer'" class="behavior-badge">
@@ -155,9 +210,16 @@
                     <div class="qa-answer">A. {{ item.gold_answer }}</div>
                   </div>
                   <div class="qa-actions">
-                    <button class="icon-btn approve" title="승인" @click.stop="approveItem(item)"><i class="fa-solid fa-check"></i></button>
-                    <button class="icon-btn edit" title="수정" @click.stop="startEdit(item)"><i class="fa-solid fa-pen"></i></button>
-                    <button class="icon-btn reject" title="반려" @click.stop="rejectItem(item)"><i class="fa-solid fa-xmark"></i></button>
+                    <template v-if="!selectedIsMerged">
+                      <button class="icon-btn approve" title="승인" @click.stop="approveItem(item)"><i class="fa-solid fa-check"></i></button>
+                      <button class="icon-btn edit" title="수정" @click.stop="startEdit(item)"><i class="fa-solid fa-pen"></i></button>
+                      <button class="icon-btn reject" title="반려" @click.stop="rejectItem(item)"><i class="fa-solid fa-xmark"></i></button>
+                    </template>
+                    <!-- 2026.11.19(sooyeon.choi) 추가 - '검색 확인 필요' 문항만 같은 조항(섹션)으로 다시 생성 -->
+                    <button v-if="canRegenerate(item)" class="icon-btn edit" :title="regenerateLabel(item)"
+                            :disabled="regeneratingQaId !== null" @click.stop="regenerateItem(item)">
+                      <i class="fa-solid" :class="regeneratingQaId === item.qa_id ? 'fa-spinner fa-spin' : 'fa-rotate'"></i>
+                    </button>
                   </div>
                 </div>
                 <!-- 근거 원문 펼침 -->
@@ -184,7 +246,8 @@
           <!-- 3. 골드셋 버전 -->
           <section class="card" v-if="!isGenerating">
             <div class="card-title"><i class="fa-solid fa-medal"></i> 골드셋 버전</div>
-            <form class="finalize-row" @submit.prevent="finalizeDataset">
+            <p v-if="selectedIsMerged" class="hint">합본은 만들 때 확정(v1)됩니다. 원본을 고쳤다면 합본을 다시 만들어 주세요.</p>
+            <form v-else class="finalize-row" @submit.prevent="finalizeDataset">
               <input v-model="finalizeNote" placeholder="버전 메모 (예: 초기 30문항)" />
               <button type="submit" class="btn-primary" :disabled="!approvedCount">
                 <i class="fa-solid fa-flag-checkered"></i> 승인 항목으로 골드셋 확정 ({{ approvedCount }}건)
@@ -227,15 +290,50 @@
               </option>
             </select>
           </div>
+          <!-- 2026.11.19(sooyeon.choi) 추가 - 생성 방식. 단일 출처 = 질의 1건당 근거 청크 1개, 질문 유형 구분 없음 -->
           <div class="form-row">
-            <label>생성 목표 건수 <span class="label-hint">5~200</span></label>
+            <label>생성 방식</label>
+            <select v-model="createForm.generation_mode">
+              <option value="typed">유형별 (사실·절차·비교·멀티홉)</option>
+              <option value="law_article">법령 조항 (조항별 고르게)</option>
+              <option value="single_section">일반 문서 (섹션별 고르게)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>생성 목표 건수 <span class="label-hint">5~200{{ createForm.generation_mode === 'law_article' ? ' · 법령별 60 권장' : '' }}</span></label>
             <input type="number" v-model="createForm.target_count" min="5" max="200" />
+          </div>
+          <template v-if="createForm.generation_mode === 'law_article'">
+            <div class="form-row">
+              <label>조항 직접 언급 비율 <span class="label-hint">% · 질문에 "제N조"를 넣는 비율</span></label>
+              <input type="number" v-model="createForm.article_ref_ratio" min="0" max="100" />
+            </div>
+            <div class="form-row">
+              <label class="chk"><input type="checkbox" v-model="createForm.include_annex" /> 별표 포함 <span class="label-hint">끄면 조문이 모자랄 때만 보충</span></label>
+            </div>
+          </template>
+          <div class="form-row" v-if="createForm.generation_mode !== 'typed'">
+            <label>질의ID 접두어 <span class="label-hint">예: 산안 → 산안-001 (비우면 Q)</span></label>
+            <input v-model="createForm.query_id_prefix" maxlength="20" placeholder="Q" />
           </div>
           <div class="form-row">
             <label>생성 LLM</label>
             <select v-model="createForm.llm_backend">
               <option value="vllm">로컬 vLLM (무료)</option>
               <option value="openai">OpenAI</option>
+            </select>
+          </div>
+          <!-- 2026.11.18(sooyeon.choi) 추가 - vLLM에 띄워진 모델 중 선택. 꺼진 모델은 선택 불가(데이터셋 생성 기간에만 켜는 모델 등) -->
+          <div class="form-row" v-if="createForm.llm_backend === 'vllm'">
+            <label>생성 모델</label>
+            <select v-model="createForm.llm_model" :disabled="genModelsLoading">
+              <option v-if="genModelsLoading" value="">불러오는 중...</option>
+              <option
+                v-for="m in genModels"
+                :key="m.model"
+                :value="m.model"
+                :disabled="!m.available && !m.is_default"
+              >{{ m.model }}{{ m.is_default ? ' (챗봇 기본)' : '' }}{{ m.available ? '' : ' (꺼짐)' }}</option>
             </select>
           </div>
           <!-- 2026.07.24(sychoi) 수정 - OpenAI 키는 최초 1회만 저장(관리자 계정 단위), 이후 재사용.
@@ -304,7 +402,77 @@
       </div>
     </div>
 
+    <!-- 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋 만들기 모달 -->
+    <div v-if="showMergeModal" class="modal-overlay" @pointerdown.self="showMergeModal = false">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="merge-title">
+        <div class="modal-head"><h3 id="merge-title"><i class="fa-solid fa-layer-group"></i> 합본 데이터셋 만들기</h3></div>
+        <form @submit.prevent="submitMerge">
+          <div class="modal-body">
+          <div class="form-row">
+            <label for="merge-name">합본 이름</label>
+            <input id="merge-name" v-model="mergeName" maxlength="200" required />
+          </div>
+          <div class="form-row">
+            <label>합칠 데이터셋 (고른 순서대로 이어 붙임)</label>
+            <ol class="merge-list">
+              <li v-for="d in mergeSelectedDatasets" :key="d.dataset_id">
+                <b>{{ d.name }}</b> · 최신 확정본 · {{ d.collection_name }} · 접두어 <code class="prefix-code">{{ queryIdPrefix(d) }}</code>
+              </li>
+            </ol>
+            <!-- 2026.11.23(sooyeon.choi) 추가 - 접두어가 같으면 질의ID가 겹쳐 합본이 거부되므로 미리 안내 -->
+            <p v-for="clash in mergePrefixClashes" :key="clash.prefix" class="prefix-clash" role="alert">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              {{ clash.names.join(' · ') }}의 접두어가 모두 <b>{{ clash.prefix }}</b>라 질의ID({{ clash.prefix }}-001 …)가 겹칩니다.
+              목록의 질의ID 접두어 <i class="fa-solid fa-pen"></i> 버튼으로 서로 다르게 바꿔 주세요.
+            </p>
+          </div>
+          <ul class="merge-rules">
+            <li>질의ID는 원본 그대로 유지합니다(겹치면 만들지 않음).</li>
+            <li>문항마다 원래 컬렉션에서 검색합니다. 지표 계산은 단독 평가와 같습니다(항목별 계산 → 전체 집계).</li>
+            <li>만들면 바로 확정(v1)되어 평가 실행에서 고를 수 있습니다.</li>
+            <li>원본을 고친 뒤에는 원본을 다시 확정하고 합본을 새로 만들어야 반영됩니다.</li>
+          </ul>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" :disabled="isMerging" @click="showMergeModal = false">취소</button>
+            <button type="submit" class="btn-primary" :disabled="isMerging || !mergeName.trim() || mergePrefixClashes.length > 0">
+              <i class="fa-solid" :class="isMerging ? 'fa-spinner fa-spin' : 'fa-layer-group'"></i>
+              {{ isMerging ? '만드는 중…' : '만들기' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- 평가 데이터셋 삭제 확인 모달 -->
+    <!-- 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경 모달 -->
+    <div v-if="prefixTarget" class="modal-overlay" @pointerdown.self="closePrefixModal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prefix-title">
+        <div class="modal-head"><h3 id="prefix-title"><i class="fa-solid fa-pen"></i> 질의ID 접두어 변경</h3></div>
+        <form @submit.prevent="savePrefix">
+          <div class="modal-body">
+            <div class="form-row">
+              <label for="prefix-input">{{ prefixTarget.name }} <span class="label-hint">예: 산안 → 산안-001 (비우면 Q)</span></label>
+              <input id="prefix-input" v-model="prefixInput" maxlength="20" placeholder="Q" autofocus />
+            </div>
+            <ul class="merge-rules">
+              <li>한글·영문·숫자·_·- 만 쓸 수 있습니다(최대 20자).</li>
+              <li>문항·확정본(골드셋) 내용은 바뀌지 않고, 질의ID 앞부분만 바뀝니다.</li>
+              <li>새로 내려받는 시험 데이터셋 Excel부터 적용됩니다. 이전에 받은 Excel의 질의ID는 그대로입니다.</li>
+              <li>이미 만든 합본은 만들 때의 질의ID를 유지합니다. 반영하려면 합본을 다시 만들어 주세요.</li>
+            </ul>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" :disabled="isSavingPrefix" @click="closePrefixModal">취소</button>
+            <button type="submit" class="btn-primary" :disabled="isSavingPrefix">
+              <i class="fa-solid" :class="isSavingPrefix ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+              {{ isSavingPrefix ? '저장 중…' : '저장' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div v-if="deleteDatasetTarget" class="modal-overlay delete-dataset-overlay" @pointerdown.self="closeDeleteDatasetModal">
       <div class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-dataset-title">
         <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -337,26 +505,36 @@ import { useEvalSettings } from '../composables/useEvalSettings';
 
 const {
   isAdmin, displayName, sidebarOpen, isLoading, loadError, toast,
-  datasets, selectedDataset, downloadingDatasetId, isGenerating, generateProgress,
+  datasets, selectedDataset, downloadingDatasetId, downloadingKind, isGenerating, generateProgress,
   displayQaItems, qaTotal, qaPage, qaTotalPages,
   statusFilter, typeFilter, undetectedOnly, undetectedCount,
   selectedQaIds, isAllSelected, isSelectingAll, toggleSelectAll, editingItem,
   approvedCount, datasetItemCount, showCreateModal, collections, createForm, goldsets, finalizeNote,
+  genModels, genModelsLoading, loadGenModels,
   deleteDatasetTarget, isDeletingDataset,
-  loadDatasets, loadCollections, selectDataset, downloadApprovedExcel, applyFilters, goToPage, toggleExpand,
+  loadDatasets, loadCollections, selectDataset, downloadApprovedExcel, downloadTestsetExcel, applyFilters, goToPage, toggleExpand,
   createDataset, approveItem, rejectItem, bulkApprove, bulkReject,
+  regeneratingQaId, canRegenerate, regenerateLabel, regenerateItem,
   startEdit, toggleEditTag, saveEdit, cancelEdit, finalizeDataset, deleteDataset,
   closeDeleteDatasetModal, confirmDeleteDataset, logout,
   statusLabel, typeLabel, reviewLabel, tagLabel, behaviorLabel, formatDate,
   EXPECTED_BEHAVIOR_OPTIONS, AVAILABLE_TAGS,
+  // 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋
+  mergeEnabled, mergeSelection, showMergeModal, mergeName, isMerging, mergeSelectedDatasets, mergeItemTotal,
+  selectedIsMerged, isMerged, mergedSources, collectionLabel, canMergeSelect, isMergeSelected,
+  toggleMergeSelect, clearMergeSelection, openMergeModal, submitMerge,
+  // 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경
+  queryIdPrefix, mergePrefixClashes, prefixTarget, prefixInput, isSavingPrefix, openPrefixModal, closePrefixModal, savePrefix,
 } = useEvalDatasets();
 
 // 2026.07.24(sychoi) 추가 - 평가 전용 OpenAI 키 1회 저장/재사용
 const { hasOpenAIKey, keyInput, savingKey, keyError, loadKeyStatus, saveKey } = useEvalSettings();
 const changingKey = ref(false);
 const onSaveKey = async () => { if (await saveKey()) changingKey.value = false; };
+// 2026.11.18(sooyeon.choi) 수정 - vLLM은 모델 목록을 다 불러온 뒤에만 생성 가능
 const canCreateDataset = computed(() => !isGenerating.value
-  && (createForm.value.llm_backend !== 'openai' || hasOpenAIKey.value));
+  && (createForm.value.llm_backend !== 'openai' || hasOpenAIKey.value)
+  && (createForm.value.llm_backend !== 'vllm' || !genModelsLoading.value));
 const submitCreateDataset = () => {
   if (canCreateDataset.value) createDataset();
 };
@@ -366,6 +544,7 @@ const openCreate = () => {
   changingKey.value = false;
   loadCollections();
   loadKeyStatus();
+  loadGenModels();
 };
 
 onMounted(loadDatasets);
@@ -399,6 +578,24 @@ onMounted(loadDatasets);
 .muted { color: #94a3b8; }
 .strong { font-weight: 600; }
 .hint { color: #94a3b8; font-size: 0.82rem; }
+/* 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋 */
+.merge-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; font-size: 0.82rem; color: #1e3a8a; }
+.merge-sum { color: #475569; }
+.merge-spacer { flex: 1; }
+.merge-hint { color: #64748b; font-size: 0.78rem; margin: 0 0 0.5rem; }
+.btn-merge { background: #7c3aed; border: 1px solid #7c3aed; color: #fff; border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; }
+.btn-merge:disabled { opacity: 0.45; cursor: not-allowed; }
+.merged-badge { display: inline-block; background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 999px; padding: 0 0.5rem; font-size: 0.72rem; font-weight: 600; margin-left: 0.25rem; }
+.merged-note { background: #f5f3ff; border: 1px dashed #a78bfa; color: #4c1d95; border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0.6rem 0; font-size: 0.8rem; line-height: 1.6; }
+.merge-list { margin: 0.2rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; line-height: 1.7; color: #334155; }
+.merge-rules { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.78rem; line-height: 1.7; color: #64748b; }
+/* 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 */
+.prefix-code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0 0.35rem; font-size: 0.78rem; color: #0f172a; }
+.prefix-muted { color: #94a3b8; font-size: 0.75rem; }
+.btn-prefix-edit { background: none; border: none; color: #64748b; cursor: pointer; padding: 0 0.25rem; font-size: 0.72rem; }
+.btn-prefix-edit:hover:not(:disabled) { color: #2563eb; }
+.btn-prefix-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+.prefix-clash { margin: 0.5rem 0 0; padding: 0.45rem 0.6rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #b91c1c; font-size: 0.78rem; line-height: 1.6; }
 .label-hint { font-weight: 400; color: #94a3b8; font-size: 0.72rem; margin-left: 4px; }
 /* 2026.07.24(sychoi) 추가 - OpenAI 키 저장 UI */
 .key-saved { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #15803d; }

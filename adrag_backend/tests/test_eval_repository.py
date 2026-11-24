@@ -28,7 +28,7 @@ def reset_database_singletons():
 @pytest.fixture
 def repo(tmp_path):
     """임시 DB 초기화 + 부모 컬렉션 1건 생성 후 EvalRepository 반환."""
-    db = database.get_database_manager(str(tmp_path / "eval.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("평가용 컬렉션", "eval_test_coll"),

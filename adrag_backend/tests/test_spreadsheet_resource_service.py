@@ -255,7 +255,7 @@ async def test_download_applies_document_permission_and_hides_absolute_path(monk
     monkeypatch.setattr(
         resource_routes,
         "get_settings",
-        lambda: type("Settings", (), {"instance_dir": str(tmp_path), "sqlite_db_path": str(tmp_path / "unused.db")})(),
+        lambda: type("Settings", (), {"instance_dir": str(tmp_path)})(),
     )
     monkeypatch.setattr(
         resource_routes,
@@ -392,7 +392,7 @@ async def test_list_api_applies_permission_and_hides_absolute_path(monkeypatch, 
     monkeypatch.setattr(
         resource_routes,
         "get_settings",
-        lambda: type("Settings", (), {"instance_dir": str(tmp_path), "sqlite_db_path": str(tmp_path / "unused.db")})(),
+        lambda: type("Settings", (), {"instance_dir": str(tmp_path)})(),
     )
     monkeypatch.setattr(
         resource_routes,

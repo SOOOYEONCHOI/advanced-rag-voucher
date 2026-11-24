@@ -75,26 +75,33 @@ class CollectionService:
         # 2026.06.25(sooyeon.choi) 수정 - Qdrant Dashboard에서 직접 삭제된 컬렉션의 SQLite 잔여 메타데이터 정리
         self._cleanup_missing_qdrant_collection(qdrant_name, display_name, created_by)
 
-        # 사용자별 최대 개수 검증
-        owner_count = (
-            self.collection_repo.count_by_owner(created_by)
-            if created_by else self.collection_repo.count()
-        )
+        # 2026.11.23(woojin.jung) 수정 - 최대 개수·이름 중복은 생성자가 아니라 부서 기준
+        #   (운영관리자가 바뀌어도 부서 대화 주제 수가 그대로 이어지고, 화면의 "n / 10 등록됨"과 같은 기준)
+        if department_id:
+            department_collections = self.collection_repo.get_by_department(department_id)
+            owner_count = len(department_collections)
+            existing = [c for c in department_collections if c.display_name == display_name]
+        else:
+            # 사용자별 최대 개수 검증
+            owner_count = (
+                self.collection_repo.count_by_owner(created_by)
+                if created_by else self.collection_repo.count()
+            )
+            # 2026.06.16(sooyeon.choi) 수정 - collection_name → display_name, get_by_name → get_by_display_name
+            existing = (
+                [
+                    c for c in self.collection_repo.get_by_owner(created_by)
+                    if c.display_name == display_name
+                ]
+                if created_by
+                else (
+                    [self.collection_repo.get_by_display_name(display_name)]
+                    if self.collection_repo.get_by_display_name(display_name) else []
+                )
+            )
         if owner_count >= self.settings.max_collections:
             raise ValueError(f"최대 {self.settings.max_collections}개까지 등록 가능합니다")
 
-        # 2026.06.16(sooyeon.choi) 수정 - collection_name → display_name, get_by_name → get_by_display_name
-        existing = (
-            [
-                c for c in self.collection_repo.get_by_owner(created_by)
-                if c.display_name == display_name
-            ]
-            if created_by
-            else (
-                [self.collection_repo.get_by_display_name(display_name)]
-                if self.collection_repo.get_by_display_name(display_name) else []
-            )
-        )
         if existing:
             raise ValueError("이미 등록된 컬렉션 이름입니다")
 

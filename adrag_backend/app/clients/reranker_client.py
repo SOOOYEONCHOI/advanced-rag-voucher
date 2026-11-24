@@ -21,11 +21,34 @@ class RerankerResponseError(RuntimeError):
     """vLLM score 응답 형식 또는 내용이 요청과 일치하지 않을 때 발생한다."""
 
 
+# 2026.11.19(sooyeon.choi) 수정 - Qwen3-Reranker 공식 입력 형식(모델 학습 형식, 원문 그대로 유지)
+_QWEN3_PREFIX = (
+    "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query "
+    'and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n'
+    "<|im_start|>user\n"
+)
+_QWEN3_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+
+
+def format_rerank_inputs(
+    prompt_format: str, instruction: str, query: str, documents: List[str]
+) -> Tuple[str, List[str]]:
+    """2026.11.19(sooyeon.choi) 수정 - 설정한 형식으로 (질의, 문서 목록)을 만든다. plain은 그대로."""
+    if prompt_format != "qwen3":
+        return query, documents
+    return (
+        f"{_QWEN3_PREFIX}<Instruct>: {instruction}\n<Query>: {query}\n",
+        [f"<Document>: {document}{_QWEN3_SUFFIX}" for document in documents],
+    )
+
+
 class RerankerClient:
     """vLLM /v1/score 기반 Reranker 클라이언트."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (⑥ Reranker 모델 이름·GPU 서버 주소·시간 제한·출력 개수 설정)
         self.top_k = settings.reranker_top_k
         # 2026.04.21(sooyeon.choi) 수정 - 로컬 모델 로드 제거, vLLM API URL/모델명 사용
         self.api_url = settings.reranker_api_url.rstrip("/")
@@ -34,6 +57,9 @@ class RerankerClient:
         self.timeout = settings.reranker_timeout
         # 2026.07.07(sooyeon.choi) 수정 - 모델 입력 한도 초과 시 vLLM 기본 truncation 사용
         self.truncate_prompt_tokens = settings.reranker_truncate_prompt_tokens
+        # 2026.11.19(sooyeon.choi) 수정 - 입력 형식(plain 기본 / qwen3), 설정이 없는 가짜 설정은 plain
+        self.prompt_format = getattr(settings, "reranker_prompt_format", "plain")
+        self.instruction = getattr(settings, "reranker_instruction", "")
 
     # ── 재순위화 ─────────────────────────────────────────
 
@@ -56,6 +82,8 @@ class RerankerClient:
         if not documents:
             return []
 
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (⑤ 질의–청크 관련도 점수 계산 후 점수 순 정렬, 상위 개수 반환)
         scores = await self._call_score_api(query, documents)
 
         scored = list(enumerate(scores))
@@ -66,16 +94,20 @@ class RerankerClient:
     # ── 내부 HTTP 호출 ────────────────────────────────────
 
     # 2026.04.21(sooyeon.choi) 수정 - vLLM /v1/score 엔드포인트 호출 메서드 추가
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (⑥ GPU 서버 Reranker 모델(vLLM /v1/score) 점수 요청)
     async def _call_score_api(
         self,
         query: str,
         documents: List[str],
     ) -> List[float]:
         """vLLM /v1/score 엔드포인트 호출."""
+        # 2026.11.19(sooyeon.choi) 수정 - 입력 형식 적용(문서 개수·순서는 그대로라 응답 index 검증은 동일)
+        text_1, text_2 = format_rerank_inputs(self.prompt_format, self.instruction, query, documents)
         payload = {
             "model": self.model_name,
-            "text_1": query,
-            "text_2": documents,
+            "text_1": text_1,
+            "text_2": text_2,
             # 2026.07.07(sooyeon.choi) 수정 - CE threshold가 항상 활성화 점수 기준이 되도록 고정
             "use_activation": True,
             "truncate_prompt_tokens": self.truncate_prompt_tokens,

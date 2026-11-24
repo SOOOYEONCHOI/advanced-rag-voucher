@@ -73,6 +73,10 @@ class ChunkSummary:
     score: float
     section_name: Optional[str] = None
     page_number: Optional[int] = None
+    # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의 결과 기록용 위치·순위(기존 응답은 None)
+    sheet_name: Optional[str] = None
+    step_no: Optional[int] = None
+    rank: Optional[int] = None
 
 
 # =============================================================================
@@ -255,5 +259,13 @@ class QueryResponse:
     images_total: Optional[int] = None
     # 검색/리랭킹 시간을 전체 생성시간과 분리해 비교할 수 있는 노드별 시간(s).
     timing: Dict[str, float] = field(default_factory=dict)
+    # 2026.11.18(sooyeon.choi) 추가 - 재랭킹 전 하이브리드 검색 상위 N(capture_retrieval=True일 때만 채움, 기본 빈 목록)
+    retrieved_chunks: List[ChunkSummary] = field(default_factory=list)
+    # 2026.11.18(sooyeon.choi) 추가 - 결과 코드(success·no_context 등). 일괄 질의 결과 유형 표시에 사용
+    outcome_code: Optional[str] = None
+    # 2026.11.18(sooyeon.choi) 추가 - 요청 시작 → LLM 첫 답변 토큰까지(ms). 답변을 생성하지 않았으면 None
+    first_token_ms: Optional[float] = None
+    # F-08/F-09: 검색·재랭킹의 성패를 답변 생성과 독립적으로 평가한다.
+    stage_statuses: Dict[str, str] = field(default_factory=dict)
 
 

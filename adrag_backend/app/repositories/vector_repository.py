@@ -73,6 +73,8 @@ class VectorRepository:
         self.kiwi_bm25_vector_name = kiwi_bm25_vector_name
 
         try:
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (⑤ Qdrant 벡터 DB 연결)
             self.client = QdrantClient(host=self.host, port=self.port)
             logger.info(f"Connected to Qdrant at {self.host}:{self.port}")
         except Exception as e:
@@ -601,6 +603,8 @@ class VectorRepository:
         else:
             vector_weights = [per_dense_weight for _ in dense_vectors]
         try:
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드 (② Qdrant에서 의미·BM25 검색 후보를 가중 RRF로 통합해 limit=top_k개 반환)
             response = self.client.query_points(
                 collection_name=collection,
                 prefetch=[

@@ -6,8 +6,7 @@ marked.setOptions({
   gfm: true,
 });
 
-export const escapeHtml = (value = '') =>
-  String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const escapeHtml = (value = '') => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export const formatResponse = (text = '') => {
   const html = marked.parse(String(text || ''));
@@ -16,8 +15,7 @@ export const formatResponse = (text = '') => {
   });
 };
 
-export const sortCitations = (citations = []) =>
-  [...citations].sort((a, b) => (parseInt(a.citation_id) || 0) - (parseInt(b.citation_id) || 0));
+export const sortCitations = (citations = []) => [...citations].sort((a, b) => (parseInt(a.citation_id) || 0) - (parseInt(b.citation_id) || 0));
 
 // 동일한 문서는 한 번만 표시하고, 선택 가능한 페이지 목록을 함께 구성한다.
 // 2026.07.10(sooeyon.choi) 추가 - 매핑된 매뉴얼 citation은 표시용 원본 PDF 기준 파일명/페이지 사용
@@ -26,8 +24,7 @@ export const citationDisplayFilename = (citation) =>
     ? citation.display_filename || citation.original_filename || citation.document_name || '문서명 없음'
     : citation?.original_filename || citation?.document_name || '문서명 없음';
 
-export const citationDisplayPage = (citation) =>
-  citation?.manual_display_mapped ? citation.display_page_number : citation?.page_number;
+export const citationDisplayPage = (citation) => (citation?.manual_display_mapped ? citation.display_page_number : citation?.page_number);
 
 export const groupCitationsByDocument = (citations = []) => {
   const groups = new Map();
@@ -64,17 +61,18 @@ export const groupCitationsByDocument = (citations = []) => {
 export const renderInlineCitations = (html, citations = [], renderPending = false, selectedCitationId = null, messageIndex = null, images = []) => {
   let rendered = html;
 
-  if (citations?.length || renderPending) rendered = rendered.replace(/\[(\d+)\]/g, (match, num) => {
-    const id = parseInt(num);
-    const exists = citations.some((c) => c.citation_id === id || c.citation_id === String(id));
-    const isActive = selectedCitationId != null && (selectedCitationId === id || selectedCitationId === String(id));
-    if (!exists) {
-      if (!renderPending) return match;
-      return `<span class="inline-citation pending${isActive ? ' active' : ''}" data-citation-id="${id}">[${num}]</span>`;
-    }
-    const messageArg = Number.isInteger(messageIndex) ? `, ${messageIndex}` : '';
-    return `<span class="inline-citation${isActive ? ' active' : ''}" data-citation-id="${id}" onclick="window.__openCitation(${id}${messageArg})">[${num}]</span>`;
-  });
+  if (citations?.length || renderPending)
+    rendered = rendered.replace(/\[(\d+)\]/g, (match, num) => {
+      const id = parseInt(num);
+      const exists = citations.some((c) => c.citation_id === id || c.citation_id === String(id));
+      const isActive = selectedCitationId != null && (selectedCitationId === id || selectedCitationId === String(id));
+      if (!exists) {
+        if (!renderPending) return match;
+        return `<span class="inline-citation pending${isActive ? ' active' : ''}" data-citation-id="${id}">[${num}]</span>`;
+      }
+      const messageArg = Number.isInteger(messageIndex) ? `, ${messageIndex}` : '';
+      return `<span class="inline-citation${isActive ? ' active' : ''}" data-citation-id="${id}" onclick="window.__openCitation(${id}${messageArg})">[${num}]</span>`;
+    });
 
   // 2026.10.22(woojin.jung) 수정 - 답변의 [IMG:ref]를 해당 메시지 이미지 뷰어를 여는 번호 배지로 변환
   // 2026.11.04 수정 - 스트리밍 중 LLM이 대괄호 없이 쓴 img:ref도 같은 배지로 변환
@@ -104,12 +102,9 @@ export const formatTime = (value) => {
 };
 
 export const docTypeLabel = (type) => {
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - drawing: 도면
   const map = { law: '법령', manual: '매뉴얼', general: '일반', spreadsheet: '스프레드시트', drawing: '도면' };
   return map[type] || type || '-';
 };
-// 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 문서 목록 파서 열 표시 이름(처리기 이름 → 화면 용어)
-export const parserLabel = (parser) => ({ drawing_ingest: '도면 처리기' })[parser] || parser || '-';
 export const docTypeSourceLabel = (source) => {
   const map = {
     user_selected: '사용자 선택',
@@ -117,4 +112,13 @@ export const docTypeSourceLabel = (source) => {
     file_extension: '파일 확장자',
   };
   return map[source] || source || '-';
+};
+
+// 서버 내부 파서 식별자를 문서 목록에 노출할 사용자용 이름으로 변환한다.
+export const parserTypeLabel = (type) => {
+  const map = {
+    excel_ingest: '엑셀 처리기',
+    drawing_ingest: '도면 처리기',
+  };
+  return map[type] || type || '-';
 };

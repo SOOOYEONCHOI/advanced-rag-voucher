@@ -61,7 +61,7 @@ class LLMClient:
         payload = {
             "model": self.model,
             "messages": messages,
-            "temperature": temperature or self.default_temperature,
+            "temperature": temperature if temperature is not None else self.default_temperature,
             "max_tokens": max_tokens or self.default_max_tokens,
             "stream": False,
             "chat_template_kwargs": {"enable_thinking": False},
@@ -102,7 +102,7 @@ class LLMClient:
         payload = {
             "model": self.model,
             "messages": messages,
-            "temperature": temperature or self.default_temperature,
+            "temperature": temperature if temperature is not None else self.default_temperature,
             "max_tokens": max_tokens or self.default_max_tokens,
             "stream": True,
             # 2026.06.19(sooyeon.choi) 추가 - 스트림 마지막 청크에서 토큰 사용량 수집

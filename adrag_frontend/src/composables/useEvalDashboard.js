@@ -5,36 +5,29 @@ import { useRouter } from 'vue-router';
 import { evalApi } from '../api/evalApi';
 import { useAuthStore } from '../stores/authStore';
 
+// 2026.11.19(sooyeon.choi) 수정 - 주요 지표를 AI+ 인증 시험 합의서(시험 1~3) 기준으로 변경.
+//   반환 시간(시험 4, ms)은 비율 차트와 단위가 달라 실행 결과 화면에서만 보여 준다.
+//   그 밖의 지표는 보조 지표(이전 실행의 옛 키도 라벨 유지).
 export const KPI_TARGETS = Object.freeze({
-  'retrieval.rrf.recall@10': 0.80,
+  'retrieval.rrf.hit@10': 0.80,
   'retrieval.rerank.ndcg@5': 0.80,
-  'answer.correctness': 0.80,
-  'answer.correctness.v1': 0.80,
-  'answer.correctness.v2': 0.80,
-  'answer.correctness.judge': 0.80,
-  'answer.correctness.f2': 0.80,
-  // 하위 호환 — 이전 평가 run 표시용
-  'answer.correctness_v2_shadow': 0.80,
-  'answer.correctness_v2_f2_shadow': 0.80,
-  'citation.correctness': 0.80,
-  'citation.completeness': 0.80,
+  'answer.judge_accuracy': 0.80,
 });
 
 export const PRIMARY_KPI_METRICS = [
-  { key: 'retrieval.rrf.recall@10', label: 'Retriever Recall@10' },
-  { key: 'retrieval.rerank.ndcg@5', label: 'Reranked NDCG@5' },
-  { key: 'answer.correctness', label: 'Answer Correctness' },
-  { key: 'answer.correctness.v1', label: 'Answer Correctness (v1)' },
-  { key: 'answer.correctness.v2', label: 'Answer Correctness (v2)' },
-  { key: 'answer.correctness.judge', label: 'Answer Correctness (Judge)' },
-  { key: 'answer.correctness.f2', label: 'Answer Correctness (F2)' },
-  { key: 'citation.correctness', label: 'Citation Correctness' },
-  { key: 'citation.completeness', label: 'Citation Completeness' },
+  { key: 'retrieval.rrf.hit@10', label: '검색 완전성 Recall@10' },
+  { key: 'retrieval.rerank.ndcg@5', label: '검색 최종 정합성 NDCG@5' },
+  { key: 'answer.judge_accuracy', label: '답변 생성 정확도 (LLM 심사)' },
 ];
 
 export const SECONDARY_METRICS = [
-  { key: 'retrieval.rerank.mrr@5', label: 'Reranked MRR@5' },
+  { key: 'retrieval.rrf.recall@10', label: '정답 청크 커버율 Recall@10' },
+  { key: 'retrieval.rerank.hit@5', label: '재랭킹 적중률 Hit@5' },
+  { key: 'retrieval.rerank.rr@5', label: 'Reranked MRR@5' },
   { key: 'retrieval.rrf.ndcg@10', label: 'Retriever NDCG@10' },
+  { key: 'answer.correctness', label: 'Answer Correctness (F2)' },
+  { key: 'citation.correctness', label: 'Citation Correctness' },
+  { key: 'citation.completeness', label: 'Citation Completeness' },
 ];
 
 export const TREND_METRICS = [
@@ -43,20 +36,24 @@ export const TREND_METRICS = [
 ];
 
 const METRIC_META = {
-  'retrieval.rrf.recall@10': { group: '주요 지표', label: 'Retriever Recall@10', pct: true },
-  'retrieval.rerank.ndcg@5': { group: '주요 지표', label: 'Reranked NDCG@5', pct: true },
-  'answer.correctness': { group: '주요 지표', label: 'Answer Correctness', pct: true },
-  'answer.correctness.v1': { group: '주요 지표', label: 'Answer Correctness (v1)', pct: true },
-  'answer.correctness.v2': { group: '주요 지표', label: 'Answer Correctness (v2)', pct: true },
-  'answer.correctness.judge': { group: '주요 지표', label: 'Answer Correctness (Judge)', pct: true },
-  'answer.correctness.f2': { group: '주요 지표', label: 'Answer Correctness (F2)', pct: true },
-  // 하위 호환 — 이전 평가 run 표시용
-  'answer.correctness_v2_shadow': { group: '주요 지표', label: 'Answer Correctness (F1, legacy)', pct: true },
-  'answer.correctness_v2_f2_shadow': { group: '주요 지표', label: 'Answer Correctness (F2, legacy)', pct: true },
-  'citation.correctness': { group: '주요 지표', label: 'Citation Correctness', pct: true },
-  'citation.completeness': { group: '주요 지표', label: 'Citation Completeness', pct: true },
-  'retrieval.rerank.mrr@5': { group: '보조 지표', label: 'Reranked MRR@5', pct: true },
+  'retrieval.rrf.hit@10': { group: '주요 지표', label: '검색 완전성 Recall@10', pct: true },
+  'retrieval.rerank.ndcg@5': { group: '주요 지표', label: '검색 최종 정합성 NDCG@5', pct: true },
+  'answer.judge_accuracy': { group: '주요 지표', label: '답변 생성 정확도 (LLM 심사)', pct: true },
+  'retrieval.rrf.recall@10': { group: '보조 지표', label: '정답 청크 커버율 Recall@10', pct: true },
+  'retrieval.rerank.hit@5': { group: '보조 지표', label: '재랭킹 적중률 Hit@5', pct: true },
+  'retrieval.rerank.rr@5': { group: '보조 지표', label: 'Reranked MRR@5', pct: true },
   'retrieval.rrf.ndcg@10': { group: '보조 지표', label: 'Retriever NDCG@10', pct: true },
+  'answer.correctness': { group: '보조 지표', label: 'Answer Correctness (F2)', pct: true },
+  'citation.correctness': { group: '보조 지표', label: 'Citation Correctness', pct: true },
+  'citation.completeness': { group: '보조 지표', label: 'Citation Completeness', pct: true },
+  // 하위 호환 — 이전 평가 run 표시용
+  'answer.correctness.v1': { group: '보조 지표', label: 'Answer Correctness (v1)', pct: true },
+  'answer.correctness.v2': { group: '보조 지표', label: 'Answer Correctness (v2)', pct: true },
+  'answer.correctness.judge': { group: '보조 지표', label: 'Answer Correctness (Judge)', pct: true },
+  'answer.correctness.f2': { group: '보조 지표', label: 'Answer Correctness (F2)', pct: true },
+  'answer.correctness_v2_shadow': { group: '보조 지표', label: 'Answer Correctness (F1, legacy)', pct: true },
+  'answer.correctness_v2_f2_shadow': { group: '보조 지표', label: 'Answer Correctness (F2, legacy)', pct: true },
+  'retrieval.rerank.mrr@5': { group: '보조 지표', label: 'Reranked MRR@5 (legacy)', pct: true },
 };
 const GROUP_ORDER = ['주요 지표', '보조 지표'];
 const DASHBOARD_METRIC_KEYS = new Set(Object.keys(METRIC_META));

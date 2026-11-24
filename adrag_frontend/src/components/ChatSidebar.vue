@@ -16,7 +16,10 @@
       <div v-if="!collectionsLoaded" class="history-loading">
         <i class="fa-solid fa-circle-notch fa-spin"></i>
       </div>
-      <div v-else-if="chatCollections.length === 0" class="history-empty">접근 가능한 대화 주제가 없습니다.</div>
+      <!-- 2026.11.23(woojin.jung) 수정 - 소속 부서가 비활성이면 이유를 안내 -->
+      <div v-else-if="chatCollections.length === 0" class="history-empty">
+        {{ authUser?.department_active === false ? '소속 부서가 비활성화되어 사용할 수 있는 대화 주제가 없습니다. 관리자에게 문의하세요.' : '접근 가능한 대화 주제가 없습니다.' }}
+      </div>
       <div v-for="col in chatCollections" :key="col.qdrant_name" class="history-item" :class="{ active: selectedCollection === col.qdrant_name }" @click="$emit('selectCollection', col)">
         <i class="fa-solid fa-comments" style="color: #94a3b8; flex-shrink: 0"></i>
         <span class="history-item-text">{{ col.collection_name }}</span>
@@ -26,9 +29,18 @@
     <div class="auth-card">
       <div class="auth-title">채팅 사용자</div>
       <div v-if="authUser.user_id" class="auth-user">
-        <div class="auth-name">{{ authUser.user_id || authUser.user_name }}</div>
-        <div class="auth-sub">{{ authUser.token_type === 'admin_access' ? '관리자 세션' : '로그인됨' }}</div>
-        <button class="auth-btn secondary" @click="$emit('logout')">로그아웃</button>
+        <!-- 2026.11.23(woojin.jung) 수정 - 아이디 → 이름 우선(관리 콘솔 사이드바와 같은 표시) -->
+        <div class="auth-name">{{ authUser.user_name || authUser.user_id }}</div>
+        <!-- 2026.11.20(woojin.jung) 수정 - 부서 · 역할 표기 -->
+        <div class="auth-sub">{{ authSub }}</div>
+        <!-- 2026.11.13(woojin.jung) 수정 - 로그아웃 옆에 비밀번호 변경(일반 사용자만) -->
+        <div class="auth-actions">
+          <button v-if="authUser.token_type !== 'admin_access'" class="auth-btn secondary" type="button" @click="passwordDialogOpen = true">
+            <i class="fa-solid fa-key"></i>
+            비밀번호 변경
+          </button>
+          <button class="auth-btn secondary" @click="$emit('logout')">로그아웃</button>
+        </div>
       </div>
       <div v-else class="auth-form">
         <router-link to="/login?redirect=/chat" class="auth-btn auth-btn-link">
@@ -39,19 +51,30 @@
       </div>
     </div>
 
-    <div class="links-section">
-      <router-link to="/admin" class="link-item">
+    <!-- 2026.11.20(woojin.jung) 수정 - 관리 콘솔은 부서 운영관리자만, 일반 사용자는 내 활동 현황 -->
+    <div v-if="authUser.user_id" class="links-section">
+      <router-link v-if="authUser.role === 'manager'" to="/admin" class="link-item">
         <i class="fa-solid fa-shield-halved"></i>
         관리 콘솔
       </router-link>
+      <router-link v-else to="/statistics" class="link-item">
+        <i class="fa-solid fa-chart-bar"></i>
+        내 활동 현황
+      </router-link>
     </div>
   </aside>
+
+  <ChangePasswordDialog :open="passwordDialogOpen" :userId="authUser.user_id || ''" @close="passwordDialogOpen = false" />
 </template>
 
 <script setup>
+import { computed, ref } from 'vue';
 import sidebarLogo from '../assets/brand/logo-rag-w.png';
+import ChangePasswordDialog from './ChangePasswordDialog.vue';
 
-defineProps({
+const passwordDialogOpen = ref(false);
+
+const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false,
@@ -80,6 +103,13 @@ defineProps({
 });
 
 defineEmits(['close', 'selectCollection', 'logout']);
+
+const authSub = computed(() => {
+  const user = props.authUser;
+  if (user.token_type === 'admin_access') return '관리자 세션';
+  const role = user.role === 'manager' ? '운영관리자' : '일반 사용자';
+  return user.department_name ? `${user.department_name} · ${role}` : role;
+});
 </script>
 
 <style scoped>
@@ -207,6 +237,20 @@ defineEmits(['close', 'selectCollection', 'logout']);
 }
 .auth-btn.secondary {
   background: #334155;
+}
+/* 2026.11.13(woojin.jung) 추가 - 비밀번호 변경·로그아웃 버튼 나란히 */
+.auth-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.auth-actions .auth-btn {
+  white-space: nowrap;
+}
+.auth-actions .auth-btn i {
+  margin-right: 4px;
+}
+.auth-btn.secondary:hover {
+  background: #475569;
 }
 .auth-btn-link {
   flex: none;

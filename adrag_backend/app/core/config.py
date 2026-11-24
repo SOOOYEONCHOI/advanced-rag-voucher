@@ -76,6 +76,15 @@ class Settings(BaseSettings):
     # 2026.07.07(sooyeon.choi) 수정 - vLLM score 입력 truncation과 장애 시 후보 상한 명시
     reranker_truncate_prompt_tokens: int = -1
     reranker_degraded_top_k: int = 3
+    # 2026.11.19(sooyeon.choi) 수정 - 리랭커 입력 형식 선택
+    #   plain(기본·기존 동작): 질의·문서 텍스트를 그대로 /v1/score에 보낸다
+    #   qwen3: Qwen3-Reranker 공식 지시문 형식(system 판정 지시 + <Instruct>/<Query>/<Document> + assistant 접미)
+    #   형식을 바꾸면 점수 분포가 달라지므로 relevance_threshold를 평가셋 기준으로 다시 맞춘다
+    reranker_prompt_format: Literal["plain", "qwen3"] = "plain"
+    reranker_instruction: str = (
+        "Given a question about Korean occupational safety and health laws, "
+        "judge whether the document contains the law article or passage that answers the question"
+    )
     retrieve_timeout: float = 90.0          # retrieve 노드 전체 타임아웃 (임베딩 + Qdrant 검색 합산)
 
     # ── Docling 파싱 서버 ───────────────────────────────
@@ -114,7 +123,7 @@ class Settings(BaseSettings):
     # 2026.07.08(sooyeon.choi) 수정 - 단일 문서의 유사 청크가 컨텍스트를 독점하지 않도록 제한
     context_max_chunks_per_document: int = 2
     max_citation_results: int = 5           # 최대 인용 결과 수 (코드 레벨 기본값)
-    max_collections: int = 5                # 사용자당 최대 컬렉션 수 (코드 레벨 기본값)
+    max_collections: int = 10               # 사용자당 최대 컬렉션 수 (코드 레벨 기본값)
     max_context_chars: int = 32000          # assemble_context 최대 문자 수 (한국어 ~16,000 토큰)
     query_min_length: int = 2              # 질의 최소 문자 수
     query_max_length: int = 2000           # 질의 최대 문자 수
@@ -183,18 +192,32 @@ class Settings(BaseSettings):
     guardrail_llm_fallback: bool = True
 
     # ── Answer Correctness 평가 ─────────────────────────
-    # 네 지표는 항상 계산·저장하고 primary는 UI 주 지표 하나만 선택한다.
-    answer_correctness_primary: str = "f2"  # v1 | v2 | f2 | judge
-    answer_correctness_fallback_chain: list[str] = Field(
-        default_factory=lambda: ["judge", "v2", "v1"]
-    )
+    # 2026.11.17(sooyeon.choi) 수정 - Answer Correctness는 F2(문장 정렬 기반) 한 종류로 고정.
+    #   answer_correctness_primary·fallback_chain·judge_* 설정 삭제. 아래 v2 값은 F2 계산 조건이다.
     answer_correctness_v2_dedupe_threshold: float = 0.92
     answer_correctness_v2_precision_candidate_ratio: int = 3
     answer_correctness_v2_min_sentence_chars: int = 10
     answer_correctness_v2_max_sentences_per_answer: int = 30
-    answer_correctness_judge_backend: str = "vllm"
-    answer_correctness_judge_model: Optional[str] = None
-    answer_correctness_judge_temperature: float = 0.0
+    # 2026.11.17(sooyeon.choi) 추가 - 평가 전용 인용 [N] 누락 보정(LLM 재호출). 운영과 같은 답변을 평가하도록 기본 끔
+    eval_citation_repair_enabled: bool = False
+
+    # ── 시험 대응 일괄 질의(eval-batch-query-design-v1.0.md 8장) ─────────
+    # 2026.11.18(sooyeon.choi) 추가 - 질의 파일 일괄 실행·결과 CSV/xlsx. 기본 끔(끄면 API 404)
+    eval_batch_query_enabled: bool = False
+    eval_batch_max_rows: int = Field(default=500, ge=1)
+    eval_batch_warmup_count: int = Field(default=3, ge=0)          # F-06 결과·평균에서 제외하는 사전 실행 건수
+    eval_batch_retry_count: int = Field(default=0, ge=0)           # F-07 재시도 없음(응답시간 왜곡 방지)
+    eval_batch_query_timeout_s: float = Field(default=120.0, gt=0)  # 질의 1건 제한 시간
+    eval_batch_top_n_record: int = Field(default=10, ge=1)          # 재랭킹 전/후 기록 개수
+    eval_batch_gold_match_threshold: float = Field(default=0.5, ge=0.0, le=1.0)  # F-11
+    eval_batch_upload_max_mb: int = Field(default=10, ge=1)
+    eval_batch_query_max_chars: int = Field(default=2000, ge=1)
+    # 2026.11.20(sooyeon.choi) 수정 - 합본 평가 데이터셋(확정 데이터셋 여러 개 → 한 데이터셋, eval-merged-dataset-design-v1.0.md).
+    #   끄면 합본 API 404·화면 버튼 숨김. 단독 데이터셋 기능에는 영향 없음
+    eval_dataset_merge_enabled: bool = True
+    # 2026.11.18(sooyeon.choi) 추가 - 데이터셋 생성에 쓸 추가 vLLM 모델("모델명=주소" 쉼표 구분).
+    #   비우면 챗봇 기본 LLM(VLLM_API_URL·VLLM_MODEL_NAME)만 선택 가능(기존 동작). 인증 키는 VLLM_API_KEY 공용
+    eval_gen_vllm_models: str = ""
     openai_api_key: Optional[str] = None
 
     # 2026.11.06(sooyeon.choi) 수정 - 복원은 보존을 전제로 한다(보존 OFF + 복원 ON이면 기동 실패, 설계 v1.1 10절)
@@ -206,13 +229,6 @@ class Settings(BaseSettings):
             )
         return self
 
-    @field_validator("answer_correctness_primary")
-    @classmethod
-    def validate_answer_correctness_primary(cls, value: str) -> str:
-        if value not in {"v1", "v2", "f2", "judge"}:
-            raise ValueError("answer_correctness_primary must be v1, v2, f2, or judge")
-        return value
-
     # 2026.11.11(sooyeon.choi) 추가 - 빈 값은 미설정(균등 배분), 0~1 밖은 오류
     @field_validator("dense_original_query_share", mode="before")
     @classmethod
@@ -223,21 +239,6 @@ class Settings(BaseSettings):
         if not 0.0 <= share <= 1.0:
             raise ValueError("DENSE_ORIGINAL_QUERY_SHARE는 0~1 사이여야 합니다")
         return share
-
-    @field_validator("answer_correctness_fallback_chain")
-    @classmethod
-    def validate_answer_correctness_fallback_chain(cls, value: list[str]) -> list[str]:
-        allowed = {"v1", "v2", "f2", "judge"}
-        if len(value) != len(set(value)) or any(item not in allowed for item in value):
-            raise ValueError("answer_correctness_fallback_chain contains invalid or duplicate metrics")
-        return value
-
-    @field_validator("answer_correctness_judge_backend")
-    @classmethod
-    def validate_answer_correctness_judge_backend(cls, value: str) -> str:
-        if value not in {"vllm", "openai"}:
-            raise ValueError("answer_correctness_judge_backend must be vllm or openai")
-        return value
 
     # ── 파일 저장 ────────────────────────────────────────
     # 원본 업로드 파일 영구 보관 경로 (연/월 하위 폴더 자동 생성)

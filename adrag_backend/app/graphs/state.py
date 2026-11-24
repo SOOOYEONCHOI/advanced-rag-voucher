@@ -115,6 +115,8 @@ class PipelineState(TypedDict):
     usage: Optional[dict]  # {"prompt_tokens": int, "completion_tokens": int}
     # 2026.06.19(sooyeon.choi) 추가 - 질의 처리 최종 결과 코드
     outcome_code: str
+    retrieval_status: str  # F-08: ok/error/not_run
+    rerank_status: str     # F-09: ok/error/skipped/empty/not_run
 
 
 # 2026.07.16(sooyeon.choi) 추가 - 초기 state 팩토리
@@ -184,4 +186,6 @@ def make_initial_state(
         "timing": {},
         "usage": None,
         "outcome_code": "unknown",
+        "retrieval_status": "not_run",
+        "rerank_status": "not_run",
     }

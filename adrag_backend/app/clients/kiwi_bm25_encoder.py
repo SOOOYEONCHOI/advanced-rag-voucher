@@ -17,6 +17,8 @@ class KiwiBm25Encoder:
 
     # 2026.07.07(sooyeon.choi) 수정 - 후보 400개 재계산 대신 Qdrant BM25 sparse vector 사용
     def __init__(self, settings: "Settings") -> None:
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (⑦ BM25 상수(k1·b·평균 길이)·Kiwi 토큰 정책 설정)
         self.k1 = settings.bm25_k1
         self.b = settings.bm25_b
         self.avg_len = settings.bm25_avg_len
@@ -55,6 +57,9 @@ class KiwiBm25Encoder:
             options=self._options(),
         )
 
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (⑥ Kiwi 형태소 분석으로 BM25 키워드 질의 생성(키워드 검색))
+    # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (④ Kiwi 형태소 분석으로 BM25 키워드 질의 생성(키워드 검색))
     def encode_query(self, text: str) -> Document:
         return Document(
             text=self.normalize_query(text),

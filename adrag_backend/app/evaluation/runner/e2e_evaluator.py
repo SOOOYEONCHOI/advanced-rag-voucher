@@ -1,30 +1,31 @@
 """Full 평가 — 운영 RAG 실행 + 규칙 기반 답변/Citation 지표.
 
 eval_runner._evaluate_item()에서 run_type이 end_to_end/full일 때 호출된다.
+
+2026.11.17(sooyeon.choi) 수정 - 지표 정리
+  - Answer Correctness는 F2(문장 정렬 Coverage 중심) 하나로 고정. v1(전체 답변 코사인),
+    RAGAS Judge, 항목별 fallback 선택 삭제(항목마다 다른 방식 점수가 한 평균에 섞이던 문제)
+  - 규칙 일치(rule_check)·형식(check_format) 지표 삭제
+  - 검색 지표는 K=1,3,5,10 고정 + 설정 N/K를 함께 계산(시험 항목 Hit@10·NDCG@5)
 """
 
 import json
 from typing import Any, Dict, List, Optional, Set
 
 from app.evaluation.adapters.embedder_adapter import EvalEmbedder
-from app.evaluation.metrics.answer_correctness_v1 import check_format, check_refusal
+from app.evaluation.metrics.answer_correctness_v1 import check_refusal
 from app.evaluation.metrics.answer_correctness_v2 import (
     compute_sentence_alignment,
     split_sentences_ko_rule_v2,
 )
 from app.evaluation.metrics.answer_correctness_f2 import build_answer_correctness_f2
-from app.evaluation.metrics.answer_correctness_judge import evaluate_correctness_judge
 from app.evaluation.metrics.citation_metrics import (
     compute_evaluation_citation_metrics,
 )
 from app.evaluation.metrics.retrieval_metrics import compute_channel_metrics
 from app.evaluation.metrics.similarity import (
     InvalidEmbeddingVector,
-    clamp_similarity,
-    cosine_similarity,
-    count_citation_tags,
     normalize_answer_v2,
-    rule_check,
 )
 from app.utils.log.log import LoggingLogger
 
@@ -36,6 +37,8 @@ _SKIP_ANSWER_CORRECTNESS_BEHAVIORS = {
     "guardrail", "permission_denied", "not_enough_info"
 }
 _SKIP_RETRIEVAL_BEHAVIORS = {"guardrail", "permission_denied"}
+# 2026.11.17(sooyeon.choi) 추가 - 검색 지표 고정 cutoff(retrieval 평가와 동일, 시험 Hit@10·NDCG@5 포함)
+_K_VALUES = (1, 3, 5, 10)
 
 
 def _get_pipeline():
@@ -57,6 +60,8 @@ async def evaluate_end_to_end(
     collection_name: str,
 ) -> Dict[str, Any]:
     """QA 1건의 end-to-end 평가 결과 필드를 반환한다."""
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 1) 시험 데이터를 불러오는 코드 (③ 문항별 질의문 추출)
     question = item["question"]
     gold_answer = item.get("gold_answer", "")
     gold_chunk_ids: Set[str] = set(_parse_list(item.get("gold_chunk_ids")))
@@ -64,6 +69,8 @@ async def evaluate_end_to_end(
     expected_behavior = item.get("expected_behavior", "answer")
 
     # 1) RAG 전체 실행 (그래프 직접 호출 — reranked_chunks에 chunk_id 포함)
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (③ 시험 질의문을 RAG 파이프라인에 넣어 실행 요청)
     result = await _get_pipeline().run(
         query=question,
         collection_name=collection_name,
@@ -72,7 +79,11 @@ async def evaluate_end_to_end(
     )
 
     system_answer = result["answer"]
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (① 측정한 반환 시간(latency_ms)·첫 토큰 시간(timing_json)을 문항 결과에 담음)
     fields: Dict[str, Any] = {
+        # 2026.11.17(sooyeon.choi) 추가 - 응답시간은 그래프 실행(검색→재랭킹→답변 생성)만 측정
+        "latency_ms": result.get("latency_ms"),
         "answer_text": system_answer,
         "timing_json": result["timing"],
         "token_usage_json": result["usage"],
@@ -91,52 +102,33 @@ async def evaluate_end_to_end(
         fields["retrieval_json"] = _compute_pipeline_retrieval_metrics(
             result=result,
             gold_chunk_ids=gold_chunk_ids,
-            gold_document_ids=gold_document_ids,
             retrieval_top_n=int(config.get("retrieval_top_n", config.get("top_k", 10))),
             rerank_top_k=int(config.get("rerank_top_k", 5)),
         )
 
-    if not system_answer:
-        if expected_behavior != "answer":
-            fields["status"] = "ok"
-        else:
-            # 평가 실행은 완료됐으므로 제외하지 않고 답변 품질 실패로 집계한다.
-            fields["status"] = "ok"
+    outcome = result.get("outcome_code")
+    fields["status"] = "error" if outcome in {
+        "validation_error", "retrieval_error", "llm_error", "system_error", "cancelled"
+    } else "ok"
+    fields["timing_json"] = {
+        **(result.get("timing") or {}),
+        "stage_statuses": {
+            "retrieval": result.get("retrieval_status"),
+            "rerank": result.get("rerank_status"),
+            "answer": "error" if outcome == "llm_error" else "ok" if system_answer else "not_run",
+        },
+    }
 
-    # 2026.08.03(sooyeon.choi) 수정 - rule-v1.1 공식 점수와 rule-v2 shadow를 병행 계산
-    answer_metric, answer_metric_v2 = await _evaluate_answer_correctness_pair(
+    # 2026.11.17(sooyeon.choi) 수정 - 문장 정렬(v2)은 F2 계산 입력으로만 쓰고 F2를 공식 점수로 저장
+    if fields["status"] == "error":
+        fields["error_message"] = result.get("error") or outcome
+    alignment = await _evaluate_answer_alignment(
         gold_answer=gold_answer,
         system_answer=system_answer,
         expected_behavior=expected_behavior,
         config=config,
     )
-    fields["answer_correctness_v1_json"] = answer_metric
-    fields["answer_correctness_v2_json"] = answer_metric_v2
-    if answer_metric["status"] == "evaluated":
-        fields["similarity"] = answer_metric["value"]
-
-    # F2: v2 결과 재사용 (추가 임베딩 불필요)
-    f2_result = build_answer_correctness_f2(answer_metric_v2, config)
-    fields["answer_correctness_f2_json"] = f2_result
-
-    # Judge: 별도 LLM 호출
-    judge_result = await evaluate_correctness_judge(
-        question,
-        gold_answer,
-        system_answer,
-        config,
-        expected_behavior=expected_behavior,
-    )
-    fields["answer_correctness_judge_json"] = judge_result
-
-    # Aggregation: 4가지 중 최선값 선택
-    fields["answer_correctness_json"] = _aggregate_correctness(
-        {"v1": answer_metric, "v2": answer_metric_v2, "f2": f2_result, "judge": judge_result},
-        config,
-    )
-
-    # 3) 규칙 기반 체크 (수치·법규조항)
-    fields["rule_check_json"] = rule_check(gold_answer, system_answer)
+    fields["answer_correctness_json"] = build_answer_correctness_f2(alignment, config)
 
     # 5) 규칙 기반 Citation 지표와 공통 diagnostics
     citation_metrics = compute_evaluation_citation_metrics(
@@ -179,113 +171,43 @@ async def evaluate_end_to_end(
     return fields
 
 
-async def _evaluate_answer_correctness(
+# 2026.11.17(sooyeon.choi) 삭제 - _evaluate_answer_correctness()(v1 호환 래퍼), _aggregate_correctness()(항목별 fallback 선택)
+
+
+# 2026.11.17(sooyeon.choi) 수정 - v1(전체 답변 cosine) 계산 제거, 문장 정렬(v2) 결과만 반환
+#   반환값은 F2 계산 입력(gold_coverage·system_precision)이며 별도 지표로 저장하지 않는다.
+async def _evaluate_answer_alignment(
     *,
     gold_answer: str,
     system_answer: str,
     expected_behavior: str,
     config: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """기존 호출부 호환: 병행 계산 결과 중 공식 rule-v1.1만 반환한다."""
-    answer_metric, _ = await _evaluate_answer_correctness_pair(
-        gold_answer=gold_answer,
-        system_answer=system_answer,
-        expected_behavior=expected_behavior,
-        config=config,
-    )
-    return answer_metric
-
-
-def _aggregate_correctness(
-    results: Dict[str, Any],
-    config: Dict[str, Any],
-) -> Dict[str, Any]:
-    """중앙 설정 snapshot에서 선택한 지표를 반환한다."""
-    primary = config.get("answer_correctness_primary", "v1")
-    fallback_chain = config.get("answer_correctness_fallback_chain", ["f2", "v2", "v1"])
-
-    evaluated = {
-        k: v for k, v in results.items()
-        if v and v.get("status") == "evaluated" and v.get("value") is not None
-    }
-
-    def _with_source(result: Dict[str, Any], source: str) -> Dict[str, Any]:
-        meta = {
-            **(result.get("metadata") or {}),
-            "selected_metric": source,
-            "configured_primary": primary,
-            "fallback_used": source != primary,
-        }
-        return {**result, "metadata": meta}
-
-    chain = [primary] + [k for k in fallback_chain if k != primary]
-    for key in chain:
-        if key in evaluated:
-            return _with_source(evaluated[key], key)
-
-    # 모두 evaluated 아님 — 첫 번째 non-None 결과 반환
-    for key in chain:
-        if results.get(key):
-            return _with_source(results[key], key)
-
-    return {"value": None, "status": "excluded", "reason": "all_methods_unavailable", "metadata": {}}
-
-
-# 2026.08.03(sooyeon.choi) 수정 - v1 전체답변 cosine과 v2 문장정렬 F1을 한 batch로 계산
-async def _evaluate_answer_correctness_pair(
-    *,
-    gold_answer: str,
-    system_answer: str,
-    expected_behavior: str,
-    config: Dict[str, Any],
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
-    answer_config = config.get("answer_correctness") or {}
     v2_config = config.get("answer_correctness_v2") or {}
     metadata: Dict[str, Any] = {
-        "method": "embedding_cosine",
-        "model": answer_config.get("embedding_model"),
-        "model_version": answer_config.get("model_version"),
-        "normalization_version": answer_config.get("normalization_version", "v2"),
-        "metric_version": config.get("metric_version", "rule-v1.1"),
-        "citation_tags_removed": count_citation_tags(gold_answer)
-        + count_citation_tags(system_answer),
-    }
-    v2_metadata: Dict[str, Any] = {
         "method": "sentence_alignment_f1",
-        "model": v2_config.get("embedding_model") or answer_config.get("embedding_model"),
-        "model_version": v2_config.get("model_version") or answer_config.get("model_version"),
+        "model": v2_config.get("embedding_model"),
+        "model_version": v2_config.get("model_version"),
         "normalization_version": v2_config.get("normalization_version", "v2"),
         "sentence_split_version": v2_config.get("sentence_split_version", "ko-rule-v2"),
-        "metric_version": v2_config.get("metric_version", "rule-v2-shadow.2"),
+        "metric_version": v2_config.get("metric_version", "rule-v2.3"),
     }
 
-    def result_pair(value, status, reason):
-        return (
-            {"value": value, "status": status, "reason": reason, "metadata": metadata},
-            {"value": value, "status": status, "reason": reason, "metadata": v2_metadata},
-        )
+    def result(value, status, reason):
+        return {"value": value, "status": status, "reason": reason, "metadata": metadata}
 
     if expected_behavior in _SKIP_ANSWER_CORRECTNESS_BEHAVIORS:
-        return result_pair(None, "excluded", "expected_behavior_not_answer")
-
-    normalized_gold = normalize_answer_v2(gold_answer)
-    normalized_answer = normalize_answer_v2(system_answer)
-    metadata.update({
-        "gold_normalized_length": len(normalized_gold),
-        "system_normalized_length": len(normalized_answer),
-    })
-
-    if not normalized_gold:
-        return result_pair(None, "excluded", "missing_gold_answer")
-    if not normalized_answer:
-        metadata.update({"raw_cosine": None, "normalization_delta": None})
-        v2_metadata.update({
+        return result(None, "excluded", "expected_behavior_not_answer")
+    if not normalize_answer_v2(gold_answer):
+        return result(None, "excluded", "missing_gold_answer")
+    if not normalize_answer_v2(system_answer):
+        metadata.update({
             "gold_sentence_count": 0,
             "system_sentence_count": 0,
             "gold_coverage": 0.0,
             "system_precision": 0.0,
         })
-        return result_pair(0.0, "evaluated", "empty_system_answer")
+        return result(0.0, "evaluated", "empty_system_answer")
 
     min_chars = int(v2_config.get("min_sentence_chars", 10))
     max_sentences = int(v2_config.get("max_sentences_per_answer", 30))
@@ -304,62 +226,22 @@ async def _evaluate_answer_correctness_pair(
     system_sentences = split_sentences_ko_rule_v2(
         normalized_answer_lines, min_sentence_chars=min_chars, max_sentences=max_sentences
     )
-    v2_metadata.update({
+    metadata.update({
         "gold_sentence_count": len(gold_sentences),
         "system_sentence_count": len(system_sentences),
     })
-    requested_texts = [
-        gold_answer, system_answer, normalized_gold, normalized_answer,
-        *gold_sentences, *system_sentences,
-    ]
-    unique_texts = list(dict.fromkeys(requested_texts))
+    if not gold_sentences:
+        return result(None, "excluded", "missing_gold_sentences")
+    if not system_sentences:
+        metadata.update({"gold_coverage": 0.0, "system_precision": 0.0})
+        return result(0.0, "evaluated", "empty_system_sentences")
+
+    unique_texts = list(dict.fromkeys([*gold_sentences, *system_sentences]))
     try:
         unique_embeddings = await EvalEmbedder().embed(unique_texts)
         if len(unique_embeddings) != len(unique_texts):
             raise InvalidEmbeddingVector("embedding_count_mismatch")
         embedding_by_text = dict(zip(unique_texts, unique_embeddings))
-        normalized_cosine = clamp_similarity(cosine_similarity(
-            embedding_by_text[normalized_gold],
-            embedding_by_text[normalized_answer],
-        ))
-
-        raw_cosine = None
-        try:
-            raw_cosine = clamp_similarity(cosine_similarity(
-                embedding_by_text[gold_answer],
-                embedding_by_text[system_answer],
-            ))
-        except InvalidEmbeddingVector:
-            # 공식 normalized 계산이 성공했다면 raw 비교 실패는 진단값에만 영향을 준다.
-            pass
-
-        metadata.update({
-            "raw_cosine": raw_cosine,
-            "normalization_delta": (
-                normalized_cosine - raw_cosine
-                if raw_cosine is not None else None
-            ),
-        })
-        v1_result = {
-            "value": normalized_cosine,
-            "status": "evaluated",
-            "reason": None,
-            "metadata": metadata,
-        }
-        if not gold_sentences:
-            return (v1_result, {
-                "value": None,
-                "status": "excluded",
-                "reason": "missing_gold_sentences",
-                "metadata": v2_metadata,
-            })
-        if not system_sentences:
-            return (v1_result, {
-                "value": 0.0,
-                "status": "evaluated",
-                "reason": "empty_system_sentences",
-                "metadata": v2_metadata,
-            })
 
         # 2026.08.03(sooyeon.choi) 수정 - 중복 제거와 Gold 비례 precision 후보 제한 적용
         v2 = compute_sentence_alignment(
@@ -369,7 +251,7 @@ async def _evaluate_answer_correctness_pair(
             dedupe_threshold=float(v2_config.get("semantic_dedupe_threshold", 0.92)),
             precision_candidate_ratio=int(v2_config.get("precision_candidate_ratio", 3)),
         )
-        v2_metadata.update({
+        metadata.update({
             "gold_coverage": v2["gold_coverage"],
             "system_precision": v2["system_precision"],
             "gold_matches": v2["gold_matches"],
@@ -380,94 +262,54 @@ async def _evaluate_answer_correctness_pair(
             "removed_gold_sentence_indices": v2["removed_gold_sentence_indices"],
             "removed_system_sentence_indices": v2["removed_system_sentence_indices"],
             "precision_candidate_count": v2["precision_candidate_count"],
-            "embedding_request_text_count": len(requested_texts),
             "embedding_unique_text_count": len(unique_texts),
         })
-        return (v1_result, {
-            "value": v2["value"],
-            "status": "evaluated",
-            "reason": None,
-            "metadata": v2_metadata,
-        })
+        return result(v2["value"], "evaluated", None)
     except InvalidEmbeddingVector as exc:
         reason = str(exc)
         logger.warning("[eval][e2e] Answer Correctness 계산 불가: %s", reason)
-        return ({
-            "value": None,
-            "status": "error",
-            "reason": reason,
-            "metadata": metadata,
-        }, {
-            "value": None,
-            "status": "error",
-            "reason": reason,
-            "metadata": v2_metadata,
-        })
+        return result(None, "error", reason)
     except Exception as exc:
         logger.warning(
             "[eval][e2e] Answer Correctness 임베딩 실패 type=%s",
             type(exc).__name__,
         )
-        return ({
-            "value": None,
-            "status": "error",
-            "reason": "embedding_error",
-            "metadata": {**metadata, "error_type": type(exc).__name__},
-        }, {
-            "value": None,
-            "status": "error",
-            "reason": "embedding_error",
-            "metadata": {**v2_metadata, "error_type": type(exc).__name__},
-        })
+        metadata["error_type"] = type(exc).__name__
+        return result(None, "error", "embedding_error")
 
 
 def _compute_pipeline_retrieval_metrics(
     *,
     result: Dict[str, Any],
     gold_chunk_ids: Set[str],
-    gold_document_ids: Set[str],
     retrieval_top_n: int,
     rerank_top_k: int,
 ) -> Dict[str, Any]:
-    """운영 RAG가 실제 사용한 RRF·rerank 결과로 검색 지표를 계산한다."""
+    """운영 RAG가 실제 사용한 RRF(재랭킹 전)·rerank 결과로 검색 지표를 계산한다.
 
-    def _metrics(
-        chunks: List[Dict[str, Any]],
-        gold_ids: Set[str],
-        cutoff: int,
-        id_key: str,
-    ) -> Dict[str, Any]:
-        ranked_ids = [str(chunk.get(id_key)) for chunk in chunks if chunk.get(id_key)]
-        return compute_channel_metrics(ranked_ids, gold_ids, (cutoff,))
+    2026.11.17(sooyeon.choi) 수정 - 설정 N/K 단일 cutoff → K=1,3,5,10 + N/K로 확장,
+    문서 단위(document_*) 지표 삭제(청크 단위 정답 기준과 이중 집계되던 문제)
+    """
+
+    def _metrics(chunks: List[Dict[str, Any]], cutoffs: tuple) -> Dict[str, Any]:
+        ranked_ids = [str(chunk.get("chunk_id")) for chunk in chunks if chunk.get("chunk_id")]
+        return compute_channel_metrics(ranked_ids, gold_chunk_ids, cutoffs)
 
     retrieved = result.get("retrieved_chunks") or []
     reranked = result.get("reranked_chunks") or []
-
-    rrf_metrics = _metrics(
-        retrieved, gold_chunk_ids, retrieval_top_n, "chunk_id"
-    )
-    rerank_metrics = _metrics(
-        reranked, gold_chunk_ids, rerank_top_k, "chunk_id"
-    )
-
-    rrf_document_metrics = _metrics(
-        retrieved, gold_document_ids, retrieval_top_n, "document_id"
-    )
-    rerank_document_metrics = _metrics(
-        reranked, gold_document_ids, rerank_top_k, "document_id"
-    )
-    rrf_metrics.update({
-        f"document_{key}": value
-        for key, value in rrf_document_metrics.items()
-        if key != "gold_ranks"
-    })
-    rerank_metrics.update({
-        f"document_{key}": value
-        for key, value in rerank_document_metrics.items()
-        if key != "gold_ranks"
-    })
-
-    return {"rrf": rrf_metrics, "rerank": rerank_metrics}
+    metrics = {
+        "rrf": _metrics(retrieved, tuple(sorted({*_K_VALUES, retrieval_top_n}))),
+        "rerank": _metrics(reranked, tuple(sorted({*_K_VALUES, rerank_top_k}))),
+    }
+    # F-08/F-09: 재랭킹 대체 결과를 정상 재랭킹으로 평가하지 않는다.
+    if result.get("retrieval_status") in ("error", "not_run"):
+        metrics["rrf"] = {"error": True, "reason": "retrieval_error"}
+    rerank_status = result.get("rerank_status")
+    if rerank_status in ("error", "not_run"):
+        metrics["rerank"] = {"error": True, "reason": "rerank_error"}
+    elif rerank_status == "skipped":
+        metrics["rerank"] = {"skipped": True, "reason": "reranker_disabled"}
+    return metrics
 
 
 # ── ①축 병합 헬퍼 ────────────────────────────────────────────────────────────
@@ -477,7 +319,7 @@ def _guardrail(result: Dict[str, Any], expected_behavior: str, answer: str) -> D
     return {
         "intent": result.get("intent"),
         "should_retrieve": result.get("should_retrieve"),
-        "format_correct": check_format(answer),
+        # 2026.11.17(sooyeon.choi) 삭제 - format_correct(check_format)
         "refusal_correct": check_refusal(expected_behavior, answer),
     }
 
@@ -517,9 +359,7 @@ def _threshold_fallback(
     return metrics
 
 
-def _check_refusal(expected_behavior: str, answer: str) -> Optional[bool]:
-    """not_enough_info 케이스에서 거절 문구 포함 여부. 그 외 None."""
-    return check_refusal(expected_behavior, answer)
+# 2026.11.17(sooyeon.choi) 삭제 - 사용처 없는 _check_refusal() 래퍼
 
 
 def _parse_list(value: Any) -> List[str]:

@@ -14,16 +14,18 @@
           </button>
           <div class="header-text">
             <h1>대화 주제 설정</h1>
-            <p>최대 5개의 대화 주제를 등록하여 문서군별로 분리 저장할 수 있습니다.</p>
+            <p>최대 {{ maxCollections }}개의 대화 주제를 등록하여 문서군별로 분리 저장할 수 있습니다.</p>
           </div>
         </div>
         <div class="collections-badge">
           <i class="fa-solid fa-database"></i>
-          {{ savedCollectionCount }} / 5 등록됨
+          {{ savedCollectionCount }} / {{ maxCollections }} 등록됨
         </div>
       </header>
 
       <!-- Content: 관리자·일반 사용자 동일 UI -->
+      <!-- 2026.11.23(woojin.jung) 추가 - 비활성 부서: 읽기 전용 안내 -->
+      <DepartmentReadOnlyNotice class="readonly-banner" />
       <div class="settings-body" :class="{ 'show-detail': mobileDetail }">
         <!-- 2026.11.12(woojin.jung) 추가 - 왼쪽: 대화 주제 목록 -->
         <nav class="topic-list" aria-label="대화 주제 목록">
@@ -54,12 +56,12 @@
           <button
             type="button"
             class="btn-add-topic"
-            :disabled="savedCollectionCount >= maxCollections || collections.some((c) => c._isNew) || isSavingCollection"
+            :disabled="departmentReadOnly || savedCollectionCount >= maxCollections || collections.some((c) => c._isNew) || isSavingCollection"
             @click="addCollection"
           >
             <i class="fa-solid fa-plus"></i> 새 대화 주제
           </button>
-          <div v-if="savedCollectionCount >= maxCollections" class="list-hint">최대 5개까지 등록할 수 있습니다.</div>
+          <div v-if="savedCollectionCount >= maxCollections" class="list-hint">최대 {{ maxCollections }}개까지 등록할 수 있습니다.</div>
         </nav>
 
         <!-- 2026.11.12(woojin.jung) 추가 - 오른쪽: 선택한 대화 주제 상세 (선택이 바뀌면 다시 그려 스크롤 초기화) -->
@@ -86,7 +88,9 @@
             <!-- 기본 정보 -->
             <template v-if="activeTab === 'basic'">
               <div class="basic-form">
-                <p v-if="!col.can_update" class="readonly-note"><i class="fa-solid fa-lock"></i> 대화 주제를 만든 사용자나 관리자만 수정할 수 있습니다.</p>
+                <p v-if="!col.can_update" class="readonly-note">
+                  <i class="fa-solid fa-lock"></i> {{ departmentReadOnly ? '소속 부서가 비활성화되어 수정할 수 없습니다.' : '소속 부서의 대화 주제만 수정할 수 있습니다.' }}
+                </p>
                 <div class="form-group" :class="{ invalid: col._touched && !col._draft.name.trim() }">
                   <label for="collectionName">대화 주제</label>
                   <input id="collectionName" v-model="col._draft.name" type="text" placeholder="대화 주제 입력" :disabled="isSavingCollection || !col.can_update" @blur="col._touched = true" />
@@ -108,7 +112,10 @@
 
             <!-- 채팅 시작 화면 질문: 추천 질문 등록(최대 5개) + 많이 찾는 질문 확인·숨기기 -->
             <template v-else-if="activeTab === 'faq'">
-              <p v-if="!col.can_update" class="readonly-note"><i class="fa-solid fa-lock"></i> 대화 주제를 만든 사용자나 관리자만 시작 화면 질문을 관리할 수 있습니다.</p>
+              <p v-if="!col.can_update" class="readonly-note">
+                <i class="fa-solid fa-lock"></i>
+                {{ departmentReadOnly ? '소속 부서가 비활성화되어 시작 화면 질문을 수정할 수 없습니다. 현재 모습은 [미리보기]에서 확인할 수 있습니다.' : '소속 부서의 대화 주제만 시작 화면 질문을 관리할 수 있습니다.' }}
+              </p>
               <p v-else-if="!col._faqLoaded" class="readonly-note error"><i class="fa-solid fa-circle-exclamation"></i> 시작 화면 질문을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
               <template v-else>
                 <p class="faq-intro">
@@ -194,7 +201,7 @@
 
             <!-- 미리보기: 사용자 채팅 시작 화면 (ChatView.vue 시작 화면과 같은 모양, 저장 전 편집 내용 반영) -->
             <template v-else>
-              <p v-if="!col.can_update || !col._faqLoaded" class="readonly-note"><i class="fa-solid fa-circle-info"></i> 시작 화면 질문을 불러올 수 없어 미리보기를 표시할 수 없습니다.</p>
+              <p v-if="!col._faqLoaded" class="readonly-note"><i class="fa-solid fa-circle-info"></i> 시작 화면 질문을 불러올 수 없어 미리보기를 표시할 수 없습니다.</p>
               <template v-else>
                 <p class="preview-note">
                   <i class="fa-regular fa-eye"></i>
@@ -314,17 +321,23 @@
 import { useRouter } from 'vue-router';
 import AdminSidebar from '../components/AdminSidebar.vue';
 import AppToast from '../components/AppToast.vue';
+import DepartmentReadOnlyNotice from '../components/DepartmentReadOnlyNotice.vue';
 import PageHeader from '../components/PageHeader.vue';
 import { useCollectionSettings } from '../composables/useCollectionSettings';
+import { computed } from 'vue';
+import { useAuthStore } from '../stores/authStore';
 
 export default {
-  components: { AdminSidebar, AppToast, PageHeader },
+  components: { AdminSidebar, AppToast, DepartmentReadOnlyNotice, PageHeader },
   setup() {
     const router = useRouter();
     const settings = useCollectionSettings({ router });
     // 2026.11.12(woojin.jung) 추가 - 미리보기에 표시할 추천 질문 (빈 칸 제외)
     const previewRecommended = (col) => col._draft.recommended.map((q) => q.trim()).filter(Boolean);
-    return { ...settings, previewRecommended };
+    // 2026.11.23(woojin.jung) 추가 - 비활성 부서의 운영관리자는 읽기 전용
+    const authStore = useAuthStore();
+    const departmentReadOnly = computed(() => authStore.departmentReadOnly);
+    return { ...settings, previewRecommended, departmentReadOnly };
   },
 };
 </script>
@@ -599,6 +612,10 @@ export default {
 }
 
 /* 2026.11.12(woojin.jung) 추가 - 목록 + 상세 레이아웃 */
+/* 2026.11.23(woojin.jung) 추가 - 비활성 부서 안내(본문 좌우 여백에 맞춤) */
+.readonly-banner {
+  margin: 1.25rem 2rem 0;
+}
 .settings-body {
   flex: 1;
   min-height: 0;

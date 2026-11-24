@@ -26,6 +26,11 @@
           </div>
         </div>
 
+        <!-- 2026.11.13(woojin.jung) 추가 - 비밀번호 변경 후 이동했을 때 안내 -->
+        <div v-if="!errorMsg && passwordChanged" class="notice-msg" role="status">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>비밀번호가 변경되었습니다.<br />새 비밀번호로 다시 로그인해 주세요.</span>
+        </div>
         <div v-if="errorMsg" class="error-msg"><i class="fa-solid fa-circle-exclamation"></i> {{ errorMsg }}</div>
 
         <button type="submit" class="btn-login" :disabled="isLoading || !userId.trim() || !password">
@@ -54,6 +59,7 @@ export default {
     const showPassword = ref(false);
     const isLoading = ref(false);
     const errorMsg = ref('');
+    const passwordChanged = route.query.reason === 'password_changed';
 
     const handleLogin = async () => {
       errorMsg.value = '';
@@ -79,8 +85,10 @@ export default {
         }
 
         // /admin 하위 경로로의 redirect는 무시하고 /chat으로
+        // 2026.11.20(woojin.jung) 수정 - 부서 운영관리자는 관리 콘솔 경로로 복귀 허용
         const redirect = route.query.redirect;
-        router.push(redirect && !redirect.startsWith('/admin') ? redirect : '/chat');
+        const allowAdminPath = result.role === 'manager';
+        router.push(redirect && (allowAdminPath || !redirect.startsWith('/admin')) ? redirect : '/chat');
       } catch (err) {
         // 2026.07.23(sychoi) 수정 - 422 검증 오류의 detail은 배열이며 제출한 입력값이 echo되어 있다.
         // 그대로 출력하면 원문 JSON과 비밀번호가 화면에 노출되므로 문자열일 때만 사용한다.
@@ -92,7 +100,7 @@ export default {
       }
     };
 
-    return { userId, password, showPassword, isLoading, errorMsg, handleLogin, loginLogo };
+    return { userId, password, showPassword, isLoading, errorMsg, passwordChanged, handleLogin, loginLogo };
   },
 };
 </script>
@@ -216,6 +224,22 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.notice-msg {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.notice-msg i {
+  margin-top: 3px;
 }
 
 .btn-login {

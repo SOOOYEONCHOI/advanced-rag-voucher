@@ -20,7 +20,7 @@ class UiSettingsRepository:
             """
             SELECT ui_type
             FROM tb_users
-            WHERE user_id = ? AND role = 'user'
+            WHERE user_id = ? AND role IN ('user', 'manager')
             """,
             (user_id,),
         )
@@ -31,7 +31,7 @@ class UiSettingsRepository:
             """
             UPDATE tb_users
             SET ui_type = ?, updated_at = ?
-            WHERE user_id = ? AND role = 'user' AND ui_type IS NULL
+            WHERE user_id = ? AND role IN ('user', 'manager') AND ui_type IS NULL
             """,
             (ui_type, updated_at, user_id),
         )
@@ -39,7 +39,7 @@ class UiSettingsRepository:
 
     def user_exists(self, user_id: str) -> bool:
         rows = self.db.execute_query(
-            "SELECT 1 FROM tb_users WHERE user_id = ? AND role = 'user'",
+            "SELECT 1 FROM tb_users WHERE user_id = ? AND role IN ('user', 'manager')",
             (user_id,),
         )
         return bool(rows)

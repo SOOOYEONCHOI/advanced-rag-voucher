@@ -23,8 +23,10 @@
 
       <!-- Content -->
       <div class="admin-content">
+        <!-- 2026.11.23(woojin.jung) 추가 - 비활성 부서: 읽기 전용 안내 + 업로드 카드 숨김(목록의 수정·삭제는 서버 can_edit/can_delete 로 비활성) -->
+        <DepartmentReadOnlyNotice />
         <!-- Upload Card -->
-        <div class="card upload-card">
+        <div v-if="!departmentReadOnly" class="card upload-card">
           <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> 문서 업로드</div>
 
           <!-- Drop Zone -->
@@ -43,8 +45,9 @@
             <div class="drop-placeholder">
               <i class="fa-solid fa-file-circle-plus drop-icon"></i>
               <p>파일을 드래그하거나 클릭하여 선택 · 최대 10개</p>
-              <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 서버가 도면 처리를 켜면 도면 확장자 안내 -->
-              <span>PDF · DOCX · PPTX · XLSX · 이미지<template v-if="drawingIngestExtensions.length"> · 도면(DWG·DXF)</template></span>
+              <span
+                >PDF · DOCX · PPTX · XLSX · 이미지<template v-if="drawingEnabled"> · {{ drawingIngestExtensions.map((ext) => ext.toUpperCase()).join(' · ') }}</template></span
+              >
             </div>
           </div>
           <p v-if="selectionMessage" class="form-error" role="alert">{{ selectionMessage }}</p>
@@ -68,7 +71,6 @@
               </div>
               <div class="form-group">
                 <label>문서 유형 <span class="required">*</span></label>
-                <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면만 고르면 문서 유형 "도면(자동)" 고정, 섞여 있으면 도면이 아닌 파일에만 적용 -->
                 <select v-if="allDrawingFiles" disabled aria-label="문서 유형">
                   <option>도면(자동)</option>
                 </select>
@@ -76,22 +78,22 @@
                   <option v-for="option in documentTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                 </select>
                 <div v-if="documentTypeCompatibilityError" class="form-error">{{ documentTypeCompatibilityError }}</div>
-                <div v-else-if="hasDrawingFile" class="form-hint">
-                  <i class="fa-solid fa-circle-info"></i> 도면은 전용 처리기로 처리됩니다. 처리 후 검수하며, 검색에는 아직 쓰이지 않습니다.<template v-if="!allDrawingFiles"> 문서 유형은 도면이 아닌 파일에만 적용됩니다.</template>
-                </div>
+                <div v-else-if="allDrawingFiles" class="form-hint"><i class="fa-solid fa-circle-info"></i> 파일 확장자로 도면 유형을 자동 적용합니다.</div>
                 <div v-else class="form-hint">{{ selectedDocumentTypeDescription }}</div>
               </div>
               <!-- 2026.10.19(sooyeon.choi) 수정 - 공통 제품 모델 입력 제거: 아래 처리 현황의 파일별 모델명 입력으로 전환 -->
               <div class="form-group">
                 <label>파서 선택</label>
                 <!-- 2026.10.16(sooyeon.choi) 추가 - 선택 파일이 모두 엑셀 전용 처리기 대상이면 파서 선택 비활성 + 안내 -->
-                <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 전용 처리기(엑셀·도면)만 고르면 비활성 -->
-                <select v-model="form.parserType" :disabled="isUploading || allDedicatedFiles">
+                <select v-if="allDrawingFiles" disabled aria-label="파서 선택">
+                  <option>도면 처리기(자동)</option>
+                </select>
+                <select v-else v-model="form.parserType" :disabled="isUploading || allExcelIngestFiles">
                   <option value="docling">Docling API (PDF·DOCX·PPTX·이미지)</option>
                   <option value="pdfplumber">pdfplumber (PDF 전용, 빠름)</option>
                 </select>
                 <div v-if="hasExcelIngestFile" class="form-hint"><i class="fa-solid fa-circle-info"></i> 엑셀은 전용 처리기로 처리됩니다(문서 유형·파서 선택과 관계없음).</div>
-                <div v-if="hasDrawingFile" class="form-hint"><i class="fa-solid fa-circle-info"></i> 도면은 도면 처리기로 처리됩니다.</div>
+                <div v-if="hasDrawingFile" class="form-hint"><i class="fa-solid fa-circle-info"></i> 도면은 전용 처리기로 변환·항목 추출·이미지 생성을 수행합니다.</div>
               </div>
               <!-- <div class="form-group">
                 <label>청크 크기 <span class="label-hint">(비우면 자동)</span></label>
@@ -160,8 +162,7 @@
               <li v-for="item in uploadItems" :key="item.clientId" class="upload-file" :class="item.status">
                 <div class="upload-file-main">
                   <div class="upload-file-name">
-                    <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 아이콘 -->
-                    <i :class="isDrawingFile(item) ? 'fa-solid fa-compass-drafting icon-drawing' : 'fa-regular fa-file-lines'"></i>
+                    <i class="fa-regular fa-file-lines"></i>
                     <strong :title="item.filename">{{ item.filename }}</strong>
                     <span class="upload-file-size">{{ formatFileSize(item.size) }}</span>
                   </div>
@@ -194,11 +195,10 @@
                     <p v-if="modelError(item)" class="model-error" aria-live="polite">{{ modelError(item) }}</p>
                   </div>
                   <div class="upload-file-status">
-                    <span class="upload-state" :class="needsReview(item) ? 'review' : item.status"
+                    <span class="upload-state" :class="item.status"
                       ><i v-if="progressAnimated(item)" class="fa-solid fa-spinner fa-spin upload-state-spinner" aria-hidden="true"></i>{{ uploadStateLabel(item) }}</span
                     >
                     <ol v-if="['running', 'failed', 'completed'].includes(item.status)" class="upload-steps" :aria-label="`${item.filename} 처리 단계`">
-                      <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 파일 종류별 단계 칸(도면 5칸) -->
                       <li v-for="(step, index) in stepsFor(item)" :key="step.key" :class="uploadStepState(item, index)" :title="step.label"></li>
                     </ol>
                     <span class="upload-step-label">{{ uploadStatusLabel(item) }}</span>
@@ -219,40 +219,17 @@
                   </div>
                 </div>
                 <p v-if="validationError(item)" class="upload-file-message error">{{ validationError(item) }}</p>
-                <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 오류 코드는 안내 문구로 -->
-                <p v-if="item.error" class="upload-file-message error">{{ displayError(item) }}</p>
+                <p v-if="item.error" class="upload-file-message error">{{ item.error }}</p>
                 <p v-if="item.monitorError" class="upload-file-message error">상태 확인 실패: {{ item.monitorError }}</p>
                 <p v-if="item.status === 'submission_unknown'" class="upload-file-message">중복 업로드를 피하려면 아래 문서 목록에서 접수 여부를 확인한 뒤 다시 선택하세요.</p>
-                <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과 요약·같은 품번 안내(자동 교체 없음)·[처리 결과 보기] -->
                 <p v-if="item.result?.drawing?.same_part_no_documents?.length" class="upload-file-message info">
-                  <i class="fa-solid fa-circle-info"></i>
-                  <span
-                    >같은 품번({{ item.result.drawing.part_no }}) 문서가 이미 있습니다:
-                    {{ item.result.drawing.same_part_no_documents.map((d) => d.product_model || d.original_filename).join(', ') }}. 개정본이면 그 문서의 [새 버전 등록]으로 올려 주세요. 이 파일은 새
-                    문서로 등록되었습니다.</span
-                  >
+                  <i class="fa-solid fa-circle-info"></i> 같은 품번의 기존 도면 {{ item.result.drawing.same_part_no_documents.length }}건이 있습니다. 기존 문서는 자동으로 교체되지 않습니다.
                 </p>
-                <details v-if="item.result?.drawing" class="batch-result" open>
-                  <summary>
-                    도면 처리 결과 · <strong>{{ item.result.drawing.part_no || '품번 미검출' }}</strong> · Rev {{ item.result.drawing.rev || '미검출' }} · 경고
-                    {{ item.result.drawing.warn_count }}
+                <details v-if="item.result" class="batch-result">
+                  <summary v-if="isDrawingItem(item)">
+                    처리 결과 · 품번 {{ item.result.drawing?.part_no || '미검출' }} · {{ item.result.drawing?.sheet_size || '용지 미검출' }} · 경고 {{ item.result.drawing?.warn_count ?? 0 }}건
                   </summary>
-                  <dl>
-                    <dt>품명</dt>
-                    <dd>{{ item.result.drawing.part_name || '-' }}</dd>
-                    <dt>용지 · 축척</dt>
-                    <dd>{{ item.result.drawing.sheet_size || '-' }} · {{ item.result.drawing.scale || '-' }}</dd>
-                    <dt>부품표</dt>
-                    <dd>{{ item.result.drawing.bom_rows ? `${item.result.drawing.bom_rows}행` : '없음(가공품)' }}</dd>
-                    <dt>대화 주제</dt>
-                    <dd>{{ item.result.collection_name }}</dd>
-                    <dt>검색</dt>
-                    <dd>미적용(검수 후 다음 단계에서 적용)</dd>
-                  </dl>
-                  <button type="button" class="btn-text primary" @click="openDrawingResult(item.result)"><i class="fa-solid fa-up-right-from-square"></i> 처리 결과 보기</button>
-                </details>
-                <details v-else-if="item.result" class="batch-result">
-                  <summary>처리 결과 · {{ item.result.total_pages ?? '-' }}페이지 · {{ item.result.chunk_count ?? '-' }}개 청크</summary>
+                  <summary v-else>처리 결과 · {{ item.result.total_pages ?? '-' }}페이지 · {{ item.result.chunk_count ?? '-' }}개 청크</summary>
                   <dl>
                     <dt>문서 유형</dt>
                     <dd>{{ docTypeLabel(item.result.doc_type) }} · {{ docTypeSourceLabel(item.result.doc_type_source) }}</dd>
@@ -260,6 +237,12 @@
                     <dd>{{ item.result.collection_name }}</dd>
                     <dt>Document ID</dt>
                     <dd>{{ item.result.document_id }}</dd>
+                    <template v-if="isDrawingItem(item)">
+                      <dt>품명 · 개정</dt>
+                      <dd>{{ item.result.drawing?.part_name || '미검출' }} · {{ item.result.drawing?.rev || '미검출' }}</dd>
+                      <dt>부품표</dt>
+                      <dd>{{ item.result.drawing?.bom_rows ? `${item.result.drawing.bom_rows}행` : '없음(가공품)' }}</dd>
+                    </template>
                   </dl>
                 </details>
               </li>
@@ -304,239 +287,247 @@
           </div>
 
           <!-- 2026.11.11(woojin.jung) 수정 - 대화 주제 필터를 드롭다운에서 문서 수가 보이는 칩으로 변경 -->
-          <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면이 있으면 대화 주제가 하나여도 칩 줄을 보여 유형 칩을 둔다 -->
-          <div v-if="documents.length > 0 && (topicFilters.length > 2 || drawingCount > 0)" class="topic-filter-bar" role="group" aria-label="대화 주제로 거르기">
-            <button
-              v-for="f in visibleTopicFilters"
-              :key="f.value || '__all'"
-              type="button"
-              class="topic-chip"
-              :class="{ active: filterCollection === f.value, empty: f.count === 0 }"
-              :aria-pressed="filterCollection === f.value"
-              @click="setTopicFilter(f.value)"
-            >
-              <span class="topic-chip-label">{{ f.label }}</span>
-              <span class="topic-chip-count">{{ f.count }}</span>
-            </button>
-            <!-- 2026.11.11(woojin.jung) 추가 - 상위 칩 밖의 주제는 검색 목록에서 선택 -->
-            <div v-if="hiddenTopicCount > 0" class="topic-more" @focusout="onTopicMenuFocusout" @keydown.esc.stop="closeTopicMenu">
-              <button type="button" class="topic-chip more" :aria-expanded="topicMenuOpen" aria-haspopup="true" @click="toggleTopicMenu">
-                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <span class="topic-chip-label">{{ hiddenTopicCount }}개 더보기</span>
+          <div v-if="documents.length > 0 && topicFilters.length > 1" class="filter-row">
+            <span class="filter-row-label">대화 주제</span>
+            <div class="topic-filter-bar" role="group" aria-label="대화 주제로 거르기">
+              <button
+                v-for="f in visibleTopicFilters"
+                :key="f.value || '__all'"
+                type="button"
+                class="topic-chip"
+                :class="{ active: filterCollection === f.value, empty: f.count === 0 }"
+                :aria-pressed="filterCollection === f.value"
+                @click="setTopicFilter(f.value)"
+              >
+                <span class="topic-chip-label">{{ f.label }}</span>
+                <span class="topic-chip-count">{{ f.count }}</span>
               </button>
-              <div v-if="topicMenuOpen" class="topic-menu">
-                <input v-model="topicSearch" v-focus type="search" class="topic-menu-search" placeholder="대화 주제 검색" aria-label="대화 주제 검색" />
-                <ul class="topic-menu-list">
-                  <li v-for="f in topicMenuResults" :key="f.value">
-                    <button type="button" class="topic-menu-item" :class="{ active: filterCollection === f.value, empty: f.count === 0 }" @mousedown.prevent @click="selectTopicFromMenu(f.value)">
-                      <span class="topic-chip-label">{{ f.label }}</span>
-                      <span class="topic-chip-count">{{ f.count }}</span>
-                    </button>
-                  </li>
-                  <li v-if="topicMenuResults.length === 0" class="topic-menu-empty">일치하는 대화 주제가 없습니다.</li>
-                </ul>
+              <!-- 2026.11.11(woojin.jung) 추가 - 상위 칩 밖의 주제는 검색 목록에서 선택 -->
+              <div v-if="hiddenTopicCount > 0" class="topic-more" @focusout="onTopicMenuFocusout" @keydown.esc.stop="closeTopicMenu">
+                <button type="button" class="topic-chip more" :aria-expanded="topicMenuOpen" aria-haspopup="true" @click="toggleTopicMenu">
+                  <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                  <span class="topic-chip-label">{{ hiddenTopicCount }}개 더보기</span>
+                </button>
+                <div v-if="topicMenuOpen" class="topic-menu">
+                  <input v-model="topicSearch" v-focus type="search" class="topic-menu-search" placeholder="대화 주제 검색" aria-label="대화 주제 검색" />
+                  <ul class="topic-menu-list">
+                    <li v-for="f in topicMenuResults" :key="f.value">
+                      <button type="button" class="topic-menu-item" :class="{ active: filterCollection === f.value, empty: f.count === 0 }" @mousedown.prevent @click="selectTopicFromMenu(f.value)">
+                        <span class="topic-chip-label">{{ f.label }}</span>
+                        <span class="topic-chip-count">{{ f.count }}</span>
+                      </button>
+                    </li>
+                    <li v-if="topicMenuResults.length === 0" class="topic-menu-empty">일치하는 대화 주제가 없습니다.</li>
+                  </ul>
+                </div>
               </div>
             </div>
-            <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 유형 칩 "도면 N"(대화 주제 필터와 함께 적용) -->
-            <template v-if="drawingCount > 0">
-              <span class="topic-sep" aria-hidden="true"></span>
-              <button type="button" class="topic-chip type-chip" :class="{ active: drawingOnly }" :aria-pressed="drawingOnly" @click="toggleDrawingOnly">
-                <i class="fa-solid fa-compass-drafting" aria-hidden="true"></i>
-                <span class="topic-chip-label">도면</span>
-                <span class="topic-chip-count">{{ drawingCount }}</span>
-              </button>
-            </template>
+          </div>
+          <div v-if="documents.length > 0 && drawingEnabled" class="filter-row document-type-filter-row">
+            <span class="filter-row-label">문서 유형</span>
+            <button
+              type="button"
+              class="drawing-only-filter"
+              :class="{ active: filterDocumentType === 'drawing' }"
+              :aria-pressed="filterDocumentType === 'drawing'"
+              @click="setDocumentTypeFilter('drawing')"
+            >
+              <span class="filter-checkbox" aria-hidden="true"><i v-if="filterDocumentType === 'drawing'" class="fa-solid fa-check"></i></span>
+              <span>도면만 보기</span>
+              <span class="drawing-filter-count">{{ drawingDocumentCount }}</span>
+            </button>
           </div>
 
-          <div v-if="documents.length === 0" class="empty-table">
-            <i class="fa-regular fa-folder-open"></i>
-            <p>업로드된 문서가 없습니다.</p>
-          </div>
+          <!-- 필터 결과 수가 달라도 카드 높이가 바뀌지 않도록 목록 영역의 높이를 고정한다. -->
+          <div class="document-list-viewport">
+            <div v-if="documents.length === 0" class="empty-table">
+              <i class="fa-regular fa-folder-open"></i>
+              <p>업로드된 문서가 없습니다.</p>
+            </div>
 
-          <div v-else-if="filteredDocuments.length === 0" class="empty-table">
-            <i class="fa-regular fa-folder-open"></i>
-            <p>'{{ activeTopicLabel }}' 대화 주제에 업로드된 문서가 없습니다.</p>
-            <!-- <button type="button" class="btn-text" @click="setTopicFilter('')"><i class="fa-solid fa-xmark"></i> 필터 해제</button> -->
-          </div>
+            <div v-else-if="filteredDocuments.length === 0" class="empty-table">
+              <i class="fa-regular fa-folder-open"></i>
+              <p>선택한 조건에 맞는 업로드 문서가 없습니다.</p>
+              <!-- <button type="button" class="btn-text" @click="setTopicFilter('')"><i class="fa-solid fa-xmark"></i> 필터 해제</button> -->
+            </div>
 
-          <div v-else class="table-scroll" :style="filenameColumnStyle" @mousedown="startFilenameResizeFromHeader">
-            <table class="doc-table">
-              <!-- 2026.10.19(sooyeon.choi) 수정 - 선두 모델명, 파일명(최신본), 현재 버전·최근 변경일 컬럼 추가(업로드 시각 → 최근 변경일) -->
-              <!-- 2026.10.20(woojin.jung) 수정 - 모델명(굵게)·파일명(링크)을 한 셀 두 줄로 합쳐 관계를 드러냄 -->
-              <colgroup>
-                <col class="col-filename" />
-                <col class="col-doc-type" />
-                <col class="col-pages" />
-                <col class="col-topic" />
-                <col class="col-user" />
-                <col class="col-parser" />
-                <col class="col-version" />
-                <col class="col-upload-time" />
-                <col class="col-actions" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th class="th-filename">모델명 · 파일(현재 버전)</th>
-                  <th>문서 유형</th>
-                  <th>총 페이지</th>
-                  <!-- <th>청크 수</th> -->
-                  <th>대화주제</th>
-                  <th>업로더</th>
-                  <th>파서</th>
-                  <th>현재 버전</th>
-                  <th>최근 변경일</th>
-                  <th>작업</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="doc in filteredDocuments" :key="doc.document_id">
-                  <!-- 2026.10.19(sooyeon.choi) 추가 - 모델명 표시·연필 아이콘 인라인 수정(저장/취소, Enter 저장·Esc 취소) -->
-                  <!-- 2026.10.20(woojin.jung) 수정 - 모델명 클릭·연필로 수정(본인 문서만 연필 노출), 저장/취소는 아이콘 버튼 -->
-                  <td class="td-filename">
-                    <div v-if="editingModelId === doc.document_id" class="model-cell editing">
-                      <input
-                        v-model="editingModelValue"
-                        v-focus
-                        type="text"
-                        class="model-input"
-                        :class="{ invalid: modelEditError }"
-                        aria-label="모델명"
-                        placeholder="모델명 입력"
-                        :aria-invalid="Boolean(modelEditError)"
-                        :disabled="savingModelId === doc.document_id"
-                        @keydown.enter.prevent="saveModelEdit(doc)"
-                        @keydown.esc.prevent="cancelModelEdit"
-                      />
-                      <button class="btn-model-icon save" :disabled="savingModelId === doc.document_id" title="저장 (Enter)" aria-label="모델명 저장" @click="saveModelEdit(doc)">
-                        <i :class="savingModelId === doc.document_id ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-check'"></i>
-                      </button>
-                      <button class="btn-model-icon" :disabled="savingModelId === doc.document_id" title="취소 (Esc)" aria-label="모델명 수정 취소" @click="cancelModelEdit">
-                        <i class="fa-solid fa-xmark"></i>
-                      </button>
-                      <p v-if="modelEditError" class="model-error" aria-live="polite">{{ modelEditError }}</p>
-                    </div>
-                    <div v-else class="model-cell">
+            <div v-else class="table-scroll" :style="filenameColumnStyle" @mousedown="startFilenameResizeFromHeader">
+              <table class="doc-table">
+                <!-- 2026.10.19(sooyeon.choi) 수정 - 선두 모델명, 파일명(최신본), 현재 버전·최근 변경일 컬럼 추가(업로드 시각 → 최근 변경일) -->
+                <!-- 2026.10.20(woojin.jung) 수정 - 모델명(굵게)·파일명(링크)을 한 셀 두 줄로 합쳐 관계를 드러냄 -->
+                <colgroup>
+                  <col class="col-filename" />
+                  <col class="col-doc-type" />
+                  <col class="col-pages" />
+                  <col class="col-topic" />
+                  <col class="col-user" />
+                  <col class="col-parser" />
+                  <col class="col-version" />
+                  <col class="col-upload-time" />
+                  <col class="col-actions" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th class="th-filename">모델명 · 파일(현재 버전)</th>
+                    <th>문서 유형</th>
+                    <th>총 페이지</th>
+                    <!-- <th>청크 수</th> -->
+                    <th>대화주제</th>
+                    <th>업로더</th>
+                    <th>파서</th>
+                    <th>현재 버전</th>
+                    <th>최근 변경일</th>
+                    <th>작업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="doc in filteredDocuments" :key="doc.document_id">
+                    <!-- 2026.10.19(sooyeon.choi) 추가 - 모델명 표시·연필 아이콘 인라인 수정(저장/취소, Enter 저장·Esc 취소) -->
+                    <!-- 2026.10.20(woojin.jung) 수정 - 모델명 클릭·연필로 수정(본인 문서만 연필 노출), 저장/취소는 아이콘 버튼 -->
+                    <td class="td-filename">
+                      <div v-if="editingModelId === doc.document_id" class="model-cell editing">
+                        <input
+                          v-model="editingModelValue"
+                          v-focus
+                          type="text"
+                          class="model-input"
+                          :class="{ invalid: modelEditError }"
+                          aria-label="모델명"
+                          placeholder="모델명 입력"
+                          :aria-invalid="Boolean(modelEditError)"
+                          :disabled="savingModelId === doc.document_id"
+                          @keydown.enter.prevent="saveModelEdit(doc)"
+                          @keydown.esc.prevent="cancelModelEdit"
+                        />
+                        <button class="btn-model-icon save" :disabled="savingModelId === doc.document_id" title="저장 (Enter)" aria-label="모델명 저장" @click="saveModelEdit(doc)">
+                          <i :class="savingModelId === doc.document_id ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-check'"></i>
+                        </button>
+                        <button class="btn-model-icon" :disabled="savingModelId === doc.document_id" title="취소 (Esc)" aria-label="모델명 수정 취소" @click="cancelModelEdit">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <p v-if="modelEditError" class="model-error" aria-live="polite">{{ modelEditError }}</p>
+                      </div>
+                      <div v-else class="model-cell">
+                        <button
+                          v-if="doc.can_edit"
+                          class="model-name editable"
+                          :disabled="Boolean(savingModelId)"
+                          :title="`${doc.product_model || '-'} — 클릭하여 모델명 수정`"
+                          @click="startModelEdit(doc)"
+                        >
+                          <span class="model-name-text">{{ doc.product_model || '-' }}</span>
+                          <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                        <strong v-else class="model-name" :title="doc.product_model">{{ doc.product_model || '-' }}</strong>
+                      </div>
+                      <div class="filename-cell-content">
+                        <i :class="doc.doc_type === 'drawing' ? 'fa-solid fa-compass-drafting drawing-icon' : 'fa-regular fa-file-lines'"></i>
+                        <button class="filename-link" :disabled="openingDocId === doc.document_id" :title="`${doc.filename} — 원본 열기`" @click="openOriginalDocument(doc)">
+                          <span class="filename-text">{{ doc.filename }}</span>
+                          <i v-if="openingDocId === doc.document_id" class="fa-solid fa-spinner fa-spin"></i>
+                        </button>
+                      </div>
+                      <div v-if="doc.doc_type === 'drawing' && doc.drawing" class="drawing-meta">품번 {{ doc.drawing.part_no || '미검출' }} · Rev {{ doc.drawing.rev || '미검출' }}</div>
+                    </td>
+                    <td>
+                      <span class="badge" :class="doc.doc_type">
+                        {{ docTypeLabel(doc.doc_type) }}
+                      </span>
+                      <div v-if="doc.doc_type === 'drawing' && doc.drawing" class="drawing-state-chips">
+                        <span :class="doc.drawing.review_status === 'reviewed' ? 'reviewed' : 'pending'">{{ doc.drawing.review_status === 'reviewed' ? '검수 완료' : '미검수' }}</span>
+                        <span class="muted">검색 미적용</span><span v-if="doc.drawing.warn_count" class="warn">경고 {{ doc.drawing.warn_count }}</span>
+                      </div>
+                    </td>
+                    <td>{{ doc.doc_type === 'drawing' ? `${doc.total_pages ?? 1}매${doc.drawing?.sheet_size ? ` · ${doc.drawing.sheet_size}` : ''}` : (doc.total_pages ?? '-') }}</td>
+                    <!-- <td class="td-chunks">{{ doc.chunk_count ?? '-' }}</td> -->
+                    <!-- 2026.11.11(woojin.jung) 수정 - 대화주제를 누르면 해당 주제로 거르기(다시 누르면 해제) -->
+                    <td>
                       <button
-                        v-if="doc.can_edit"
-                        class="model-name editable"
-                        :disabled="Boolean(savingModelId)"
-                        :title="`${doc.product_model || '-'} — 클릭하여 모델명 수정`"
-                        @click="startModelEdit(doc)"
+                        type="button"
+                        class="topic-link"
+                        :class="{ active: filterCollection === doc.collection_name }"
+                        :title="filterCollection === doc.collection_name ? '필터 해제' : '이 대화 주제만 보기'"
+                        @click="setTopicFilter(doc.collection_name)"
                       >
-                        <span class="model-name-text">{{ doc.product_model || '-' }}</span>
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        {{ collectionTopicLabel(doc.collection_name) }}
                       </button>
-                      <strong v-else class="model-name" :title="doc.product_model">{{ doc.product_model || '-' }}</strong>
-                    </div>
-                    <div class="filename-cell-content">
-                      <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 아이콘 -->
-                      <i :class="doc.doc_type === 'drawing' ? 'fa-solid fa-compass-drafting icon-drawing' : 'fa-regular fa-file-lines'"></i>
-                      <button class="filename-link" :disabled="openingDocId === doc.document_id" :title="`${doc.filename} — 원본 열기`" @click="openOriginalDocument(doc)">
-                        <span class="filename-text">{{ doc.filename }}</span>
-                        <i v-if="openingDocId === doc.document_id" class="fa-solid fa-spinner fa-spin"></i>
-                      </button>
-                    </div>
-                    <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 품번·Rev -->
-                    <div v-if="doc.drawing" class="drawing-meta">{{ doc.drawing.part_no || '품번 미검출' }} · Rev {{ doc.drawing.rev || '미검출' }}</div>
-                  </td>
-                  <td>
-                    <span class="badge" :class="doc.doc_type">
-                      {{ docTypeLabel(doc.doc_type) }}
-                    </span>
-                    <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 검색 미적용·검수 상태·경고 수 -->
-                    <div v-if="doc.drawing" class="state-chips">
-                      <span class="state-chip">검색 미적용</span>
-                      <span class="state-chip" :class="doc.drawing.review_status === 'reviewed' ? 'reviewed' : 'pending'">{{ doc.drawing.review_status === 'reviewed' ? '검수 완료' : '미검수' }}</span>
-                      <span v-if="doc.drawing.warn_count" class="state-chip warn">경고 {{ doc.drawing.warn_count }}</span>
-                    </div>
-                  </td>
-                  <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 매수·용지 -->
-                  <td>{{ doc.drawing ? `${doc.total_pages ?? 1}매 · ${doc.drawing.sheet_size || '-'}` : doc.total_pages ?? '-' }}</td>
-                  <!-- <td class="td-chunks">{{ doc.chunk_count ?? '-' }}</td> -->
-                  <!-- 2026.11.11(woojin.jung) 수정 - 대화주제를 누르면 해당 주제로 거르기(다시 누르면 해제) -->
-                  <td>
-                    <button
-                      type="button"
-                      class="topic-link"
-                      :class="{ active: filterCollection === doc.collection_name }"
-                      :title="filterCollection === doc.collection_name ? '필터 해제' : '이 대화 주제만 보기'"
-                      @click="setTopicFilter(doc.collection_name)"
-                    >
-                      {{ collectionTopicLabel(doc.collection_name) }}
-                    </button>
-                  </td>
-                  <td>
-                    {{ doc.uploaded_by || '-' }}
-                  </td>
-                  <td>{{ parserLabel(doc.parser_type) }}</td>
-                  <!-- 2026.10.19(sooyeon.choi) 추가 - 현재 버전(시스템 version_no)·최근 변경일(등록·모델명 수정 시각, KST) -->
-                  <td>
-                    <span class="version-badge">v{{ doc.version_no ?? 1 }}</span>
-                    <!-- 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중 표시(처리 중에는 현재 버전으로 검색·답변) -->
-                    <!-- 2026.11.09(woojin.jung) 수정 - 최신본 변경·이전 버전 복원 처리 중 배지를 같은 형식으로 표시 -->
-                    <span v-if="isVersionPending(doc)" class="version-pending" :title="`새 버전 v${pendingVersionNo(doc)} 등록 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`">
-                      <i class="fa-solid fa-spinner fa-spin"></i> v{{ pendingVersionNo(doc) }} 등록 중
-                    </span>
-                    <span
-                      v-else-if="versionRestore.isRestorePending(doc)"
-                      class="version-pending"
-                      :title="`v${versionRestore.restoreTargetNo(doc) ?? ''} 적용 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`"
-                    >
-                      <i class="fa-solid fa-spinner fa-spin"></i> v{{ versionRestore.restoreTargetNo(doc) ?? '?' }} 전환 중
-                    </span>
-                  </td>
-                  <!-- 2026.11.11(woojin.jung) 수정 - 최근 변경일은 분까지만 표시 -->
-                  <td class="td-time">{{ formatTime(doc.updated_at || doc.upload_timestamp).replace(/(\d{2}:\d{2}):\d{2}$/, '$1') }}</td>
-                  <!-- 2026.04.02(sooyeon.choi) - 문서 삭제 기능 추가 -->
-                  <!-- 2026.10.19(sooyeon.choi) 수정 - [최신본 변경]·[버전 이력] 추가, 기존 삭제 버튼·권한 유지(처리 중에는 삭제 불가) -->
-                  <td>
-                    <div class="document-actions">
-                      <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과·검수 -->
-                      <button v-if="doc.drawing" class="btn-doc-action btn-drawing-result" title="도면 처리 결과·검수" @click="openDrawingResult(doc)">
-                        <i class="fa-solid fa-clipboard-check"></i><span>처리 결과</span>
-                      </button>
-                      <button
-                        v-if="versionReplaceEnabled"
-                        class="btn-doc-action btn-latest-version"
-                        :disabled="!doc.can_edit || isVersionPending(doc) || versionRestore.isDocumentBusy(doc)"
-                        :title="
-                          !doc.can_edit
-                            ? '본인이 업로드한 문서만 새 버전을 등록할 수 있습니다.'
-                            : versionRestore.isRestorePending(doc)
-                              ? '다른 버전을 적용하는 중입니다.'
-                              : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
-                                ? '새 버전 등록을 처리 중입니다.'
-                                : '새 파일을 이 문서의 새 버전으로 등록'
-                        "
-                        @click="openReplaceDialog(doc)"
+                    </td>
+                    <td>
+                      {{ doc.uploaded_by || '-' }}
+                    </td>
+                    <td>{{ parserTypeLabel(doc.parser_type) }}</td>
+                    <!-- 2026.10.19(sooyeon.choi) 추가 - 현재 버전(시스템 version_no)·최근 변경일(등록·모델명 수정 시각, KST) -->
+                    <td>
+                      <span class="version-badge">v{{ doc.version_no ?? 1 }}</span>
+                      <!-- 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중 표시(처리 중에는 현재 버전으로 검색·답변) -->
+                      <!-- 2026.11.09(woojin.jung) 수정 - 최신본 변경·이전 버전 복원 처리 중 배지를 같은 형식으로 표시 -->
+                      <span v-if="isVersionPending(doc)" class="version-pending" :title="`새 버전 v${pendingVersionNo(doc)} 등록 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`">
+                        <i class="fa-solid fa-spinner fa-spin"></i> v{{ pendingVersionNo(doc) }} 등록 중
+                      </span>
+                      <span
+                        v-else-if="versionRestore.isRestorePending(doc)"
+                        class="version-pending"
+                        :title="`v${versionRestore.restoreTargetNo(doc) ?? ''} 적용 처리 중 — 완료 전까지 현재 버전으로 검색됩니다.`"
                       >
-                        <i class="fa-solid fa-arrow-up-from-bracket"></i><span>새 버전 등록</span>
-                      </button>
-                      <button class="btn-doc-action btn-version-history" title="버전 이력" @click="versionRestore.openHistory(doc)">
-                        <i class="fa-solid fa-clock-rotate-left"></i><span>버전 이력</span>
-                      </button>
-                      <button
-                        class="btn-delete-doc"
-                        :disabled="!doc.can_delete || deletingId === doc.document_id || isVersionPending(doc) || versionRestore.isDocumentBusy(doc)"
-                        @click="confirmDeleteDoc(doc)"
-                        :title="
-                          !doc.can_delete
-                            ? '본인이 업로드한 문서만 개별 삭제할 수 있습니다.'
-                            : versionRestore.isRestorePending(doc)
-                              ? '버전 적용을 처리 중인 문서는 삭제할 수 없습니다.'
-                              : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
-                                ? '새 버전 등록을 처리 중인 문서는 삭제할 수 없습니다.'
-                                : '문서 삭제'
-                        "
-                      >
-                        <i v-if="deletingId === doc.document_id" class="fa-solid fa-spinner fa-spin"></i>
-                        <i v-else class="fa-solid fa-trash"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                        <i class="fa-solid fa-spinner fa-spin"></i> v{{ versionRestore.restoreTargetNo(doc) ?? '?' }} 전환 중
+                      </span>
+                    </td>
+                    <!-- 2026.11.11(woojin.jung) 수정 - 최근 변경일은 분까지만 표시 -->
+                    <td class="td-time">{{ formatTime(doc.updated_at || doc.upload_timestamp).replace(/(\d{2}:\d{2}):\d{2}$/, '$1') }}</td>
+                    <!-- 2026.04.02(sooyeon.choi) - 문서 삭제 기능 추가 -->
+                    <!-- 2026.10.19(sooyeon.choi) 수정 - [최신본 변경]·[버전 이력] 추가, 기존 삭제 버튼·권한 유지(처리 중에는 삭제 불가) -->
+                    <td>
+                      <div class="document-actions">
+                        <button v-if="drawingEnabled && doc.doc_type === 'drawing'" class="btn-doc-action btn-drawing-result" title="추출된 도면 처리 결과 보기" @click="openDrawingResult(doc)">
+                          <i class="fa-solid fa-compass-drafting"></i><span>처리 결과</span>
+                        </button>
+                        <button
+                          v-if="versionReplaceEnabled"
+                          class="btn-doc-action btn-latest-version"
+                          :disabled="!doc.can_edit || isVersionPending(doc) || versionRestore.isDocumentBusy(doc)"
+                          :title="
+                            !doc.can_edit
+                              ? departmentReadOnly
+                                ? '소속 부서가 비활성화되어 새 버전을 등록할 수 없습니다.'
+                                : '소속 부서 문서만 새 버전을 등록할 수 있습니다.'
+                              : versionRestore.isRestorePending(doc)
+                                ? '다른 버전을 적용하는 중입니다.'
+                                : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
+                                  ? '새 버전 등록을 처리 중입니다.'
+                                  : '새 파일을 이 문서의 새 버전으로 등록'
+                          "
+                          @click="openReplaceDialog(doc)"
+                        >
+                          <i class="fa-solid fa-arrow-up-from-bracket"></i><span>새 버전 등록</span>
+                        </button>
+                        <button class="btn-doc-action btn-version-history" title="버전 이력" @click="versionRestore.openHistory(doc)">
+                          <i class="fa-solid fa-clock-rotate-left"></i><span>버전 이력</span>
+                        </button>
+                        <button
+                          class="btn-delete-doc"
+                          :disabled="!doc.can_delete || deletingId === doc.document_id || isVersionPending(doc) || versionRestore.isDocumentBusy(doc)"
+                          @click="confirmDeleteDoc(doc)"
+                          :title="
+                            !doc.can_delete
+                              ? departmentReadOnly
+                                ? '소속 부서가 비활성화되어 삭제할 수 없습니다.'
+                                : '소속 부서 문서만 삭제할 수 있습니다.'
+                              : versionRestore.isRestorePending(doc)
+                                ? '버전 적용을 처리 중인 문서는 삭제할 수 없습니다.'
+                                : isVersionPending(doc) || versionRestore.isDocumentBusy(doc)
+                                  ? '새 버전 등록을 처리 중인 문서는 삭제할 수 없습니다.'
+                                  : '문서 삭제'
+                          "
+                        >
+                          <i v-if="deletingId === doc.document_id" class="fa-solid fa-spinner fa-spin"></i>
+                          <i v-else class="fa-solid fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -595,108 +586,39 @@
 
     <!-- 2026.11.09(woojin.jung) 수정 - 버전 이력 대화상자를 이전 버전 복원(버전 선택·복원 확인·진행·적용 이력) 화면으로 교체 -->
     <DocumentVersionHistoryDialog :restore="versionRestore" />
-    <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과·검수 -->
-    <DrawingResultDialog :target="drawingResultTarget" @close="closeDrawingResult" @toast="showAlert" @reviewed="loadDocuments" />
     <!-- 2026.11.09(woojin.jung) 추가 - 문서 목록 Excel 안전 사본 다운로드(참고 문서 창과 같은 동작) -->
     <SpreadsheetViewer ref="spreadsheetViewer" @toast="showAlert" />
+    <DrawingResultDialog v-if="drawingResultTarget" :document="drawingResultTarget" @close="closeDrawingResult" @changed="onDrawingReviewChanged" @toast="showAlert" />
   </div>
 </template>
 
 <script>
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminSidebar from '../components/AdminSidebar.vue';
 import AppToast from '../components/AppToast.vue';
+import DepartmentReadOnlyNotice from '../components/DepartmentReadOnlyNotice.vue';
 import DocumentVersionHistoryDialog from '../components/DocumentVersionHistoryDialog.vue';
-import DrawingResultDialog from '../components/DrawingResultDialog.vue'; // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+import DrawingResultDialog from '../components/DrawingResultDialog.vue';
 import SpreadsheetViewer from '../components/SpreadsheetViewer.vue';
 import { useAdminDocuments } from '../composables/useAdminDocuments';
+import { useAuthStore } from '../stores/authStore';
 
 export default {
-  components: { AdminSidebar, AppToast, DocumentVersionHistoryDialog, DrawingResultDialog, SpreadsheetViewer },
+  components: { AdminSidebar, AppToast, DepartmentReadOnlyNotice, DocumentVersionHistoryDialog, DrawingResultDialog, SpreadsheetViewer },
   // 2026.10.19(sooyeon.choi) 추가 - 모델명 수정 입력창이 열리면 바로 입력할 수 있게 포커스
   directives: { focus: { mounted: (el) => el.focus() } },
   setup() {
     const router = useRouter();
-    return useAdminDocuments({ router });
+    const authStore = useAuthStore();
+    // 2026.11.23(woojin.jung) 추가 - 비활성 부서의 운영관리자는 읽기 전용
+    const departmentReadOnly = computed(() => authStore.departmentReadOnly);
+    return { ...useAdminDocuments({ router }), departmentReadOnly };
   },
 };
 </script>
 
 <style scoped>
-/* 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 아이콘·품번 줄·상태 칩·유형 칩·확인 필요 상태 */
-.icon-drawing {
-  color: #0f766e;
-}
-.drawing-meta {
-  margin-top: 3px;
-  font-family: Consolas, monospace;
-  font-size: 0.76rem;
-  color: #0f766e;
-}
-.badge.drawing {
-  background: #ccfbf1;
-  color: #0f766e;
-}
-.state-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 5px;
-}
-.state-chip {
-  padding: 0.05rem 0.4rem;
-  border-radius: 4px;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 0.7rem;
-  white-space: nowrap;
-}
-.state-chip.pending {
-  background: #fff7ed;
-  color: #c2410c;
-}
-.state-chip.reviewed {
-  background: #dcfce7;
-  color: #15803d;
-}
-.state-chip.warn {
-  background: #fee2e2;
-  color: #dc2626;
-}
-.topic-sep {
-  align-self: stretch;
-  width: 1px;
-  margin: 0 0.25rem;
-  background: #e2e8f0;
-}
-.type-chip i {
-  color: #0f766e;
-}
-.type-chip.active i {
-  color: #fff;
-}
-.btn-drawing-result {
-  border-color: #99f6e4 !important;
-  background: #f0fdfa !important;
-  color: #0f766e !important;
-}
-.upload-state.review,
-.summary-chip.review {
-  background: #ffedd5;
-  color: #c2410c;
-}
-.upload-file-message.info {
-  display: flex;
-  gap: 0.4rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 6px;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-.btn-text.primary {
-  color: #2563eb;
-  font-weight: 600;
-}
 /* 2026.10.02(woojin.jung) 수정 - 업로드 진행 현황 UI 개선(요약 칩·분할 진행 막대·파일 목록·단계 인디케이터) */
 .batch-selection {
   display: flex;
@@ -1508,7 +1430,21 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: 0.9rem;
+  min-width: 0;
+}
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.filter-row-label {
+  flex: 0 0 4.5rem;
+  padding-top: 0.38rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .topic-chip {
   display: inline-flex;
@@ -1680,7 +1616,16 @@ export default {
   color: #2563eb;
 }
 
+.document-list-viewport {
+  height: clamp(280px, 38vh, 420px);
+  min-height: 0;
+}
 .empty-table {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 2.5rem;
   color: #94a3b8;
@@ -1695,7 +1640,8 @@ export default {
 }
 
 .table-scroll {
-  overflow-x: auto;
+  height: 100%;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 .doc-table {
@@ -1736,6 +1682,9 @@ export default {
   width: 280px;
 }
 .doc-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: #f8fafc;
   padding: 0.6rem 0.75rem;
   text-align: left;
@@ -1746,7 +1695,7 @@ export default {
 }
 /* 2026.10.19(sooyeon.choi) 수정 - 리사이즈 손잡이를 첫 컬럼이 아닌 파일명 헤더(th-filename)에 둔다 */
 .doc-table th.th-filename {
-  position: relative;
+  position: sticky;
   cursor: col-resize;
   user-select: none;
   padding-right: 1.6rem;
@@ -2370,6 +2319,147 @@ code {
   }
   .dialog-box {
     padding: 1.25rem;
+  }
+}
+
+.summary-chip.review {
+  background: #ffedd5;
+  color: #c2410c;
+}
+.upload-file-message.info {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.drawing-icon {
+  color: #0f766e;
+}
+.document-type-filter-row {
+  align-items: center;
+  padding-top: 0.65rem;
+  border-top: 1px solid #f1f5f9;
+}
+.document-type-filter-row .filter-row-label {
+  padding-top: 0;
+}
+.drawing-only-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    color 0.15s;
+}
+.drawing-only-filter:hover {
+  border-color: #5eead4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+.drawing-only-filter:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+}
+.drawing-only-filter.active {
+  border-color: #14b8a6;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-weight: 600;
+}
+.filter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+  background: #fff;
+  color: #fff;
+  font-size: 0.65rem;
+}
+.drawing-only-filter.active .filter-checkbox {
+  border-color: #0d9488;
+  background: #0d9488;
+}
+.drawing-filter-count {
+  min-width: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.4rem;
+  text-align: center;
+}
+.drawing-only-filter.active .drawing-filter-count {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.badge.drawing {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.drawing-meta {
+  margin-top: 0.2rem;
+  color: #0f766e;
+  font-family: Consolas, monospace;
+  font-size: 0.75rem;
+}
+.drawing-state-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 0.3rem;
+}
+.drawing-state-chips span {
+  padding: 0.08rem 0.4rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.drawing-state-chips .pending {
+  background: #fff7ed;
+  color: #c2410c;
+}
+.drawing-state-chips .reviewed {
+  background: #dcfce7;
+  color: #15803d;
+}
+.drawing-state-chips .warn {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.btn-doc-action.btn-drawing-result {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .filter-row-label {
+    flex-basis: auto;
+    padding-top: 0;
+  }
+  .document-type-filter-row {
+    align-items: flex-start;
   }
 }
 </style>

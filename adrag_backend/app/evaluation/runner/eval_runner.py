@@ -17,9 +17,18 @@ import time
 from collections import defaultdict
 from typing import Any, Dict, List, Set
 
-from app.evaluation.metric_catalog import metric_catalog
+from app.evaluation.metric_catalog import (
+    ALL_DENOMINATOR_KEYS,
+    FIRST_TOKEN_KEY,
+    JUDGE_ACCURACY_KEY,
+    RESPONSE_TIME_KEY,
+    metric_catalog,
+)
 from app.evaluation.metrics.models import MetricAggregate, MetricResult
-from app.evaluation.metrics.retrieval_metrics import compute_channel_metrics
+from app.evaluation.metrics.retrieval_metrics import (
+    compute_channel_metrics,
+    is_aggregated_retrieval_metric,
+)
 from app.repositories.evaluation_repository import EvalRepository
 from app.evaluation.runner import run_registry
 from app.utils.log.log import LoggingLogger
@@ -29,6 +38,7 @@ logger = LoggingLogger().getLogger(__name__)
 _DEFAULT_CHANNELS = ["dense", "kiwi_bm25", "rrf"]   # 기본 평가 채널
 _K_VALUES = (1, 3, 5, 10)
 _SKIP_RETRIEVAL_BEHAVIORS = {"guardrail", "permission_denied"}
+_CITATION_METRIC_KEYS = ("correctness", "completeness")
 
 def start_run(run_id: int) -> None:
     """이벤트 루프에 run 실행 태스크를 등록한다 (라우터에서 호출)."""
@@ -42,6 +52,10 @@ async def _execute_run(run_id: int) -> None:
         run = repo.get_run(run_id)
         if not run:
             return
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (① 골드셋(시험 데이터셋) 문항 목록·검색 컬렉션 로드)
+        # [AI+ 시험] NDCG@5 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (① 골드셋(시험 데이터셋) 문항 목록·검색 컬렉션 로드)
+        # [AI+ 시험] 반환 시간 - 1) 시험 데이터를 불러오는 코드 (① 골드셋(시험 데이터셋) 문항 목록 로드)
         goldset = repo.get_goldset(run["goldset_id"])
         items = json.loads(goldset["items_snapshot_json"])
         config = json.loads(run["config_json"])
@@ -53,21 +67,29 @@ async def _execute_run(run_id: int) -> None:
         repo.update_run_status(run_id, "running")
         logger.info(f"[eval] run {run_id} 시작 — {len(items)}건, type={run['run_type']}")
 
-        semaphore = asyncio.Semaphore(int(config.get("concurrency", 3)))
         run_type = run["run_type"]
+        # 시험 4: 답변 생성 시간이 포함된 평가는 질의를 순차 실행한다.
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (① 전체 RAG 평가는 1건씩 순차 실행)
+        semaphore = asyncio.Semaphore(1 if run_type in ("full", "end_to_end") else int(config.get("concurrency", 3)))
 
         async def _process(item: Dict[str, Any]) -> None:
             async with semaphore:
                 if run_registry.is_cancel_requested(run_id):
                     return
                 qa_id = item.get("qa_id", 0)
+                started = time.monotonic()
                 try:
-                    fields = await _evaluate_item(item, run_type, config, collection_name)
+                    # 2026.11.20(sooyeon.choi) 수정 - 합본 문항은 원본 컬렉션에서 검색(없으면 골드셋 컬렉션, 기존 동작)
+                    fields = await _evaluate_item(item, run_type, config, item_collection(item, collection_name))
+                    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+                    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (④ 문항 1건 끝날 때마다 결과 저장)
                     repo.insert_item_result(run_id, qa_id, **fields)
                 except Exception as e:
                     logger.error(f"[eval] run {run_id} qa {qa_id} 실패: {e}")
                     repo.insert_item_result(
-                        run_id, qa_id, status="error", error_message=str(e)[:500]
+                        run_id, qa_id, status="error", error_message=str(e)[:500],
+                        latency_ms=int((time.monotonic() - started) * 1000),
                     )
                 finally:
                     repo.increment_run_progress(run_id)
@@ -78,6 +100,10 @@ async def _execute_run(run_id: int) -> None:
             repo.update_run_status(run_id, "cancelled")
             logger.info(f"[eval] run {run_id} 취소됨")
         else:
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (① 전 문항 평가 후 전체 집계 시작)
+            # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (① 전 문항 평가 후 전체 집계 시작)
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (① 전 문항 평가 후 전체 집계 시작)
             _aggregate_and_save_metrics(repo, run_id, items)
             repo.update_run_status(run_id, "completed")
             logger.info(f"[eval] run {run_id} 완료")
@@ -106,12 +132,47 @@ async def _evaluate_item(
         # 운영 RAG 1회 실행 결과로 검색·답변·Citation을 함께 평가한다.
         from app.evaluation.runner.e2e_evaluator import evaluate_end_to_end
         # 운영 RAG 파이프라인 실행
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] 반환 시간 - 2) 시험 데이터를 We.RAG에 입력하여 질의별 답변 생성을 요청하는 코드 (② 문항마다 답변 생성 평가 호출)
         e2e_fields = await evaluate_end_to_end(item, config, collection_name)
         fields.update(e2e_fields)
 
+    # 2026.11.17(sooyeon.choi) 수정 - full은 그래프 실행 시간(어댑터 측정)을 쓰고, 없을 때만 항목 전체 시간
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (② 반환 시간이 비었을 때만 항목 전체 시간으로 보완)
+    if fields.get("latency_ms") is None:
+        fields["latency_ms"] = int((time.monotonic() - started) * 1000)
+    # 2026.11.19(sooyeon.choi) 수정 - 반환 시간 지표(시험 4)를 넣기 위해 latency_ms 확정 뒤에 정규화
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (③ 저장 전 문항 지표 정리 호출)
     fields["metric_status_json"] = _build_item_metric_status(fields, run_type, config)
-    fields["latency_ms"] = int((time.monotonic() - started) * 1000)
     return fields
+
+
+def _number(value: Any) -> Any:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _timing_metrics(latency_ms: Any, timing: Any) -> Dict[str, MetricResult]:
+    """2026.11.19(sooyeon.choi) 추가 - 시험 4 답변 생성 반환 시간(ms)·첫 토큰 시간(ms) 항목 지표."""
+    if isinstance(timing, str):
+        try:
+            timing = json.loads(timing)
+        except json.JSONDecodeError:
+            timing = {}
+    output: Dict[str, MetricResult] = {}
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (③ 반환 시간·첫 토큰 시간을 지표 키로 정리, 없으면 측정 누락)
+    latency = _number(latency_ms)
+    output[RESPONSE_TIME_KEY] = (
+        MetricResult(latency, "evaluated") if latency is not None else MetricResult(None, "excluded", "missing_latency")
+    )
+    first_token = _number((timing or {}).get("first_token_ms")) if isinstance(timing, dict) else None
+    output[FIRST_TOKEN_KEY] = (
+        MetricResult(first_token, "evaluated") if first_token is not None
+        else MetricResult(None, "excluded", "no_first_token")
+    )
+    return output
 
 
 def _build_item_metric_status(
@@ -126,13 +187,12 @@ def _build_item_metric_status(
         status = "error" if metrics.get("error") else "excluded" if metrics.get("skipped") else "evaluated"
         reason = metrics.get("reason") or ("retrieval_error" if metrics.get("error") else None)
         for key, value in metrics.items():
+            # 2026.11.17(sooyeon.choi) 수정 - hit/recall/ndcg/rr@k만 지표로 저장(순위·건수·임계값 제외),
+            #   rerank mrr@k 별칭 삭제(rr@k와 같은 값)
+            if not is_aggregated_retrieval_metric(key):
+                continue
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 output[f"retrieval.{channel}.{key}"] = MetricResult(float(value), "evaluated").as_dict()
-                if channel == "rerank" and key.startswith("rr@"):
-                    cutoff = key.split("@", 1)[1]
-                    output[f"retrieval.rerank.mrr@{cutoff}"] = MetricResult(
-                        float(value), "evaluated"
-                    ).as_dict()
             elif value is None:
                 output[f"retrieval.{channel}.{key}"] = MetricResult(
                     None, "excluded", "missing_gold_chunks"
@@ -140,36 +200,29 @@ def _build_item_metric_status(
         if status != "evaluated":
             output[f"retrieval.{channel}"] = MetricResult(None, status, reason).as_dict()
 
-    answer = fields.get("answer_correctness_v1_json")
+    # 2026.11.17(sooyeon.choi) 수정 - Answer Correctness는 F2 한 종류(answer.correctness)만 저장.
+    #   v1·v2·judge 및 별칭(correctness_mean, *_shadow, .f2) 삭제
+    answer = fields.get("answer_correctness_json")
     if isinstance(answer, dict):
-        output["answer.correctness.v1"] = answer
-        output["answer.correctness_mean"] = answer
-    # 2026.08.03(sooyeon.choi) 수정 - rule-v2 shadow 상태를 공식 v1과 분리 저장
-    answer_v2 = fields.get("answer_correctness_v2_json")
-    if isinstance(answer_v2, dict):
-        output["answer.correctness.v2"] = answer_v2
-        output["answer.correctness_v2_shadow"] = answer_v2
-    answer_v2_f2 = fields.get("answer_correctness_f2_json")
-    if isinstance(answer_v2_f2, dict):
-        output["answer.correctness_v2_f2_shadow"] = answer_v2_f2
-        output["answer.correctness.f2"] = answer_v2_f2
-    answer_judge = fields.get("answer_correctness_judge_json")
-    if isinstance(answer_judge, dict):
-        output["answer.correctness.judge"] = answer_judge
-    answer_best = fields.get("answer_correctness_json")
-    if isinstance(answer_best, dict):
-        output["answer.correctness"] = answer_best
+        output["answer.correctness"] = answer
     citation = fields.get("citation_json")
     if isinstance(citation, dict):
         citation_status = "excluded" if citation.get("skipped") else "evaluated"
         reason = citation.get("reason")
-        for key in ("correctness", "completeness", "citation_f1", "citation_validity"):
+        # 2026.11.17(sooyeon.choi) 수정 - citation_f1·citation_validity 삭제
+        for key in _CITATION_METRIC_KEYS:
             value = citation.get(key)
             status = citation_status if value is not None else "excluded"
             output[f"citation.{key}"] = MetricResult(
                 float(value) if value is not None else None, status,
                 reason if reason else ("missing_gold_chunks" if value is None else None),
             ).as_dict()
+
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] 반환 시간 - 4) 질의별 답변 생성 반환 시간을 저장하는 코드 (③ 반환 시간·첫 토큰 시간 지표 정리 호출)
+    if scope in ("full", "end_to_end"):
+        for key, result in _timing_metrics(fields.get("latency_ms"), fields.get("timing_json")).items():
+            output[key] = result.as_dict()
 
     primary, secondary = metric_catalog(scope, config)
     for definition in [*primary, *secondary]:
@@ -191,9 +244,11 @@ async def _evaluate_retrieval(
     from app.evaluation.adapters.retrieval_adapter import EvalRetriever
     from app.evaluation.adapters.reranker_adapter import EvalReranker
 
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (③ 문항별 질의문·정답 청크ID 집합·검색 후보 수 N)
+    # [AI+ 시험] NDCG@5 - 1) 시험 데이터 및 정답 데이터를 불러오는 코드 (③ 문항별 질의문·정답 청크ID 집합·최종 문서 수 K)
     question = item["question"]
     gold_ids: Set[str] = set(_parse_json_list(item.get("gold_chunk_ids")))
-    gold_document_ids: Set[str] = set(_parse_json_list(item.get("gold_document_ids")))
     top_k = int(config.get("retrieval_top_n", config.get("top_k", 10)))
     rerank_top_k = int(config.get("rerank_top_k", 5))
     channels = config.get("channels", _DEFAULT_CHANNELS)
@@ -207,48 +262,54 @@ async def _evaluate_retrieval(
             for channel in [*channels, *(["rerank"] if config.get("enable_rerank", True) else [])]
         }
 
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (① 평가용 검색기 생성)
+    # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (① 평가용 검색기 생성)
     retriever = EvalRetriever()
     result: Dict[str, Any] = {}
     rrf_hits = None
 
     for channel in channels:
         if channel == "rrf":
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (① 시험 질의로 하이브리드 검색 요청, 상위 N=10)
             hits = await retriever.search_rrf(question, top_k, collection_name)
             rrf_hits = hits
         else:
             hits = await retriever.search_channel(channel, question, top_k, collection_name)
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 5) 상위 10개 검색 결과와 정답 데이터를 비교하여 정답 근거 청크의 포함 여부를 확인하는 코드 (① 검색 청크ID 목록과 정답 청크ID를 지표 계산에 전달)
         retrieved_ids = [chunk_id for chunk_id, _, _ in hits]
         retrieval_k_values = tuple(sorted(set((*_K_VALUES, top_k))))
-        channel_metrics = compute_channel_metrics(
+        # 2026.11.17(sooyeon.choi) 삭제 - 문서 단위(document_*) 지표(청크 정답 기준과 이중 집계)
+        result[channel] = compute_channel_metrics(
             retrieved_ids, gold_ids, retrieval_k_values
         )
-        document_ids = list(dict.fromkeys(
-            payload.get("document_id")
-            for _, _, payload in hits
-            if payload.get("document_id")
-        ))
-        document_metrics = compute_channel_metrics(
-            document_ids, gold_document_ids, retrieval_k_values
-        )
-        channel_metrics.update({
-            f"document_{key}": value
-            for key, value in document_metrics.items()
-            if key != "gold_ranks"
-        })
-        result[channel] = channel_metrics
 
     # 리랭킹 평가: RRF(또는 운영 병합) 결과 기반
     if config.get("enable_rerank", True):
-        if rrf_hits is None:
-            rrf_hits = await retriever.search_rrf(question, top_k, collection_name)
+        from app.core.config import get_settings
+        settings = get_settings()
+        # 2026.11.17(sooyeon.choi) 수정 - 재랭킹 입력·출력 수를 운영과 맞춤
+        #   기존: RRF 상위 N(10)개만 재랭킹해 상위 K(5)개 → 운영(후보 candidate_top_k개 → reranker_top_k개)보다
+        #   후보가 적어 NDCG@5가 운영과 다르게 나왔다. 지표 cutoff는 1,3,5,10 + K로 통일(full 평가와 동일).
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (① 운영과 같은 후보 수(candidate_top_k)로 하이브리드 검색)
+        candidate_top_k = max(top_k, int(settings.candidate_top_k))
+        rerank_output_k = max(rerank_top_k, int(settings.reranker_top_k))
+        if rrf_hits is None or len(rrf_hits) < candidate_top_k:
+            rrf_hits = await retriever.search_rrf(question, candidate_top_k, collection_name)
         try:
-            reranked = await EvalReranker().rerank(question, rrf_hits, top_k=rerank_top_k)
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (① 검색 후보·질의를 Reranker에 전달)
+            reranked = await EvalReranker().rerank(question, rrf_hits, top_k=rerank_output_k)
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] NDCG@5 - 5) 재정렬된 상위 5개 문서 청크의 관련도 및 순위를 정답 데이터와 비교하여 질의별 NDCG@5를 산출하는 코드 (① 재정렬 청크ID 목록과 정답 청크ID를 지표 계산에 전달)
             reranked_ids = [chunk_id for chunk_id, _, _ in reranked]
             rerank_metrics = compute_channel_metrics(
-                reranked_ids, gold_ids, (1, 3, rerank_top_k)
+                reranked_ids, gold_ids, tuple(sorted({*_K_VALUES, rerank_top_k}))
             )
-            from app.core.config import get_settings
-            threshold = get_settings().relevance_threshold
+            threshold = settings.relevance_threshold
             score_map = {chunk_id: score for chunk_id, score, _ in reranked}
             rerank_metrics["threshold"] = threshold
             rerank_metrics["evidence_above_threshold"] = (
@@ -274,9 +335,28 @@ def _parse_json_list(value: Any) -> List[str]:
     return []
 
 
+def _item_meta(item: Dict[str, Any]) -> Dict[str, Any]:
+    meta = item.get("source_meta_json")
+    if isinstance(meta, str) and meta:
+        try:
+            meta = json.loads(meta)
+        except json.JSONDecodeError:
+            return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def item_collection(item: Dict[str, Any], default: str) -> str:
+    """2026.11.20(sooyeon.choi) 수정 - 문항별 검색 컬렉션. 합본 문항은 source_meta_json.qdrant_name."""
+    return str(_item_meta(item).get("qdrant_name") or default)
+
+
 def _item_segments(item: Dict[str, Any]) -> List[str]:
-    """이 QA 항목이 속하는 집계 세그먼트 목록: all + type:* + tag:*."""
+    """이 QA 항목이 속하는 집계 세그먼트 목록: all + type:* + tag:* (+ 합본 문항은 law:*)."""
     segments = ["all"]
+    # 2026.11.20(sooyeon.choi) 수정 - 합본 법령별 값: 같은 실행의 항목 결과를 법령으로 나눠 같은 식으로 집계
+    law = _item_meta(item).get("law_label")
+    if law:
+        segments.append(f"law:{law}")
     qa_type = item.get("question_type")
     if qa_type:
         segments.append(f"type:{qa_type}")
@@ -292,7 +372,16 @@ def _aggregate_and_save_metrics(
     items: List[Dict[str, Any]],
 ) -> None:
     """항목별 결과를 세그먼트(all + type:* + tag:*)로 집계해 저장한다."""
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (② 저장된 문항별 결과 조회, 결과 없는 문항은 오류로 추가)
+    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (② 저장된 문항별 결과 조회, 결과 없는 문항은 오류로 추가)
+    # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (② 저장된 문항별 결과 조회, 결과 없는 문항은 오류로 추가)
     results = repo.list_item_results(run_id, page_size=10000)["items"]
+    result_ids = {row["qa_id"] for row in results}
+    results = [*results, *[
+        {"qa_id": item.get("qa_id"), "status": "error"}
+        for item in items if item.get("qa_id") not in result_ids
+    ]]
     seg_map = {item.get("qa_id"): _item_segments(item) for item in items}
 
     buckets: Dict[str, Dict[str, List[MetricResult]]] = defaultdict(lambda: defaultdict(list))
@@ -301,28 +390,36 @@ def _aggregate_and_save_metrics(
     config = json.loads(run.get("config_json") or "{}")
     scope = run.get("run_type", "retrieval")
     primary, secondary = metric_catalog(scope, config)
-    official_keys = [metric["key"] for metric in [*primary, *secondary]]
-    # 2026.08.03(sooyeon.choi) 수정 - catalog 비노출 shadow도 오류·제외 건수를 독립 집계
-    shadow_keys = []
-    if scope == "full":
-        shadow_keys.extend([
-            "answer.correctness.v1",
-            "answer.correctness.v2",
-            "answer.correctness.f2",
-            "answer.correctness.judge",
-            "answer.correctness",
-        ])
+    # 2026.11.19(sooyeon.choi) 수정 - 3종 LLM 심사(시험 3)는 아직 계산하지 않으므로 오류로 채우지 않는다('미측정' 표시)
+    official_keys = [metric["key"] for metric in [*primary, *secondary] if metric["key"] != JUDGE_ACCURACY_KEY]
+    # 2026.11.17(sooyeon.choi) 삭제 - v1·v2·f2·judge shadow 키 집계(Answer Correctness는 F2 한 종류)
 
     def add(segments: List[str], key: str, result: MetricResult) -> None:
         for segment in segments:
             buckets[segment][key].append(result)
 
+    def add_bool_rate(segments: List[str], key: str, value: Any) -> None:
+        if isinstance(value, bool):
+            add(segments, key, MetricResult(1.0 if value else 0.0, "evaluated"))
+
     for row in results:
         segments = seg_map.get(row["qa_id"], ["all"])
         if row["status"] != "ok":
             error_count += 1
-            for key in [*official_keys, *shadow_keys]:
+            # 단계 결과가 남아 있으면 검색·재랭킹은 독립적으로 집계한다.
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (② 실행 오류 문항은 오류로 수집, ④에서 0으로 계산)
+        # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (② 실행 오류 문항은 오류로 수집, ④에서 0으로 계산)
+        if row["status"] != "ok" and not row.get("retrieval_json"):
+            for key in official_keys:
+                if key in (RESPONSE_TIME_KEY, FIRST_TOKEN_KEY):
+                    continue
                 add(segments, key, MetricResult(None, "error", "item_execution_error"))
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (② 실행 오류 문항의 반환 시간 수집)
+            if scope in ("full", "end_to_end"):
+                for key, result in _timing_metrics(row.get("latency_ms"), row.get("timing_json")).items():
+                    add(segments, key, result)
             continue
 
         if row.get("retrieval_json"):
@@ -330,6 +427,9 @@ def _aggregate_and_save_metrics(
             for channel, metrics in retrieval.items():
                 if not isinstance(metrics, dict):
                     continue
+                # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+                # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (② 검색 오류·제외 문항은 오류·제외로 수집, ④에서 0으로 계산)
+                # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (② 재랭킹 오류·제외 문항은 오류·제외로 수집, ④에서 0으로 계산)
                 if metrics.get("skipped") or metrics.get("error"):
                     status = "excluded" if metrics.get("skipped") else "error"
                     reason = metrics.get("reason") or f"{channel}_error"
@@ -339,148 +439,101 @@ def _aggregate_and_save_metrics(
                             add(segments, official_key, MetricResult(None, status, reason))
                     continue
                 for key, value in metrics.items():
+                    # 2026.11.17(sooyeon.choi) 수정 - hit/recall/ndcg/rr@k만 평균(순위·건수·임계값 평균 금지),
+                    #   rerank mrr@k 별칭 삭제
+                    if not is_aggregated_retrieval_metric(key):
+                        continue
+                    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+                    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (② 질의별 retrieval.rrf.hit@10 값 수집)
+                    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (② 질의별 retrieval.rerank.ndcg@5 값 수집)
+                    metric_key = f"retrieval.{channel}.{key}"
                     if isinstance(value, (int, float)) and not isinstance(value, bool):
-                        add(segments, f"retrieval.{channel}.{key}", MetricResult(float(value), "evaluated"))
-                        if channel == "rerank" and key.startswith("rr@"):
-                            cutoff = key.split("@", 1)[1]
-                            add(segments, f"retrieval.rerank.mrr@{cutoff}", MetricResult(float(value), "evaluated"))
-                    elif value is None:
-                        metric_key = f"retrieval.{channel}.{key}"
-                        if metric_key in official_keys:
-                            add(segments, metric_key, MetricResult(None, "excluded", "missing_gold_chunks"))
-                        if channel == "rerank" and key.startswith("rr@"):
-                            cutoff = key.split("@", 1)[1]
-                            mrr_key = f"retrieval.rerank.mrr@{cutoff}"
-                            if mrr_key in official_keys:
-                                add(segments, mrr_key, MetricResult(None, "excluded", "missing_gold_chunks"))
+                        add(segments, metric_key, MetricResult(float(value), "evaluated"))
+                    elif value is None and metric_key in official_keys:
+                        add(segments, metric_key, MetricResult(None, "excluded", "missing_gold_chunks"))
 
-        answer_v1_json = row.get("answer_correctness_v1_json")
-        answer_metric = json.loads(answer_v1_json) if answer_v1_json else None
-        if answer_metric:
-            answer_result = MetricResult(
-                answer_metric.get("value"), answer_metric["status"], answer_metric.get("reason"),
-                answer_metric.get("metadata") or {},
-            )
-            add(segments, "answer.correctness.v1", answer_result)
-            add(segments, "answer.correctness_mean", answer_result)
-            if answer_result.status == "evaluated":
-                add(segments, "answer.similarity.mean", answer_result)
-        elif row.get("similarity") is not None:
-            similarity = float(row["similarity"])
-            add(segments, "answer.correctness_mean", MetricResult(similarity, "evaluated"))
-            add(segments, "answer.similarity.mean", MetricResult(similarity, "evaluated"))
-
-        answer_v2_json = row.get("answer_correctness_v2_json")
-        if answer_v2_json:
-            answer_metric_v2 = json.loads(answer_v2_json)
-            answer_v2_result = MetricResult(
-                answer_metric_v2.get("value"),
-                answer_metric_v2["status"],
-                answer_metric_v2.get("reason"),
-                answer_metric_v2.get("metadata") or {},
-            )
-            add(segments, "answer.correctness.v2", answer_v2_result)
-            add(segments, "answer.correctness_v2_shadow", answer_v2_result)
-
-        answer_f2_json = row.get("answer_correctness_f2_json")
-        if answer_f2_json:
-            answer_metric_v2_f2 = json.loads(answer_f2_json)
-            answer_v2_f2_result = MetricResult(
-                answer_metric_v2_f2.get("value"),
-                answer_metric_v2_f2["status"],
-                answer_metric_v2_f2.get("reason"),
-                answer_metric_v2_f2.get("metadata") or {},
-            )
-            add(segments, "answer.correctness_v2_f2_shadow", answer_v2_f2_result)
-            add(segments, "answer.correctness.f2", answer_v2_f2_result)
-
-        if row.get("answer_correctness_judge_json"):
-            judge_metric = json.loads(row["answer_correctness_judge_json"])
-            judge_result = MetricResult(
-                judge_metric.get("value"),
-                judge_metric["status"],
-                judge_metric.get("reason"),
-                judge_metric.get("metadata") or {},
-            )
-            add(segments, "answer.correctness.judge", judge_result)
-
+        # 2026.11.17(sooyeon.choi) 수정 - Answer Correctness는 F2(answer_correctness_json)만 집계.
+        #   v1·v2·judge·similarity 별칭(correctness_mean, similarity.mean, *_shadow) 삭제
         if row.get("answer_correctness_json"):
-            best_metric = json.loads(row["answer_correctness_json"])
-            best_result = MetricResult(
-                best_metric.get("value"),
-                best_metric["status"],
-                best_metric.get("reason"),
-                best_metric.get("metadata") or {},
-            )
-            add(segments, "answer.correctness", best_result)
+            answer_metric = json.loads(row["answer_correctness_json"])
+            add(segments, "answer.correctness", MetricResult(
+                answer_metric.get("value"),
+                answer_metric["status"],
+                answer_metric.get("reason"),
+                answer_metric.get("metadata") or {},
+            ))
 
         if row.get("citation_json"):
             citation = json.loads(row["citation_json"])
-            if citation.get("skipped"):
-                for key in ("correctness", "completeness"):
-                    add(segments, f"citation.{key}", MetricResult(None, "excluded", citation.get("reason")))
-            else:
-                for key, value in citation.items():
-                    if isinstance(value, (int, float)) and not isinstance(value, bool):
-                        add(segments, f"citation.{key}", MetricResult(float(value), "evaluated"))
-                for key in ("correctness", "completeness"):
-                    if citation.get(key) is None:
-                        add(segments, f"citation.{key}", MetricResult(None, "excluded", "missing_gold_chunks"))
+            # 2026.11.17(sooyeon.choi) 수정 - correctness·completeness만 집계(인용 건수 평균 등 삭제)
+            for key in _CITATION_METRIC_KEYS:
+                value = citation.get(key)
+                if citation.get("skipped"):
+                    result = MetricResult(None, "excluded", citation.get("reason"))
+                elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                    result = MetricResult(float(value), "evaluated")
+                else:
+                    result = MetricResult(None, "excluded", "missing_gold_chunks")
+                add(segments, f"citation.{key}", result)
 
         # ①축 — threshold-fallback 분기 정확성 (expected_behavior 대비)
         if row.get("threshold_fallback_json"):
             tf = json.loads(row["threshold_fallback_json"])
-            if isinstance(tf.get("correct"), bool):
-                for seg in segments:
-                    add([seg], "answer.behavior_correct_rate", MetricResult(1.0 if tf["correct"] else 0.0, "evaluated"))
+            add_bool_rate(segments, "answer.behavior_correct_rate", tf.get("correct"))
 
         # ①축 — not_enough_info 거절 적합성 (해당 케이스만)
+        # 2026.11.17(sooyeon.choi) 삭제 - answer.format_correct_rate(check_format),
+        #   answer.rule_match.mean(rule_check), latency.mean_ms(지표 계산 시간이 섞인 항목 전체 시간)
         if row.get("guardrail_json"):
             guardrail = json.loads(row["guardrail_json"])
-            if isinstance(guardrail.get("format_correct"), bool):
-                for seg in segments:
-                    add([seg], "answer.format_correct_rate", MetricResult(1.0 if guardrail["format_correct"] else 0.0, "evaluated"))
-            if isinstance(guardrail.get("refusal_correct"), bool):
-                for seg in segments:
-                    add([seg], "answer.refusal_correct_rate", MetricResult(1.0 if guardrail["refusal_correct"] else 0.0, "evaluated"))
+            add_bool_rate(segments, "answer.refusal_correct_rate", guardrail.get("refusal_correct"))
 
-        # ①축 — 수치·법규조항 규칙 일치율
-        if row.get("rule_check_json"):
-            rule = json.loads(row["rule_check_json"])
-            if isinstance(rule.get("match_ratio"), (int, float)):
-                for seg in segments:
-                    add([seg], "answer.rule_match.mean", MetricResult(float(rule["match_ratio"]), "evaluated"))
-
-        if row.get("latency_ms") is not None:
-            for seg in segments:
-                add([seg], "latency.mean_ms", MetricResult(float(row["latency_ms"]), "evaluated"))
+        # 2026.11.19(sooyeon.choi) 추가 - 시험 4 답변 생성 평균 반환 시간(ms)·첫 토큰 시간(전체 RAG 평가만)
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (② 질의별 반환 시간·첫 토큰 시간 수집)
+        if scope in ("full", "end_to_end"):
+            for key, result in _timing_metrics(row.get("latency_ms"), row.get("timing_json")).items():
+                add(segments, key, result)
 
     metrics: Dict[str, Dict[str, Any]] = {}
     for seg, kv in buckets.items():
         seg_metrics: Dict[str, Any] = {}
         for key, results_for_key in kv.items():
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (④ 측정값 합계 ÷ 건수 평균)
             aggregate = MetricAggregate.from_results(results_for_key)
             value = aggregate.as_dict()
-            if key in {"answer.correctness.v2", "answer.correctness_v2_shadow"}:
-                metric_version = (config.get("answer_correctness_v2") or {}).get(
-                    "metric_version", "rule-v2-shadow.2"
-                )
-            elif key == "answer.correctness.f2":
+            # 시험 4: 측정 누락을 제외한 부분 평균을 공식 평균으로 표시하지 않는다.
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (⑤ 측정 누락 시 공식 평균 비움)
+            if key == RESPONSE_TIME_KEY and aggregate.evaluated_count != aggregate.total_count:
+                value["value"] = None
+                value["std"] = None
+            # 2026.11.19(sooyeon.choi) 추가 - 합의서 시험 1·2 계산식: 분모 = 전체 시험 질의 수.
+            #   실행 오류·정답 없음(제외) 질의는 0으로 센다(평가 건수·제외·오류 건수는 그대로 표시)
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (④ 질의별 값 합계 ÷ 전체 시험 질의 수)
+            # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (④ 질의별 값 합계 ÷ 전체 시험 질의 수)
+            if key in ALL_DENOMINATOR_KEYS and aggregate.total_count:
+                evaluated_sum = sum(float(r.value) for r in results_for_key if r.status == "evaluated")
+                value["value"] = evaluated_sum / aggregate.total_count
+            # 2026.11.17(sooyeon.choi) 수정 - answer.correctness는 F2 지표 버전으로 기록
+            if key == "answer.correctness":
                 metric_version = (config.get("answer_correctness_f2") or {}).get(
                     "metric_version", "f2.1"
-                )
-            elif key == "answer.correctness.judge":
-                metric_version = (config.get("answer_correctness_judge") or {}).get(
-                    "metric_version", "answer_accuracy.1"
                 )
             else:
                 metric_version = config.get("metric_version", "legacy")
             value["metric_version"] = metric_version
             seg_metrics[key] = value
-            if aggregate.std is not None:
-                seg_metrics[f"{key}.std"] = aggregate.std
+            if value["std"] is not None:
+                seg_metrics[f"{key}.std"] = value["std"]
         metrics[seg] = seg_metrics
     total = len(results)
     if total:
         metrics.setdefault("all", {})["run.error_rate"] = error_count / total
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 6) 전체 시험 데이터에 대한 검색 완전성(Recall@10)을 산출하는 코드 (⑤ 집계 결과 저장)
+    # [AI+ 시험] NDCG@5 - 6) 전체 시험 데이터에 대한 질의별 NDCG@5의 평균을 산출하는 코드 (⑤ 집계 결과 저장)
+    # [AI+ 시험] 반환 시간 - 5) 전체 시험 데이터의 반환 시간을 평균하여 답변 생성 평균 반환 시간을 산출하는 코드 (⑥ 집계 결과 저장)
     repo.save_run_metrics(run_id, metrics)

@@ -5,7 +5,9 @@
       <div class="modal-card">
         <div class="modal-icon"><i class="fa-solid fa-lock"></i></div>
         <h3>접근 권한 없음</h3>
-        <p>관리자 페이지는 관리자 계정으로만 접근할 수 있습니다.</p>
+        <!-- 2026.11.20(woojin.jung) 수정 - 부서 운영관리자 전용 화면 안내 -->
+        <p v-if="accessDeniedReason === 'manager'">관리 화면은 부서 운영관리자만 사용할 수 있습니다.<br />문서·대화 주제 관련 요청은 부서 운영관리자에게 문의하세요.</p>
+        <p v-else>관리자 페이지는 관리자 계정으로만 접근할 수 있습니다.</p>
         <button class="modal-confirm-btn" @click="showAccessDeniedModal = false">확인</button>
       </div>
     </div>
@@ -76,10 +78,23 @@
 
         <div class="chat-scroll-area" :class="{ 'has-voice-panel': voiceState !== 'idle' }" ref="chatArea">
           <!-- 대화 주제 미선택 안내 -->
-          <div v-if="!selectedCollection" class="welcome">
+          <!-- 2026.11.23(woojin.jung) 수정 - 소속 부서가 비활성이면 이유를 안내 -->
+          <div v-if="!selectedCollection && authUser?.department_active === false" class="welcome">
+            <div class="welcome-icon"><i class="fa-solid fa-lock"></i></div>
+            <h2>소속 부서가 비활성화되었습니다</h2>
+            <p>지금은 사용할 수 있는 대화 주제가 없습니다. 다시 사용하려면 관리자에게 문의하세요.</p>
+          </div>
+          <!-- 2026.11.23(woojin.jung) 추가 - 개인 차단 등으로 쓸 수 있는 주제가 없을 때 -->
+          <div v-else-if="!selectedCollection && collectionsLoaded && chatCollections.length === 0" class="welcome">
+            <div class="welcome-icon"><i class="fa-solid fa-lock"></i></div>
+            <h2>사용할 수 있는 대화 주제가 없습니다</h2>
+            <p>대화 주제 접근 권한이 필요하면 부서 운영관리자에게 문의하세요.</p>
+          </div>
+          <div v-else-if="!selectedCollection" class="welcome">
             <div class="welcome-icon"><i class="fa-solid fa-comments"></i></div>
             <h2>대화 주제를 선택하세요</h2>
-            <p>좌측 패널에서 대화 주제를 선택하면 해당 문서 범위로 질문할 수 있습니다.</p>
+            <!-- 2026.11.23(woojin.jung) 수정 - 휴대폰에서는 목록이 왼쪽 패널이 아니라 메뉴(☰) 안에 있어 위치 대신 '대화 주제 목록'으로 안내 -->
+            <p>대화 주제 목록에서 주제를 선택하면 해당 문서 범위로 질문할 수 있습니다.</p>
           </div>
 
           <!-- 메시지 목록 -->
@@ -2338,6 +2353,7 @@ export default {
   color: #64748b;
   margin-bottom: 1.5rem;
   line-height: 1.6;
+  word-break: keep-all; /* 2026.11.23(woojin.jung) 추가 - "있습/니다"처럼 단어 중간에서 줄이 바뀌지 않게 */
 }
 .modal-confirm-btn {
   background: #2563eb;

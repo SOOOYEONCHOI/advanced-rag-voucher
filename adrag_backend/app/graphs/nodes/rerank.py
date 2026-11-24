@@ -44,6 +44,8 @@ def get_reranker_client() -> Reranker:
 # 2026.07.07(sooyeon.choi) 수정 - 메타데이터 prefix 포함 reranker 입력 구성
 # 문서명·섹션 정보를 prefix로 붙이면 CE 모델이 맥락을 파악해 관련성 점수 품질이 향상됨
 # 단, 이 포맷 변경 후 relevance_threshold를 평가셋 기준으로 재보정 필요
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] NDCG@5 - 4) 하이브리드 검색 결과를 Reranker 모델에 입력하여 질의와 문서 청크 간 관련도를 평가하고 검색 결과를 재정렬하는 코드 (④ 본문 앞에 [문서명]·[섹션] 머리말을 붙여 Reranker 입력 생성)
 def _build_rerank_text(chunk: Dict) -> str:
     """reranker 입력용 텍스트: 문서명·섹션 prefix + 본문."""
     metadata = chunk.get("metadata", {})
@@ -91,7 +93,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
     """vLLM /v1/score 기반 쿼리-청크 관련성 재평가."""
     if not state.get("retrieved_chunks"):
         rag_diag(logger, "[RAG][diag][node=rerank] 건너뜀 reason=청크없음")
-        return {"reranked_chunks": []}
+        return {"reranked_chunks": [], "rerank_status": "empty"}
 
     settings = deps.settings if deps else get_settings()
     # 2026.06.29(sooyeon.choi) 수정 - Task 7: rerank 단계는 reranker_top_k만 사용
@@ -131,6 +133,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
         return {
             "reranked_chunks": passthrough,
             "threshold_override": 0.0,
+            "rerank_status": "error",
         }
 
     # 2026.04.21(sooyeon.choi) reranker api 호출 분기 처리 추가
@@ -153,6 +156,7 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
         return {
             "reranked_chunks": passthrough,
             "threshold_override": 0.0,
+            "rerank_status": "skipped",
         }
 
     # 2026.07.07(sooyeon.choi) 수정 - 메타데이터 prefix 포함 텍스트를 reranker에 전달
@@ -222,4 +226,4 @@ async def rerank(state: PipelineState, deps: GraphDependencies | None = None) ->
     )
     # 2026.07.16(sooyeon.choi) 수정 - 정상 rerank 성공 시 이전 degraded 폴백의
     #   임계값 우회(threshold_override)를 해제해 잔류 오염 방지
-    return {"reranked_chunks": reranked, "threshold_override": None}
+    return {"reranked_chunks": reranked, "threshold_override": None, "rerank_status": "ok"}

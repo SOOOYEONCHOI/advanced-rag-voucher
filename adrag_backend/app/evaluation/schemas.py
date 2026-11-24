@@ -17,6 +17,10 @@ class DatasetCreateRequest(BaseModel):
     # gen_config 예: {"target_count": 50, "max_per_doc": 5, "min_chunk_chars": 200,
     #                "sampling_seed": 42,
     #                "type_ratio": {"factual": 5, "procedural": 3, "comparative": 1, "multihop": 1}}
+    # 2026.11.19(sooyeon.choi) 추가 - 단일 출처 생성(유형 구분 없음)
+    #   {"generation_mode": "law_article" | "single_section" (기본 "typed"),
+    #    "target_count": 60, "include_annex": false, "article_ref_ratio": 0.3,
+    #    "max_questions_per_chunk": 2, "query_id_prefix": "산안", "llm_model": "gemma-4-31B-it-FP8"}
 
 
 class QaItemUpdateRequest(BaseModel):
@@ -38,6 +42,17 @@ class BulkReviewRequest(BaseModel):
 
 class FinalizeRequest(BaseModel):
     note: str = ""
+
+
+# 2026.11.20(sooyeon.choi) 수정 - 합본 데이터셋 생성(확정 데이터셋 2개 이상, 고른 순서대로 이어 붙임)
+class DatasetMergeRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    dataset_ids: List[int] = Field(min_length=2, max_length=10)
+
+
+# 2026.11.23(sooyeon.choi) 추가 - 질의ID 접두어 변경(확정 데이터셋 포함, 빈 값이면 기본 'Q')
+class DatasetQueryIdPrefixRequest(BaseModel):
+    query_id_prefix: str = Field(default="", max_length=100)
 
 
 # ── 골드셋 수동 등록 (검증·초기 구축용) ─────────────────────────────────────

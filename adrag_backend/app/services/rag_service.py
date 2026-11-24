@@ -17,6 +17,7 @@ from uuid import uuid4
 from app.core.config import get_settings
 from app.core.runtime_settings import get_runtime_settings_version
 from app.graphs.rag_graph import build_rag_graph
+from app.graphs.nodes.generate_answer import FIRST_TOKEN_AT_KEY  # 2026.11.18(sooyeon.choi) 추가
 # 2026.07.16(sooyeon.choi) 수정 - 초기 state 40줄 dict 중복 제거용 팩토리 import
 from app.graphs.state import PipelineState, make_initial_state
 # 2026.07.16(sooyeon.choi) 추가 - 스트리밍 fallback 확장 규칙 공유, 임계값 헬퍼
@@ -49,6 +50,43 @@ def _resolve_collection_id(qdrant_name: Optional[str]) -> Optional[int]:
         return None
     col = CollectionRepository().get_by_qdrant_name(qdrant_name)
     return col.collection_id if col else None
+
+
+# 2026.11.18(sooyeon.choi) 추가 - 일괄 질의 결과 기록용 청크 위치(시트·단계)와 순위
+def _chunk_location(chunk: Dict[str, Any], rank: int) -> Dict[str, Any]:
+    metadata = chunk.get("metadata") or {}
+    step_no = metadata.get("step_no")
+    return {
+        "sheet_name": metadata.get("sheet_name"),
+        "step_no": step_no if isinstance(step_no, int) else None,
+        "rank": rank,
+    }
+
+
+# 2026.11.18(sooyeon.choi) 추가 - 재랭킹 전 검색 결과를 중복 제거 순위로 상위 N개만 요약
+#   (Recall@10은 중복 제거 후 상위 10개 기준, retrieval_metrics.hit_at_k와 같은 규칙)
+def _summarize_ranked_chunks(chunks: List[Dict[str, Any]], limit: int) -> List[ChunkSummary]:
+    summaries: List[ChunkSummary] = []
+    seen: set = set()
+    for chunk in chunks:
+        chunk_id = chunk.get("chunk_id")
+        if not chunk_id or chunk_id in seen:
+            continue
+        seen.add(chunk_id)
+        metadata = chunk.get("metadata") or {}
+        summaries.append(ChunkSummary(
+            chunk_id=chunk_id,
+            document_id=chunk.get("document_id", ""),
+            document_name=metadata.get("filename", ""),
+            text=chunk.get("text", ""),
+            score=chunk.get("score", 0.0),
+            section_name=metadata.get("section_name"),
+            page_number=metadata.get("page_number"),
+            **_chunk_location(chunk, len(summaries) + 1),
+        ))
+        if len(summaries) >= limit:
+            break
+    return summaries
 
 
 # 2026.11.09(sooyeon.choi) 추가 - 대화 이력 1턴 저장(query·query_stream 공통)
@@ -127,6 +165,8 @@ class RAGService:
         enable_metadata_filtering: Optional[bool] = None,
         # 2026.11.12(woojin.jung) 추가 - 질문 입력 경로(text·voice·recommended·popular), 질의 로그에 기록
         input_mode: str = "text",
+        # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의용: 재랭킹 전 검색 상위 N을 응답에 담음(기본 False, 기존 응답 동일)
+        capture_retrieval: bool = False,
     ) -> QueryResponse:
         """RAG 질의를 실행하고 구조화된 응답을 반환한다."""
         start = time.time()
@@ -149,7 +189,12 @@ class RAGService:
         # 2026.06.16(sooyeon.choi) 수정 - collection_id(int) 파악 후 QueryContext에 전달
         # 2026.07.16(sooyeon.choi) 수정 - 동기 SQLite 조회를 to_thread로 이동해 이벤트 루프 블로킹 방지
         collection_id: Optional[int] = None
-        if collection_name:
+        # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의(batch_eval)는 세션을 쓰지 않는다(대화 이력 미저장, 화면 이력과 분리)
+        is_batch_eval = input_mode == "batch_eval"
+        if collection_name and is_batch_eval:
+            session_id = None
+            collection_id = await asyncio.to_thread(_resolve_collection_id, collection_name)
+        elif collection_name:
             existing = await asyncio.to_thread(
                 meta_repo.get_session_by_collection, user_id, collection_name
             )
@@ -219,6 +264,14 @@ class RAGService:
             elapsed_ms / 1000,
         )
 
+        # 2026.11.18(sooyeon.choi) 추가 - 첫 토큰 시간(ms) = 요청 시작 → LLM 첫 답변 토큰(답변 생성 안 했으면 None)
+        timing = dict(result.get("timing") or {})
+        first_token_at = timing.pop(FIRST_TOKEN_AT_KEY, None)
+        first_token_ms = (
+            round((first_token_at - start) * 1000, 1)
+            if isinstance(first_token_at, (int, float)) else None
+        )
+
         chunks = [
             ChunkSummary(
                 chunk_id=c["chunk_id"],
@@ -228,8 +281,10 @@ class RAGService:
                 score=c["score"],
                 section_name=c["metadata"].get("section_name"),
                 page_number=c["metadata"].get("page_number"),
+                # 2026.11.18(sooyeon.choi) 추가 - 일괄 질의 결과 기록용(재랭킹 후 순위·시트·단계)
+                **(_chunk_location(c, rank) if capture_retrieval else {}),
             )
-            for c in result.get("reranked_chunks", [])
+            for rank, c in enumerate(result.get("reranked_chunks", []), start=1)
         ]
 
         citations = [
@@ -264,7 +319,22 @@ class RAGService:
             images=list(result.get("answer_images") or []),
             # 2026.11.06(sooyeon.choi) 추가 - 출처 사진 전체 장수(같은 그림 1장)
             images_total=result.get("answer_images_total") or len(result.get("answer_images") or []),
-            timing=dict(result.get("timing") or {}),
+            timing=timing,
+            first_token_ms=first_token_ms,
+            stage_statuses={
+                "retrieval": result.get("retrieval_status", "not_run"),
+                "rerank": result.get("rerank_status", "not_run"),
+                "answer": "error" if resolve_query_outcome(result) == "llm_error"
+                else "ok" if result.get("generated_answer") else "not_run",
+            } if capture_retrieval else {},
+            # 2026.11.18(sooyeon.choi) 추가 - 결과 코드, 재랭킹 전 상위 N(capture_retrieval일 때만)
+            outcome_code=resolve_query_outcome(result),
+            retrieved_chunks=(
+                _summarize_ranked_chunks(
+                    result.get("retrieved_chunks") or [], settings.eval_batch_top_n_record
+                )
+                if capture_retrieval else []
+            ),
         )
 
         # 2026.11.05(woojin.jung) 수정 - 대화 이력(세션) 저장을 쿼리 로그 기록보다 먼저 수행

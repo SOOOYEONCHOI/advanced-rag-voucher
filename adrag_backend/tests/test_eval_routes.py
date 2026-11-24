@@ -30,7 +30,7 @@ def reset_database_singletons():
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     # 임시 DB 초기화 + 부모 컬렉션
-    db = database.get_database_manager(str(tmp_path / "eval.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("평가용 컬렉션", "eval_api_coll"),
@@ -119,7 +119,7 @@ def test_create_run_returns_pending_and_persists(client):
         "retrieval_top_n": 10,
         "rerank_top_k": 5,
         "retrieval_channel": "rrf",
-        "metric_version": "rule-v1.1",
+        "metric_version": "rule-v1.3",
     }
     assert got.json()["metrics"] == []
 
@@ -186,22 +186,23 @@ def test_create_full_run_snapshots_answer_correctness_config(client):
 
     run = client.get(f"/api/eval/runs/{resp.json()['run_id']}").json()
     config = __import__("json").loads(run["config_json"])
-    assert config["metric_version"] == "rule-v1.1"
-    assert config["answer_correctness"]["method"] == "embedding_cosine"
-    assert config["answer_correctness"]["normalization_version"] == "v2"
-    assert config["answer_correctness"]["embedding_model"]
-    assert config["answer_correctness_v2"]["mode"] == "shadow"
-    assert config["answer_correctness_v2"]["metric_version"] == "rule-v2-shadow.2"
+    # 2026.11.17(sooyeon.choi) 수정 - F2 단일 지표 snapshot(v1·judge·primary·fallback 삭제)
+    assert config["metric_version"] == "rule-v1.3"
+    assert config["answer_correctness_v2"]["mode"] == "f2_input"
+    assert config["answer_correctness_v2"]["metric_version"] == "rule-v2.3"
+    assert config["answer_correctness_v2"]["normalization_version"] == "v2"
+    assert config["answer_correctness_v2"]["embedding_model"]
     assert config["answer_correctness_v2"]["semantic_dedupe_threshold"] == pytest.approx(0.92)
     assert config["answer_correctness_v2"]["precision_candidate_ratio"] == 3
     assert config["answer_correctness_f2"]["enabled"] is True
-    assert config["answer_correctness_f2"]["mode"] == "shadow"
+    assert config["answer_correctness_f2"]["mode"] == "primary"
     assert config["answer_correctness_f2"]["metric_version"] == "f2.1"
     assert config["answer_correctness_f2"]["beta"] == pytest.approx(2.0)
-    assert config["answer_correctness_primary"] in {"v1", "v2", "f2", "judge"}
-    assert config["answer_correctness_fallback_chain"]
-    assert config["answer_correctness_judge"]["method"] == "ragas_answer_accuracy"
-    assert config["answer_correctness_judge"]["metric_version"] == "answer_accuracy.1"
+    for removed in (
+        "answer_correctness", "answer_correctness_primary",
+        "answer_correctness_fallback_chain", "answer_correctness_judge",
+    ):
+        assert removed not in config
 
 
 def test_delete_running_run_conflicts_then_succeeds_after_complete(client):
@@ -282,19 +283,161 @@ def test_run_summary_separates_primary_and_secondary_metrics(client):
         "excluded_count": 0, "error_count": 0, "total_count": 1,
         "metric_version": "rule-v1.1",
     }
+    # 2026.11.17(sooyeon.choi) 수정 - 주 지표 Hit@N, 보조 지표 Recall@N·rr@K·NDCG@N
     repo.save_run_metrics(run_id, {"all": {
+        "retrieval.rrf.hit@10": aggregate,
         "retrieval.rrf.recall@10": aggregate,
         "retrieval.rerank.ndcg@5": aggregate,
-        "retrieval.rerank.mrr@5": aggregate,
+        "retrieval.rerank.rr@5": aggregate,
         "retrieval.rrf.ndcg@10": aggregate,
     }})
 
     data = client.get(f"/api/eval/runs/{run_id}").json()
     assert [metric["key"] for metric in data["primary_metrics"]] == [
-        "retrieval.rrf.recall@10", "retrieval.rerank.ndcg@5",
+        "retrieval.rrf.hit@10", "retrieval.rerank.ndcg@5",
     ]
-    assert len(data["secondary_metrics"]) == 2
+    assert [metric["key"] for metric in data["secondary_metrics"]] == [
+        "retrieval.rrf.recall@10", "retrieval.rerank.rr@5", "retrieval.rrf.ndcg@10",
+    ]
     assert data["primary_metrics"][0]["evaluated_count"] == 1
     assert data["metric_version"] == "rule-v1.1"
     assert data["legacy"] is False
     assert not any(metric["key"].startswith("answer.") for metric in data["primary_metrics"])
+
+
+# ── 데이터셋 생성 모델 선택 (2026.11.18(sooyeon.choi) 추가) ─────────────────────
+
+def _gen_settings(extra=""):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        vllm_model_name="Qwen3.5-9B",
+        vllm_api_url="http://llm:8101/",
+        vllm_api_key="k",
+        eval_gen_vllm_models=extra,
+    )
+
+
+@pytest.fixture
+def gen_models(monkeypatch):
+    """생성 모델 설정 + /v1/models 응답(served) + start_generation 캡처."""
+    import app.evaluation.adapters.gen_model_catalog as catalog
+    import app.evaluation.dataset.generator as generator_mod
+
+    state = {"served": {"http://llm:8101": ["Qwen3.5-9B"]}, "started": []}
+    settings = _gen_settings("gemma-4-31B-it-FP8=http://gen:8112, 잘못된항목")
+    monkeypatch.setattr(catalog, "get_settings", lambda: settings)
+
+    class _Resp:
+        def __init__(self, ids):
+            self.status_code = 200
+            self._ids = ids
+
+        def json(self):
+            return {"data": [{"id": i} for i in self._ids]}
+
+    class _Client:
+        async def get(self, url, **kwargs):
+            base = url[: -len("/v1/models")]
+            if base not in state["served"]:
+                raise ConnectionError("down")
+            return _Resp(state["served"][base])
+
+    monkeypatch.setattr(catalog, "get_shared_async_client", lambda: _Client())
+    monkeypatch.setattr(
+        generator_mod, "start_generation",
+        lambda dataset_id, gen_config: state["started"].append(gen_config),
+    )
+    return state
+
+
+def _stored_gen_config(dataset_id):
+    import json as _json
+    row = database.get_database_manager().execute_query(
+        "SELECT gen_config_json FROM tb_eval_datasets WHERE dataset_id = ?", (dataset_id,)
+    )[0]
+    return _json.loads(row["gen_config_json"])
+
+
+def test_generation_models_list_hides_url_and_marks_down_server(client, gen_models):
+    resp = client.get("/api/eval/settings/dataset-generation/models")
+    assert resp.status_code == 200
+    assert resp.json()["items"] == [
+        {"model": "Qwen3.5-9B", "is_default": True, "available": True},
+        {"model": "gemma-4-31B-it-FP8", "is_default": False, "available": False},
+    ]
+    assert "http" not in resp.text
+
+    gen_models["served"]["http://gen:8112"] = ["gemma-4-31B-it-FP8"]
+    items = client.get("/api/eval/settings/dataset-generation/models").json()["items"]
+    assert items[1]["available"] is True
+
+
+def test_create_dataset_with_selected_vllm_model(client, gen_models):
+    gen_models["served"]["http://gen:8112"] = ["gemma-4-31B-it-FP8"]
+    resp = client.post("/api/eval/datasets", json={
+        "name": "gemma 생성", "collection_id": client._collection_id,
+        "gen_config": {"llm_backend": "vllm", "llm_model": "gemma-4-31B-it-FP8",
+                       "vllm_api_url": "http://attacker:1"},
+    })
+    assert resp.status_code == 202, resp.text
+    runtime = gen_models["started"][-1]
+    assert runtime["vllm_api_url"] == "http://gen:8112"
+    assert runtime["llm_model"] == "gemma-4-31B-it-FP8"
+    stored = _stored_gen_config(resp.json()["dataset_id"])
+    assert stored["llm_model"] == "gemma-4-31B-it-FP8"
+    assert "vllm_api_url" not in stored
+
+
+def test_create_dataset_without_model_uses_chatbot_default(client, gen_models):
+    resp = client.post("/api/eval/datasets", json={
+        "name": "기본 생성", "collection_id": client._collection_id,
+        "gen_config": {"llm_backend": "vllm"},
+    })
+    assert resp.status_code == 202, resp.text
+    runtime = gen_models["started"][-1]
+    assert runtime["vllm_api_url"] == "http://llm:8101"
+    assert runtime["llm_model"] == "Qwen3.5-9B"
+
+
+def test_create_dataset_rejects_unknown_or_down_model(client, gen_models):
+    unknown = client.post("/api/eval/datasets", json={
+        "name": "x", "collection_id": client._collection_id,
+        "gen_config": {"llm_backend": "vllm", "llm_model": "없는모델"},
+    })
+    assert unknown.status_code == 400
+    down = client.post("/api/eval/datasets", json={
+        "name": "x", "collection_id": client._collection_id,
+        "gen_config": {"llm_backend": "vllm", "llm_model": "gemma-4-31B-it-FP8"},
+    })
+    assert down.status_code == 400
+    assert "응답하지 않습니다" in down.json()["detail"]
+    assert gen_models["started"] == []
+
+
+@pytest.mark.asyncio
+async def test_eval_llm_uses_selected_vllm_target(monkeypatch):
+    import app.evaluation.adapters.llm_adapter as adapter
+    from app.core.config import get_settings
+
+    calls = []
+
+    class _FakeLLMClient:
+        def __init__(self, settings):
+            self.target = (settings.vllm_api_url, settings.vllm_model_name)
+
+        async def chat(self, messages, **kwargs):
+            calls.append(self.target)
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    monkeypatch.setattr(adapter, "LLMClient", _FakeLLMClient)
+    monkeypatch.setattr(adapter, "_vllm_clients_by_target", {})
+    monkeypatch.setattr(adapter, "_vllm_client", None)
+
+    llm = adapter.EvalLLM(vllm_api_url="http://gen:8112", vllm_model="gemma-4-31B-it-FP8")
+    assert await llm.chat([{"role": "user", "content": "q"}]) == "ok"
+    assert await adapter.EvalLLM().chat([{"role": "user", "content": "q"}]) == "ok"
+    default = get_settings()
+    assert calls == [
+        ("http://gen:8112", "gemma-4-31B-it-FP8"),
+        (default.vllm_api_url, default.vllm_model_name),
+    ]

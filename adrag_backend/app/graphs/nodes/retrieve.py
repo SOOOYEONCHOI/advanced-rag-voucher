@@ -48,10 +48,15 @@ logger = LoggingLogger().getLogger(__name__)
 #   아래 getter들은 기존 호출부 호환을 위해 유지하며 컨테이너에 위임한다.
 #   구현 교체는 컨테이너에서 수행한다.
 
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (③ 공용 컨테이너에서 임베딩 모델 클라이언트 획득)
+# [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (③ 공용 컨테이너에서 임베딩 모델 클라이언트 획득)
 def get_embedding_client() -> EmbeddingProvider:
     return get_container().embedding
 
 
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (③ 공용 컨테이너에서 Qdrant 벡터 DB 연결 획득)
 def get_vector_repo() -> VectorStore:
     return get_container().vector_store
 
@@ -61,6 +66,8 @@ def get_sparse_encoder() -> SparseEncoder:
 
 
 # 2026.07.07(sooyeon.choi) 수정 - Qdrant hybrid query용 Kiwi BM25 query 생성
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (③ 공용 컨테이너에서 Kiwi BM25 인코더 획득)
 def get_kiwi_bm25_encoder() -> KiwiBm25Encoder:
     """Qdrant BM25 적재/검색 정책을 공유하는 인코더 싱글톤 반환."""
     return get_container().kiwi_bm25_encoder
@@ -87,6 +94,9 @@ async def _search_qdrant_hybrid(
 ):
     """Dense와 Kiwi BM25를 Qdrant 서버에서 weighted RRF로 병합한다."""
     # 2026.07.08(sooyeon.choi) 수정 - 첫 rewrite만 사용하던 누락을 제거하고 전체 Dense query 반영
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (④ 의미 검색 질의 벡터(embed_query)와 BM25 키워드 질의(encode_query) 생성)
+    # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (③ 의미 검색 질의 벡터(embed_query)와 BM25 키워드 질의(encode_query) 생성)
     dense_queries = query_bundle.dense_queries
     embeddings = query_bundle.rewritten_query_embeddings
     if embeddings:
@@ -100,6 +110,8 @@ async def _search_qdrant_hybrid(
         query_bundle.kiwi_bm25_query,
     )
     # 2026.11.11(sooyeon.choi) 수정 - 가중치는 QUERY_TYPE_PROFILE 표에서, Dense는 원문 질의 비중을 반영해 질의별로 나눈다
+    # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+    # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드 (① RRF 가중치 결정 후 Qdrant 하이브리드 검색에 질의·top_k·rrf_k 전달)
     weights = get_rrf_weights(query_type, settings)
     dense_weight = weights.get("dense", 1.0)
     share = getattr(settings, "dense_original_query_share", None)
@@ -140,6 +152,8 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
         return {
             "retrieved_chunks": [],
             "error": "검색할 컬렉션을 선택해주세요",
+            "retrieval_status": "error",
+            "rerank_status": "not_run",
             "outcome_code": "retrieval_error",
             "error_message_type": "collection_unavailable",  # 2026.11.11(sooyeon.choi) 추가
         }
@@ -151,6 +165,8 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
         return {
             "retrieved_chunks": [],
             "error": "등록되지 않은 컬렉션입니다",
+            "retrieval_status": "error",
+            "rerank_status": "not_run",
             "outcome_code": "retrieval_error",
             "error_message_type": "collection_unavailable",  # 2026.11.11(sooyeon.choi) 추가
         }
@@ -260,6 +276,8 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
         return {
             "retrieved_chunks": [],
             "error": f"검색 타임아웃 ({retrieve_timeout}초 초과)",
+            "retrieval_status": "error",
+            "rerank_status": "not_run",
             "outcome_code": "retrieval_error",
         }
     except Exception as e:
@@ -267,6 +285,8 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
         return {
             "retrieved_chunks": [],
             "error": str(e),
+            "retrieval_status": "error",
+            "rerank_status": "not_run",
             "outcome_code": "retrieval_error",
         }
 
@@ -295,4 +315,4 @@ async def retrieve(state: PipelineState, deps: GraphDependencies | None = None) 
         max(scores, default=0.0),
         min(scores, default=0.0),
     )
-    return {"retrieved_chunks": chunks, "error": None}
+    return {"retrieved_chunks": chunks, "error": None, "retrieval_status": "ok", "rerank_status": "not_run"}

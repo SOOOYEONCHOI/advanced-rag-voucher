@@ -1,7 +1,7 @@
 """Phase 1 - EXCEL_PARSE_MODE 분기, 파일 판별, excel_ingest 연동 단위 테스트.
 
 2026.10.16 수정 - Phase 1 재구현 기준으로 갱신: 적재 결과는 문서 행(tb_documents)으로 확인하고(버전·청크 기록은 Phase 2),
-업로드 대기 폴더는 현재 코드 위치(sqlite_db_path 기준, Q-15.7)를 따른다.
+업로드 대기 폴더는 현재 코드 위치(app/core/storage_paths.get_ingest_queue_dir, UPLOADED_FILES_BASE_DIR 기준)를 따른다.
 
 테스트용 xlsx는 openpyxl로 생성한다. docling-parser·Qdrant는 호출하지 않는다
 (2026.10.01 Phase 2: 파이프라인 끝까지 도는 테스트는 PostgreSQL 테스트 DB에 기록한다).
@@ -17,6 +17,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.core.storage_paths import get_ingest_queue_dir
 from app.ingest import excel_runner
 from app.ingest.file_router import (
     ROUTE_DOCLING,
@@ -293,7 +294,7 @@ def upload_client(monkeypatch, tmp_path):
     app = FastAPI()
     app.include_router(ingest.router, prefix="/api")
     app.dependency_overrides[get_current_principal] = lambda: dict(user_id="owner", is_admin=True)
-    queue_dir = Path(upload_settings(tmp_path).sqlite_db_path).parent / "ingest_jobs"
+    queue_dir = get_ingest_queue_dir(upload_settings(tmp_path))
     with TestClient(app) as client:
         yield client, jobs, state, queue_dir
 

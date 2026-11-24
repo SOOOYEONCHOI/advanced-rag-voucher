@@ -39,6 +39,9 @@ from app.utils.kiwi_tokenizer import normalize_query
 _KIWI_EVAL_LOCK = asyncio.Lock()
 
 
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (② LLM 재작성 없이 시험 질의 원문으로 의미·키워드 검색 입력 구성)
+# [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (② LLM 재작성 없이 시험 질의 원문으로 의미·키워드 검색 입력 구성)
 def _build_eval_query_bundle(query: str) -> QueryBundle:
     """재작성 없이 원 질의만으로 QueryBundle을 구성한다."""
     normalized = normalize_query(query)
@@ -60,6 +63,9 @@ class EvalRetriever:
     """RetrieverPort 구현 — 채널별 독립 검색 + 운영 방식과 동일한 병합 검색."""
 
     def __init__(self) -> None:
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (② 검색기가 Qdrant 벡터 DB·임베딩 모델 클라이언트를 받아 옴)
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (② 검색기가 임베딩 모델 클라이언트를 받아 옴)
         self._vector_repo = get_vector_repo()
         self._embedding_client = get_embedding_client()
         self._channels = {
@@ -140,6 +146,9 @@ class EvalRetriever:
         query_type = classify_query_type({})  # 평가는 전처리 없이 기본 분류 사용
 
         if settings.retrieval_engine == "qdrant_hybrid":
+            # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+            # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (③ 운영 챗봇과 같은 하이브리드 검색 함수 호출)
+            # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (② 운영 챗봇과 같은 하이브리드 검색 함수 호출)
             merged = await _search_qdrant_hybrid(
                 query_bundle=bundle,
                 collection_name=collection_name,
@@ -162,5 +171,7 @@ class EvalRetriever:
                 channel_results, profile=profile_def, k=settings.hybrid_rrf_k
             )
 
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 4) 검색 결과를 통합하여 질의별 상위 10개 문서 청크를 추출하는 코드 (③ 통합 순위에서 질의별 상위 10개(top_k) 청크 추출)
         boosted = apply_soft_boost(merged, {"keywords": []})
         return boosted[:top_k]

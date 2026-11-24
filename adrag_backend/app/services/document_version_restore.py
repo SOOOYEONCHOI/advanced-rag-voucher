@@ -54,6 +54,9 @@ BLOCK_MESSAGES = {
     "INVALID_REQUEST": "요청 형식이 올바르지 않습니다.",
     # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 버전은 검색 데이터가 없어 적용 대상이 아니다
     "DRAWING_NOT_SUPPORTED": "도면은 아직 검색에 쓰이지 않아 이전 버전 적용 대상이 아닙니다.",
+    # 2026.11.23(woojin.jung) 추가 - 부서 기준 수정 권한(이력 화면 표시용, 실행은 라우트가 403으로 차단)
+    "NO_PERMISSION": "소속 부서의 운영관리자만 버전을 적용할 수 있습니다.",
+    "DEPARTMENT_INACTIVE": "소속 부서가 비활성화되어 버전을 적용할 수 없습니다.",
 }
 STATUS_BY_CODE = {
     "INVALID_REQUEST": 422, "FEATURE_DISABLED": 403, "VERSION_NOT_FOUND": 404,

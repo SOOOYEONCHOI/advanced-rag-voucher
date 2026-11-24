@@ -18,8 +18,11 @@ from app.repositories.database import Row, get_database_manager, to_driver_sql
 # 2026.10.16 수정 - 0002_schema_hardening(테이블 추가 없음), 0003(Phase 2): 버전·청크·청크↔사진·흐름도·staging +5
 # 2026.10.19 수정 - 0004(UI-12 모델명)·0005(최신본 변경): 테이블 추가 없음
 # 2026.11.06(sooyeon.choi) 수정 - 0006(이전 버전 복원): tb_embedding_profiles·tb_document_version_activations +2
-TABLE_COUNT = 31
-HEAD = "0006_document_version_restore"
+# 2026.11.06(sooyeon.choi) 수정 - 0007(적용 이력 FK ON DELETE CASCADE): 테이블 추가 없음
+# 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 0008(답변 피드백 의견): 테이블 추가 없음,
+#   0009(채팅 시작 화면 질문): tb_collection_questions +1, 0010(도면 작업 단계): 테이블 추가 없음
+TABLE_COUNT = 32
+HEAD = "0010_drawing_ingest_steps"
 
 
 def _tables(db):
@@ -296,11 +299,16 @@ def test_document_physical_delete_cascades_phase2_rows():
             " VALUES ('r', 'd', 'p', 'image', 'x', 'h', 'image/png', 1, 'committed')")
         conn.execute("INSERT INTO tb_chunk_resources (chunk_id, resource_id) VALUES ('d:1:k#0', 'r')")
         conn.execute("INSERT INTO tb_flow_graphs (document_id, version_no, sheet_name) VALUES ('d', 1, 's')")
-    db.execute_update("DELETE FROM tb_documents WHERE document_id = 'd'")  # 대화 주제 삭제 경로(물리 삭제)
+        # 2026.11.06(sooyeon.choi) 추가 - 0006 적용 이력(baseline)이 있어도 대화 주제 삭제가 막히지 않아야 한다(0007)
+        conn.execute(
+            "INSERT INTO tb_document_version_activations (document_id, to_version_no, activation_revision, operation_type)"
+            " VALUES ('d', 1, 1, 'baseline')")
+    db.execute_update("DELETE FROM tb_documents WHERE collection_id = 1")  # 대화 주제 삭제 경로(물리 삭제, collection_service)
     counts = db.execute_query(
         "SELECT (SELECT count(*) FROM tb_document_versions) + (SELECT count(*) FROM tb_chunks)"
         " + (SELECT count(*) FROM tb_chunk_resources) + (SELECT count(*) FROM tb_flow_graphs)"
-        " + (SELECT count(*) FROM tb_spreadsheet_resources)")[0][0]
+        " + (SELECT count(*) FROM tb_spreadsheet_resources)"
+        " + (SELECT count(*) FROM tb_document_version_activations)")[0][0]
     assert counts == 0
 
 

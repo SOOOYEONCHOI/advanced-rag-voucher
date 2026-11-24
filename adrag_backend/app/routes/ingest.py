@@ -55,7 +55,17 @@ from app.ingest.drawing.common import DrawingError  # 2026.11.12(sooyeon.choi) �
 from app.ingest.drawing.detect import detect_drawing
 # 2026.07.16(sooyeon.choi) 수정 - 중복 정의 제거, 공통 모듈의 보안등급 계층 사용
 # 2026.11.09(sooyeon.choi) 수정 - 열람 범위는 공통 함수로 판정
-from app.utils.security import document_scope, get_current_principal, in_document_scope
+from app.utils.security import (
+    can_manage_department,
+    document_scope,
+    get_current_principal,
+    in_department_scope,
+    in_document_scope,
+    is_manager,
+    require_content_manager,
+    require_department_manager,
+)
+from app.repositories.collection_repository import CollectionRepository
 from app.utils.datetime import format_kst_datetime
 # 2026.10.19(sooyeon.choi) 추가 - 모델명(product_model) 기본값·검증
 from app.ingest.model_name import resolve_upload_model_name, validate_model_name
@@ -88,7 +98,18 @@ def _get_user_accessible(principal: dict) -> Optional[Tuple[Set[str], Set[str]]]
         principal["user_id"]
     )
     # 2026.11.09(sooyeon.choi) 수정 - 열람 범위 계산을 document_scope로
-    return document_scope(permissions)
+    accessible, allowed = document_scope(permissions)
+    # 2026.11.20(woojin.jung) 추가 - 부서 운영관리자는 자기 부서 대화 주제의 문서를 모두 본다(관리 대상)
+    if is_manager(principal):
+        accessible = accessible | {
+            c.qdrant_name for c in CollectionRepository().get_by_department(principal["department_id"])
+        }
+    return accessible, allowed
+
+
+# 2026.11.20(woojin.jung) 추가 - 대화 주제(qdrant_name) → 부서 ID. 문서 수정 권한은 부서 기준
+def _collection_departments() -> dict:
+    return {c.qdrant_name: c.department_id for c in CollectionRepository().get_all(include_inactive=True)}
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +248,13 @@ async def upload_document(
     - **chunk_size**: 청크 크기 오버라이드 (선택)
     - **product_model**: 모델명. 생략하면 파일명에서 마지막 확장자를 뺀 값
     """
+    # 2026.11.20(woojin.jung) 추가 - 업로드는 대상 대화 주제 부서의 운영관리자(또는 관리자)만
+    require_content_manager(principal)
+    target = CollectionRepository().get_by_qdrant_name(collection_name)
+    if target is None:
+        raise HTTPException(status_code=404, detail="대화 주제를 찾을 수 없습니다.")
+    require_department_manager(principal, target.department_id)
+
     # 2026.06.04(sooyeon.choi) 수정 - security_level을 업로드 사용자의 max_security_level에서 자동 결정
     settings_obj = get_settings()
     meta_repo = MetadataRepository()
@@ -313,12 +341,27 @@ async def get_ingest_options(principal: dict = Depends(get_current_principal)):
     }
 
 
+# 2026.11.20(woojin.jung) 추가 - 작업 조회·재시도: 관리자, 작업 요청자, 대상 대화 주제 부서의 운영관리자
+# 2026.11.23(woojin.jung) 수정 - 조회는 부서 범위만, 재시도(write)는 소속 부서가 활성일 때만
+def _can_access_job(principal: dict, job: dict, write: bool = False) -> bool:
+    if principal.get("is_admin"):
+        return True
+    if write and not principal.get("department_active", False):
+        return False
+    if job.get("created_by") == principal["user_id"]:
+        return True
+    request = job.get("request_json")
+    request = json.loads(request) if isinstance(request, str) else (request or {})
+    collection = CollectionRepository().get_by_qdrant_name(request.get("collection_name") or "")
+    return collection is not None and in_department_scope(principal, collection.department_id)
+
+
 @router.get("/jobs/{job_id}", response_model=IngestJobResponse)
 async def get_ingest_job(job_id: str, principal: dict = Depends(get_current_principal)):
     job = await asyncio.to_thread(IngestJobRepository().get, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="작업을 찾을 수 없습니다.")
-    if not principal.get("is_admin") and job.get("created_by") != principal["user_id"]:
+    if not _can_access_job(principal, job):
         raise HTTPException(status_code=403, detail="작업 조회 권한이 없습니다.")
     return IngestJobResponse(
         job_id=job_id,
@@ -336,7 +379,7 @@ async def retry_ingest_job(job_id: str, principal: dict = Depends(get_current_pr
     job = await asyncio.to_thread(IngestJobRepository().get, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="작업을 찾을 수 없습니다.")
-    if not principal.get("is_admin") and job.get("created_by") != principal["user_id"]:
+    if not _can_access_job(principal, job, write=True):
         raise HTTPException(status_code=403, detail="작업 재시도 권한이 없습니다.")
     try:
         await get_ingest_job_manager().retry(job_id)
@@ -398,10 +441,12 @@ def _drawing_summaries(document_ids: List[str]) -> dict:
     return out
 
 
-def _to_document_item(d: dict, principal: dict, pending: dict, states: dict) -> DocumentItem:
+def _to_document_item(d: dict, principal: dict, pending: dict, states: dict, departments: dict) -> DocumentItem:
     document_id = d.get("document_id")
-    # 2026.06.30(sooyeon.choi) 추가 - 관리자는 전체, 사용자는 본인 문서만 개별 삭제 가능(수정 가능 여부도 같은 규칙)
-    can_manage = bool(principal.get("is_admin") or d.get("uploaded_by") == principal["user_id"])
+    # 2026.06.30(sooyeon.choi) 추가 - 개별 삭제·수정 가능 여부
+    # 2026.11.20(woojin.jung) 수정 - 업로더 기준 → 부서 기준(대화 주제 부서의 운영관리자 또는 관리자)
+    collection = d.get("source_collection") or d.get("collection_name", "")
+    can_manage = can_manage_department(principal, departments.get(collection))
     pending_version_no, pending_job_id = pending.get(document_id, (None, None))
     state = states.get(document_id, {})
     return DocumentItem(
@@ -468,7 +513,8 @@ async def list_documents(
             _drawing_summaries, [d.get("document_id") for d in raw_docs if d.get("doc_type") == "drawing"]
         )
         # 2026.11.09(sooyeon.choi) 수정 - 응답 항목 변환을 _to_document_item으로 분리
-        docs = [_to_document_item(d, principal, pending, states) for d in raw_docs]
+        departments = await asyncio.to_thread(_collection_departments)
+        docs = [_to_document_item(d, principal, pending, states, departments) for d in raw_docs]
         for item in docs:
             item.drawing = drawings.get(item.document_id)
         return DocumentsResponse(documents=docs, total=len(docs))
@@ -488,8 +534,8 @@ async def update_document_model_name(
     # 2026.11.09(sooyeon.choi) 수정 - 문서 조회·열람 판정을 _load_visible_document로 통일
     #   (없음·삭제·열람 불가는 404, 권한 조회는 스레드에서 실행)
     doc_info = await asyncio.to_thread(_load_visible_document, document_id, principal)
-    if not principal.get("is_admin") and doc_info.get("uploaded_by") != principal["user_id"]:
-        raise HTTPException(status_code=403, detail="본인이 업로드한 문서만 모델명을 수정할 수 있습니다.")
+    # 2026.11.20(woojin.jung) 수정 - 업로더 기준 → 부서 기준
+    require_department_manager(principal, doc_info.get("department_id"))
     try:
         product_model = validate_model_name(body.product_model)
     except ValueError as exc:
@@ -573,7 +619,7 @@ def _load_visible_document(document_id: str, principal: dict) -> dict:
         """
         SELECT d.document_id, d.uploaded_by, d.security_level, d.parser_type, d.requested_doc_type,
                d.product_model, d.version_no, d.original_filename,
-               c.qdrant_name AS source_collection
+               c.qdrant_name AS source_collection, c.department_id
         FROM tb_documents d
         LEFT JOIN tb_collections c ON c.collection_id = d.collection_id
         WHERE d.document_id = ? AND d.deleted_at IS NULL
@@ -641,8 +687,8 @@ async def replace_document_version(
         if not getattr(settings_obj, "document_version_replace_enabled", True):
             raise HTTPException(status_code=403, detail="새 버전 등록 기능이 꺼져 있습니다.")
         doc = await asyncio.to_thread(_load_visible_document, document_id, principal)
-        if not principal.get("is_admin") and doc.get("uploaded_by") != principal["user_id"]:
-            raise HTTPException(status_code=404, detail="해당 문서를 찾을 수 없습니다.")
+        # 2026.11.20(woojin.jung) 수정 - 업로더 기준 → 부서 기준
+        require_department_manager(principal, doc.get("department_id"))
 
         # 파서·문서 유형은 기존 문서 설정을 따르되, 새 파일 형식에 맞지 않으면 기본값(docling·자동)
         ext_guess = (file.filename or "").rsplit(".", 1)[-1].lower()
@@ -730,6 +776,9 @@ async def list_document_versions(document_id: str, principal: dict = Depends(get
     # 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서는 모든 이전 버전에 같은 사유를 보여 준다
     if doc.get("parser_type") == ROUTE_DRAWING_INGEST:
         doc_code = "DRAWING_NOT_SUPPORTED"
+    # 2026.11.23(woojin.jung) 추가 - 수정 권한이 없으면(다른 부서·비활성 부서) 적용 버튼을 막고 사유를 보여 준다
+    if doc_code is None and not can_manage_department(principal, doc.get("department_id")):
+        doc_code = "DEPARTMENT_INACTIVE" if in_department_scope(principal, doc.get("department_id")) else "NO_PERMISSION"
     verdicts = evaluate_versions(
         rows, doc_code=doc_code, profile_id=extra["profile_id"], pending_busy=bool(pending_operation),
     )
@@ -817,7 +866,9 @@ async def restore_document_version(
     principal: dict = Depends(get_current_principal),
 ):
     # 볼 수 없거나 삭제된 문서는 404. 2026.11.06(sooyeon.choi) 수정 - 볼 수 있으면 복원 가능(관리자 전용 아님)
-    await asyncio.to_thread(_load_visible_document, document_id, principal)
+    doc = await asyncio.to_thread(_load_visible_document, document_id, principal)
+    # 2026.11.20(woojin.jung) 추가 - 복원은 문서 부서의 운영관리자(또는 관리자)만
+    require_department_manager(principal, doc.get("department_id"))
     try:
         result = await asyncio.to_thread(
             submit_restore, document_id, version_no,
@@ -1052,7 +1103,7 @@ async def delete_document(
         SELECT d.document_id, d.uploaded_by, d.original_filename, d.security_level,
                d.doc_type AS document_type, d.total_pages, d.chunk_count, d.parser_type,
                d.deleted_at,
-               c.qdrant_name AS source_collection
+               c.qdrant_name AS source_collection, c.department_id
         FROM tb_documents d
         LEFT JOIN tb_collections c ON c.collection_id = d.collection_id
         WHERE d.document_id = ?
@@ -1072,15 +1123,9 @@ async def delete_document(
                 status_code=403,
                 detail=f"'{doc_info['source_collection']}' 컬렉션에 접근 권한이 없습니다.",
             )
-    # 2026.06.30(sooyeon.choi) 추가 - 타인이 업로드한 문서의 개별 삭제 차단
-    if (
-        not principal.get("is_admin")
-        and doc_info.get("uploaded_by") != principal["user_id"]
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="본인이 업로드한 문서만 개별 삭제할 수 있습니다.",
-        )
+    # 2026.06.30(sooyeon.choi) 추가 - 개별 삭제 권한 검증
+    # 2026.11.20(woojin.jung) 수정 - 업로더 기준 → 부서 기준
+    require_department_manager(principal, doc_info.get("department_id"))
     # 2026.10.19(sooyeon.choi) 추가 - 최신본 변경 처리 중에는 삭제하지 않는다(처리 완료·실패 후 삭제)
     # 2026.11.06(sooyeon.choi) 수정 - 복원 등 다른 변경 작업이 점유 중이어도 삭제하지 않는다
     if not doc_info.get("deleted_at") and (

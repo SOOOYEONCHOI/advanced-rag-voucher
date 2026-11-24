@@ -27,6 +27,9 @@ class EmbeddingClient:
     """vLLM OpenAI-compatible Embedding 비동기 클라이언트."""
 
     def __init__(self, settings: Settings) -> None:
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (⑥ 임베딩 모델 이름·GPU 서버 주소 설정)
+        # [AI+ 시험] NDCG@5 - 2) 임베딩 모델 및 Reranker 모델을 불러오는 코드 (④ 임베딩 모델 이름·GPU 서버 주소 설정)
         self.base_url = settings.embedding_api_url.rstrip("/")
         self.model = settings.embedding_model_name
         self.api_key = settings.embedding_api_key
@@ -171,6 +174,9 @@ class EmbeddingClient:
         검색 쿼리를 임베딩 벡터로 변환합니다.
         Qwen3-Embedding 권장 instruct prefix를 자동 적용합니다.
         """
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (⑤ 질의에 instruct를 붙여 임베딩 모델로 벡터화(의미 검색))
+        # [AI+ 시험] NDCG@5 - 3) 시험 데이터를 입력하여 임베딩 기반 의미 검색과 BM25 기반 키워드 검색을 수행하는 코드 (④ 질의에 instruct를 붙여 임베딩 모델로 벡터화(의미 검색))
         instructed = self.instruct_template.format(query=query)
         embeddings = await self._request_embeddings([instructed])
         return self._normalize(embeddings)[0]

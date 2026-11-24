@@ -33,7 +33,7 @@ def reset_database_singletons():
 
 @pytest.fixture
 def repo(tmp_path):
-    db = database.get_database_manager(str(tmp_path / "eval.db"))
+    db = database.get_database_manager()
     db.execute_update(
         "INSERT INTO tb_collections (display_name, qdrant_name) VALUES (?, ?)",
         ("평가용 컬렉션", "eval_runner_coll"),
@@ -69,8 +69,20 @@ def test_compute_channel_metrics_recall_and_hit_at_5():
     assert m["hit@5"] == 1.0
     assert m["recall@5"] == 0.5          # top5에 정답 1/2
     assert m["recall@10"] == 1.0
-    assert m["rr"] == pytest.approx(1 / 3)
+    assert m["rr@5"] == pytest.approx(1 / 3)
     assert m["gold_ranks"] == [3, 6]
+    # 2026.11.17(sooyeon.choi) 수정 - 중복 지표(fail@k, rr, top1_is_relevant) 삭제
+    assert "fail@5" not in m and "rr" not in m and "top1_is_relevant" not in m
+
+
+def test_is_aggregated_retrieval_metric_whitelist():
+    # 2026.11.17(sooyeon.choi) 추가 - 순위·건수·임계값은 평균 대상이 아니다
+    from app.evaluation.metrics.retrieval_metrics import is_aggregated_retrieval_metric
+
+    for key in ("hit@10", "recall@10", "ndcg@5", "rr@5"):
+        assert is_aggregated_retrieval_metric(key)
+    for key in ("evidence_rank", "evidence_count", "total_retrieved", "threshold", "gold_ranks", "fail@5"):
+        assert not is_aggregated_retrieval_metric(key)
 
 
 def test_compute_channel_metrics_matches_evaluation_na_and_top_k_mrr():
@@ -80,12 +92,12 @@ def test_compute_channel_metrics_matches_evaluation_na_and_top_k_mrr():
     assert empty_gold["recall@5"] is None
     assert empty_gold["hit@5"] is None
     assert empty_gold["ndcg@5"] is None
-    assert empty_gold["rr"] is None
+    assert empty_gold["rr@5"] is None
 
     outside_k = compute_channel_metrics(
         ["x1", "x2", "x3", "x4", "x5", "gold"], {"gold"}, (5,)
     )
-    assert outside_k["rr"] == 0.0
+    assert outside_k["rr@5"] == 0.0
     assert outside_k["evidence_rank"] is None
 
 
@@ -159,21 +171,19 @@ def test_aggregate_produces_kpi_keys_and_segments(repo):
     run_id, snapshot = _seed_run_with_two_items(repo, tags1=["legal_reference"])
 
     # 신규 규칙 기반 실행은 judge와 legacy citation accuracy를 집계하지 않는다.
+    # 2026.11.17(sooyeon.choi) 수정 - answer.correctness(F2)만 집계, 진단값(evidence_rank 등)은 평균하지 않음
     repo.insert_item_result(
         run_id, snapshot[0]["qa_id"], status="ok",
-        retrieval_json={"rrf": {"recall@5": 1.0}, "rerank": {"hit@5": 1.0}},
-        similarity=0.9,
-        answer_correctness_v2_json={"value": 0.8, "status": "evaluated", "metadata": {"metric_version": "rule-v2-shadow.1"}},
-        answer_correctness_f2_json={"value": 0.9, "status": "evaluated", "metadata": {"metric_version": "rule-v2-f2-shadow.1"}},
+        retrieval_json={"rrf": {"recall@5": 1.0, "evidence_rank": 1, "total_retrieved": 40},
+                        "rerank": {"hit@5": 1.0, "threshold": 0.3}},
+        answer_correctness_json={"value": 0.9, "status": "evaluated", "metadata": {}},
         citation_json={"correctness": 1.0, "completeness": 1.0},
         latency_ms=1000,
     )
     repo.insert_item_result(
         run_id, snapshot[1]["qa_id"], status="ok",
         retrieval_json={"rrf": {"recall@5": 0.0}, "rerank": {"hit@5": 0.0}},
-        similarity=0.7,
-        answer_correctness_v2_json={"value": 0.6, "status": "evaluated", "metadata": {"metric_version": "rule-v2-shadow.1"}},
-        answer_correctness_f2_json={"value": 0.8, "status": "evaluated", "metadata": {"metric_version": "rule-v2-f2-shadow.1"}},
+        answer_correctness_json={"value": 0.8, "status": "evaluated", "metadata": {}},
         citation_json={"correctness": 0.0, "completeness": 0.0},
         latency_ms=2000,
     )
@@ -185,9 +195,13 @@ def test_aggregate_produces_kpi_keys_and_segments(repo):
     assert mets[("retrieval.rrf.recall@5", "all")] == pytest.approx(0.5)
     assert mets[("retrieval.rerank.hit@5", "all")] == pytest.approx(0.5)
     assert mets[("citation.correctness", "all")] == pytest.approx(0.5)
-    assert mets[("answer.correctness_mean", "all")] == pytest.approx(0.8)
-    assert mets[("answer.correctness_v2_shadow", "all")] == pytest.approx(0.7)
-    assert mets[("answer.correctness_v2_f2_shadow", "all")] == pytest.approx(0.85)
+    assert mets[("answer.correctness", "all")] == pytest.approx(0.85)
+    for removed in (
+        "answer.correctness_mean", "answer.correctness_v2_shadow", "answer.correctness_v2_f2_shadow",
+        "answer.correctness.f2", "retrieval.rrf.evidence_rank", "retrieval.rrf.total_retrieved",
+        "retrieval.rerank.threshold", "latency.mean_ms",
+    ):
+        assert (removed, "all") not in mets
     assert ("citation.accuracy", "all") not in mets
     assert ("answer.llm_correctness_mean", "all") not in mets
     assert ("judge.accuracy.mean", "all") not in mets
@@ -197,9 +211,8 @@ def test_aggregate_produces_kpi_keys_and_segments(repo):
     assert mets[("retrieval.rrf.recall@5", "type:multihop")] == pytest.approx(0.0)
     # ①축 tag 세그먼트 (legal_reference는 item1에만)
     assert mets[("retrieval.rrf.recall@5", "tag:legal_reference")] == pytest.approx(1.0)
-    # std 보조지표 + latency + error_rate
+    # std 보조지표 + error_rate
     assert ("retrieval.rrf.recall@5.std", "all") in mets
-    assert mets[("latency.mean_ms", "all")] == pytest.approx(1500.0)
     assert mets[("run.error_rate", "all")] == pytest.approx(0.0)
 
 
@@ -232,3 +245,99 @@ def test_run_registry_cancel_flow():
     run_registry.unregister(999)
     # 등록되지 않은 run 취소는 False
     assert run_registry.request_cancel(999) is False
+
+
+def test_aggregate_agreement_metrics_use_all_queries_and_response_time(repo):
+    # 2026.11.19(sooyeon.choi) 추가 - 합의서 시험 1·2 분모 = 전체 질의 수, 시험 4 평균 반환 시간(ms)
+    from app.evaluation.runner.eval_runner import _aggregate_and_save_metrics
+
+    ds = repo.create_dataset("데이터셋", repo._test_collection_id, {})
+    qa_ids = [repo.insert_qa_item(ds, f"q{i}", "a", [f"c{i}"], ["d"], ["t"], "law") for i in range(4)]
+    for qa_id in qa_ids:
+        repo.update_qa_item(qa_id, review_status="approved")
+    goldset_id = repo.create_goldset(ds)
+    snapshot = json.loads(repo.get_goldset(goldset_id)["items_snapshot_json"])
+    run_id = repo.create_run(goldset_id, "full", {"retrieval_top_n": 10, "rerank_top_k": 5}, total=4)
+
+    def ok(qa_id, hit, ndcg, latency, first_token):
+        repo.insert_item_result(
+            run_id, qa_id, status="ok",
+            retrieval_json={"rrf": {"hit@10": hit}, "rerank": {"ndcg@5": ndcg}},
+            latency_ms=latency, timing_json={"first_token_ms": first_token},
+        )
+
+    ok(qa_ids[0], 1.0, 1.0, 9000, 2000.0)
+    ok(qa_ids[1], 1.0, 0.5, 11000, None)
+    repo.insert_item_result(  # 정답 청크 없음 → 제외(분모에는 포함, 0)
+        run_id, qa_ids[2], status="ok",
+        retrieval_json={"rrf": {"hit@10": None}, "rerank": {"ndcg@5": None}}, latency_ms=10000,
+    )
+    repo.insert_item_result(run_id, qa_ids[3], status="error", error_message="boom")
+
+    _aggregate_and_save_metrics(repo, run_id, snapshot)
+    rows = {m["metric_key"]: m for m in repo.get_run_metrics(run_id) if m["segment"] == "all"}
+
+    recall = rows["retrieval.rrf.hit@10"]
+    assert recall["metric_value"] == pytest.approx(2 / 4)                     # 2 적중 / 전체 4
+    assert (recall["evaluated_count"], recall["excluded_count"], recall["error_count"]) == (2, 1, 1)
+    assert rows["retrieval.rerank.ndcg@5"]["metric_value"] == pytest.approx(1.5 / 4)
+    response = rows["answer.response_time_ms"]
+    assert response["metric_value"] is None  # 오류 항목의 시간 누락 → 부분 평균 금지
+    assert response["excluded_count"] == 1
+    assert rows["answer.first_token_ms"]["metric_value"] == pytest.approx(2000.0)
+    assert "answer.judge_accuracy" not in rows                                 # 미구현 → 미측정(오류로 채우지 않음)
+
+
+def test_aggregate_keeps_successful_search_and_error_latency():
+    from types import SimpleNamespace
+    from app.evaluation.runner.eval_runner import _aggregate_and_save_metrics
+
+    saved = {}
+    rows = [
+        {"qa_id": 1, "status": "error", "latency_ms": 9000,
+         "retrieval_json": json.dumps({"rrf": {"hit@10": 1.0}, "rerank": {"error": True}})},
+        {"qa_id": 2, "status": "error", "latency_ms": 11000},
+    ]
+    repo = SimpleNamespace(
+        list_item_results=lambda *_a, **_k: {"items": rows},
+        get_run=lambda _id: {"run_type": "full", "config_json": "{}"},
+        save_run_metrics=lambda _id, metrics: saved.update(metrics),
+    )
+    _aggregate_and_save_metrics(repo, 1, [{"qa_id": 1}, {"qa_id": 2}])
+    assert saved["all"]["retrieval.rrf.hit@10"]["value"] == 0.5
+    assert saved["all"]["retrieval.rerank.ndcg@5"]["value"] == 0.0
+    assert saved["all"]["answer.response_time_ms"]["value"] == 10000
+    assert saved["all"]["answer.response_time_ms"]["evaluated_count"] == 2
+    saved.clear()
+    repo.list_item_results = lambda *_a, **_k: {"items": rows[:1]}
+    _aggregate_and_save_metrics(repo, 1, [{"qa_id": 1}, {"qa_id": 2}])
+    assert saved["all"]["answer.response_time_ms"]["value"] is None
+    assert saved["all"]["answer.response_time_ms"]["total_count"] == 2
+    assert "answer.response_time_ms.std" not in saved["all"]
+
+
+def test_full_run_executes_queries_sequentially(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from app.evaluation.runner import eval_runner as runner
+
+    order = []
+    items = [{"qa_id": 1}, {"qa_id": 2}]
+    repo = SimpleNamespace(
+        get_run=lambda _id: {"goldset_id": 1, "run_type": "full", "config_json": '{"concurrency": 8}'},
+        get_goldset=lambda _id: {"qdrant_name": "test", "items_snapshot_json": json.dumps(items)},
+        update_run_status=lambda *_a: None, increment_run_progress=lambda *_a: None,
+        insert_item_result=lambda *_a, **_k: None,
+    )
+
+    async def evaluate(item, *_args):
+        order.append(("start", item["qa_id"]))
+        await asyncio.sleep(0)
+        order.append(("end", item["qa_id"]))
+        return {"status": "ok"}
+
+    monkeypatch.setattr(runner, "EvalRepository", lambda: repo)
+    monkeypatch.setattr(runner, "_evaluate_item", evaluate)
+    monkeypatch.setattr(runner, "_aggregate_and_save_metrics", lambda *_args: None)
+    asyncio.run(runner._execute_run(999))
+    assert order == [("start", 1), ("end", 1), ("start", 2), ("end", 2)]

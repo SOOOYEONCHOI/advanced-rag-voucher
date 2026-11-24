@@ -327,7 +327,7 @@ async def test_analysis_listing_applies_document_permission(monkeypatch, tmp_pat
     monkeypatch.setattr(
         resource_routes,
         "get_settings",
-        lambda: type("Settings", (), {"instance_dir": str(tmp_path), "sqlite_db_path": str(tmp_path / "unused.db")})(),
+        lambda: type("Settings", (), {"instance_dir": str(tmp_path)})(),
     )
     monkeypatch.setattr(
         resource_routes,

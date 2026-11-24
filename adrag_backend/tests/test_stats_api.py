@@ -10,7 +10,7 @@ import pytest
 # Keep route tests independent from environment-file and database settings.
 config_module = types.ModuleType("app.core.config")
 config_module.get_settings = lambda: types.SimpleNamespace(
-    sqlite_db_path="", instance_dir="",
+    instance_dir="",
     model_pricing_usd={},
     stats_stale_days=90,
     stats_dead_days=60,

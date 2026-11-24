@@ -10,15 +10,13 @@ export const UPLOAD_STEPS = [
   { key: 'embed', label: '임베딩', jobSteps: ['embed'] },
   { key: 'index', label: '저장', jobSteps: ['index'] },
 ];
-// 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 처리기 단계가 달라 칸을 따로 둔다(서버 current_step과 1:1)
 export const DRAWING_UPLOAD_STEPS = [
-  { key: 'prepare', label: '파일 준비', jobSteps: ['validate', 'parse'] },
+  { key: 'prepare', label: '파일 준비', jobSteps: ['queued', 'validate', 'parse'] },
   { key: 'convert', label: '변환·보정', jobSteps: ['drawing_convert'] },
   { key: 'extract', label: '항목 추출', jobSteps: ['drawing_extract'] },
   { key: 'render', label: '도면 이미지', jobSteps: ['drawing_render'] },
   { key: 'store', label: '저장', jobSteps: ['drawing_store'] },
 ];
-// 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 서버 오류 코드 → 안내 문구
 const DRAWING_ERROR_MESSAGES = {
   E_UNSUPPORTED_FORMAT: '도면 파일 형식이 아니거나 지원하지 않는 버전입니다.',
   E_CONVERT_FAILED: 'DWG를 변환하지 못했습니다. 원본을 CAD 프로그램에서 다시 저장(AutoCAD 2000~2018 형식)한 뒤 올려 주세요.',
@@ -75,19 +73,18 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
   // 2026.10.16(sooyeon.choi) 추가 - 서버가 엑셀 전용 처리기(backend 모드)를 쓰면 해당 확장자는
   //   문서 유형·파서 선택과 관계없이 전용 처리기로 처리된다. 조회 실패 시 기존 동작(docling) 유지.
   const excelIngestExtensions = ref([]);
-  // 2026.10.19(sooyeon.choi) 추가 - 문서 목록 [최신본 변경] 사용 여부(서버 설정, 조회 실패 시 켜 둠 — 서버가 다시 검사)
-  const versionReplaceEnabled = ref(true);
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 서버가 도면 처리(backend)를 켜면 .dwg·.dxf 선택 가능. 조회 실패 시 꺼진 것으로 본다
   const drawingIngestExtensions = ref([]);
   const drawingMaxUploadMb = ref(100);
+  // 2026.10.19(sooyeon.choi) 추가 - 문서 목록 [최신본 변경] 사용 여부(서버 설정, 조회 실패 시 켜 둠 — 서버가 다시 검사)
+  const versionReplaceEnabled = ref(true);
   const loadIngestOptions = async () => {
     if (!api.ingestOptions) return;
     try {
       const res = await api.ingestOptions();
       excelIngestExtensions.value = res.data?.excel_ingest_extensions || [];
+      drawingIngestExtensions.value = (res.data?.drawing_ingest_extensions || []).map((ext) => String(ext).toLowerCase());
+      drawingMaxUploadMb.value = Number(res.data?.drawing_max_upload_mb) || 100;
       versionReplaceEnabled.value = res.data?.version_replace_enabled !== false;
-      drawingIngestExtensions.value = res.data?.drawing_ingest_extensions || [];
-      drawingMaxUploadMb.value = res.data?.drawing_max_upload_mb || 100;
     } catch {
       excelIngestExtensions.value = [];
       drawingIngestExtensions.value = [];
@@ -96,16 +93,12 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
   loadIngestOptions();
   const fileExtension = (name) => (name || '').split('.').pop().toLowerCase();
   const isExcelIngestFile = (item) => excelIngestExtensions.value.includes(fileExtension(item.filename));
+  const isDrawingFile = (item) => drawingIngestExtensions.value.includes(fileExtension(item.filename));
   const hasExcelIngestFile = computed(() => submissionItems.value.some(isExcelIngestFile));
   const allExcelIngestFiles = computed(() => submissionItems.value.length > 0 && submissionItems.value.every(isExcelIngestFile));
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 파일 판정·전용 처리기(엑셀·도면) 판정
-  const isDrawingFile = (item) => drawingIngestExtensions.value.includes(fileExtension(item?.filename));
   const hasDrawingFile = computed(() => submissionItems.value.some(isDrawingFile));
   const allDrawingFiles = computed(() => submissionItems.value.length > 0 && submissionItems.value.every(isDrawingFile));
-  const allDedicatedFiles = computed(() => submissionItems.value.length > 0 && submissionItems.value.every((item) => isExcelIngestFile(item) || isDrawingFile(item)));
-  const stepsFor = (item) => (isDrawingFile(item) || item?.result?.doc_type === 'drawing' ? DRAWING_UPLOAD_STEPS : UPLOAD_STEPS);
-  const needsReview = (item) => item.status === 'completed' && Boolean(item.result?.drawing?.needs_review);
-  const displayError = (item) => DRAWING_ERROR_MESSAGES[item.errorCode] || item.error;
+  const drawingEnabled = computed(() => drawingIngestExtensions.value.length > 0);
   const acceptedExtensions = computed(() => {
     const extensions = new Set([...SUPPORTED_EXTENSIONS, ...excelIngestExtensions.value, ...drawingIngestExtensions.value]);
     return [...extensions].map((ext) => `.${ext}`).join(',');
@@ -125,7 +118,7 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
       failed: count('failed'),
       rejected: count('rejected'),
       unknown: count('submission_unknown'),
-      review: uploadItems.value.filter(needsReview).length, // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+      review: uploadItems.value.filter((item) => item.status === 'completed' && item.result?.drawing?.needs_review).length,
     };
   });
   const hasLongWait = computed(() => pendingItems.value.some((item) => now.value - item.submittedAt >= 1800000));
@@ -136,7 +129,7 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
       { key: 'queued', label: '대기', count: summary.value.queued + summary.value.selected },
       { key: 'failed', label: '실패', count: summary.value.failed + summary.value.rejected },
       { key: 'unknown', label: '확인 필요', count: summary.value.unknown },
-      { key: 'review', label: '도면 확인 필요', count: summary.value.review }, // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+      { key: 'review', label: '검수 필요', count: summary.value.review },
     ].filter((chip) => chip.count > 0)
   );
   const progressSegments = computed(() => {
@@ -149,7 +142,6 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
       .filter((segment) => segment.count > 0)
       .map((segment) => ({ ...segment, width: (segment.count / total) * 100 }));
   });
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 파일 종류별 단계 칸
   const uploadStepIndex = (item) => {
     const steps = stepsFor(item);
     if (item.status === 'completed') return steps.length;
@@ -173,8 +165,8 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
       if (item.monitorError || item.monitorBlocked) return '상태 확인 지연';
       if (!isMonitoring.value) return '자동 확인 꺼짐';
     }
-    if (needsReview(item)) return '완료 · 확인 필요'; // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
     // 2026.10.02(woojin.jung) 수정 - 내부 상태명(접수 거절·접수 미확정)을 사용자 용어로 변경
+    if (item.status === 'completed' && item.result?.drawing?.needs_review) return '완료 · 확인 필요';
     return (
       { selected: '전송 전', uploading: '전송 중', queued: '대기', running: '처리 중', completed: '완료', failed: '실패', rejected: '업로드 거부', submission_unknown: '확인 필요' }[item.status] ||
       '확인 필요'
@@ -184,7 +176,6 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
   const validationError = (item) => {
     if (!canSubmit(item)) return '';
     const ext = item.filename.split('.').pop().toLowerCase();
-    // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면은 문서 유형·파서 조건을 보지 않고 크기만 확인
     if (isDrawingFile(item)) {
       return item.size > drawingMaxUploadMb.value * 1024 * 1024 ? `도면 파일은 ${drawingMaxUploadMb.value} MiB 이하여야 합니다.` : '';
     }
@@ -211,11 +202,10 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
     if (!file) return '';
     const ext = fileExtension(file.name);
     const tooLarge = file.size > 100 * 1024 * 1024 ? 'Excel 파일은 100 MiB 이하여야 합니다.' : '';
-    if (excelIngestExtensions.value.includes(ext)) return tooLarge;
-    // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 문서↔도면 파일 일치 여부는 서버가 확인(400)
     if (drawingIngestExtensions.value.includes(ext)) {
       return file.size > drawingMaxUploadMb.value * 1024 * 1024 ? `도면 파일은 ${drawingMaxUploadMb.value} MiB 이하여야 합니다.` : '';
     }
+    if (excelIngestExtensions.value.includes(ext)) return tooLarge;
     if (ext === 'xls') return 'XLS 파일은 XLSX 형식으로 변환한 뒤 업로드하세요.';
     if (!SUPPORTED_EXTENSIONS.has(ext)) return `지원하지 않는 파일 형식: .${ext}`;
     return OOXML_EXTENSIONS.has(ext) ? tooLarge : '';
@@ -263,7 +253,6 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
         currentStep: null,
         result: null,
         error: null,
-        errorCode: null, // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
         monitorError: null,
         monitorBlocked: false,
         retrying: false,
@@ -308,8 +297,8 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
           item.status = job.status;
           item.currentStep = job.current_step;
           item.result = job.result;
-          item.error = job.error;
-          item.errorCode = job.error_code || null; // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+          item.error = DRAWING_ERROR_MESSAGES[job.error_code] || job.error;
+          item.errorCode = job.error_code || null;
           item.monitorError = null;
           completed ||= job.status === 'completed';
         } else {
@@ -422,8 +411,8 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
         item.status = job.status;
         item.currentStep = job.current_step;
         item.result = job.result;
-        item.error = job.error;
-        item.errorCode = job.error_code || null; // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+        item.error = DRAWING_ERROR_MESSAGES[job.error_code] || job.error;
+        item.errorCode = job.error_code || null;
         if (isPending(item)) startMonitoring();
         if (job.status === 'completed') await onCompleted();
       } catch (lookupError) {
@@ -437,11 +426,11 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
   // 2026.10.02(woojin.jung) 수정 - 상태 배지와 중복되던 단계 문구를 배지 옆 보조 설명으로만 사용
   const uploadStatusLabel = (item) => {
     if (['running', 'failed'].includes(item.status)) {
-      const steps = stepsFor(item); // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+      const steps = stepsFor(item);
       const index = uploadStepIndex(item);
       return `${steps[index].label} 단계${item.status === 'failed' ? '에서 실패' : ''} (${index + 1}/${steps.length})`;
     }
-    if (item.status === 'completed' && item.result?.doc_type === 'drawing') return '도면 저장 완료 · 검색 미적용'; // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
+    if (item.status === 'completed' && isDrawingItem(item)) return '도면 추출 결과 저장 완료';
     return (
       {
         selected: '업로드 시작 시 전송됩니다',
@@ -453,6 +442,14 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
       }[item.status] || ''
     );
   };
+
+  function isDrawingItem(item) {
+    return isDrawingFile(item) || item.result?.doc_type === 'drawing';
+  }
+
+  function stepsFor(item) {
+    return isDrawingItem(item) ? DRAWING_UPLOAD_STEPS : UPLOAD_STEPS;
+  }
 
   onScopeDispose(() => {
     disposed = true;
@@ -485,25 +482,23 @@ export const useDocumentUpload = ({ form, api, onCompleted, onSettled }) => {
     retryIngestJob,
     uploadStatusLabel,
     uploadSteps: UPLOAD_STEPS,
+    stepsFor,
+    isDrawingItem,
     summaryChips,
     progressSegments,
     uploadStepState,
     hasRowActions,
     progressAnimated,
     uploadStateLabel,
-    // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 업로드 상태
-    drawingIngestExtensions,
-    hasDrawingFile,
-    allDrawingFiles,
-    allDedicatedFiles,
-    isDrawingFile,
-    stepsFor,
-    needsReview,
-    displayError,
     // 2026.10.16(sooyeon.choi) 추가 - 엑셀 전용 처리기 안내·파서 선택 비활성용 상태
     excelIngestExtensions,
     hasExcelIngestFile,
     allExcelIngestFiles,
+    drawingIngestExtensions,
+    drawingMaxUploadMb,
+    drawingEnabled,
+    hasDrawingFile,
+    allDrawingFiles,
     acceptedExtensions,
     // 2026.10.19(sooyeon.choi) 추가 - 파일별 모델명 입력·검증
     canEditModel,

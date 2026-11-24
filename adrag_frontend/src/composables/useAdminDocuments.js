@@ -4,7 +4,7 @@ import { adminApi } from '../api/adminApi';
 import { collectionApi } from '../api/collectionApi';
 import { useAuthStore } from '../stores/authStore';
 import { handleDialogKeydown, restoreFocus } from '../utils/dialogKeydown';
-import { docTypeLabel, docTypeSourceLabel, formatFileSize, formatTime, parserLabel } from '../utils/textFormat';
+import { docTypeLabel, docTypeSourceLabel, formatFileSize, formatTime, parserTypeLabel } from '../utils/textFormat';
 import { useNavigationLock } from './useNavigationLock';
 import { modelNameError, useDocumentUpload } from './useDocumentUpload';
 import { useDocumentVersions } from './useDocumentVersions';
@@ -33,6 +33,7 @@ export const useAdminDocuments = ({ router }) => {
   const collections = ref([]);
   const collectionsForFilter = ref([]);
   const filterCollection = ref('');
+  const filterDocumentType = ref('');
   const sidebarOpen = ref(false);
   const registeredCollections = ref([]);
   const deleteDocTarget = ref(null);
@@ -104,7 +105,12 @@ export const useAdminDocuments = ({ router }) => {
     };
   };
 
-  const collectionTopicLabel = (collectionName) => splitCollectionDisplay(collectionName).topic;
+  // 문서에는 변경되지 않는 저장소 식별자(qdrant_name)가 남으므로,
+  // 최신 대화 주제 목록에서 표시명을 찾아 이름 변경을 문서 목록에도 반영한다.
+  const collectionTopicLabel = (collectionName) => {
+    const collection = collectionsForFilter.value.find((item) => (item.qdrant_name || item.collection_name) === collectionName);
+    return collection?.collection_name || splitCollectionDisplay(collectionName).topic;
+  };
 
   const logout = async () => {
     if (isUploading.value) return;
@@ -133,27 +139,13 @@ export const useAdminDocuments = ({ router }) => {
   };
 
   // 2026.11.11(woojin.jung) 수정 - 대화 주제 필터를 칩으로 바꾸고 주제별 문서 수를 보여주려고 전체 목록을 받아 화면에서 거른다
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 유형 칩 "도면 N"(대화 주제 필터와 함께 적용)
-  const drawingOnly = ref(false);
-  const drawingCount = computed(() => documents.value.filter((doc) => doc.doc_type === 'drawing').length);
   const filteredDocuments = computed(() =>
-    documents.value.filter(
-      (doc) => (!filterCollection.value || doc.collection_name === filterCollection.value) && (!drawingOnly.value || doc.doc_type === 'drawing'),
-    ),
+    documents.value.filter((doc) => (!filterCollection.value || doc.collection_name === filterCollection.value) && (!filterDocumentType.value || doc.doc_type === filterDocumentType.value)),
   );
-  const toggleDrawingOnly = () => {
-    drawingOnly.value = !drawingOnly.value;
+  const drawingDocumentCount = computed(() => documents.value.filter((doc) => doc.doc_type === 'drawing').length);
+  const setDocumentTypeFilter = (value) => {
+    filterDocumentType.value = filterDocumentType.value === value ? '' : value;
     if (editingModelId.value && !filteredDocuments.value.some((doc) => doc.document_id === editingModelId.value)) cancelModelEdit();
-  };
-  // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과 대화상자(목록 [처리 결과]·처리 현황 [처리 결과 보기] 공통)
-  const drawingResultTarget = ref(null);
-  const openDrawingResult = (target) => {
-    drawingResultTarget.value = { documentId: target.document_id, versionNo: target.version_no || 1, opener: document.activeElement };
-  };
-  const closeDrawingResult = () => {
-    const opener = drawingResultTarget.value?.opener;
-    drawingResultTarget.value = null;
-    restoreFocus(opener);
   };
   const topicFilters = computed(() => {
     const counts = {};
@@ -241,6 +233,10 @@ export const useAdminDocuments = ({ router }) => {
       registeredCollections.value = availableCollections;
       collectionsForFilter.value = availableCollections;
       collections.value = availableCollections.map((collection) => collection.qdrant_name);
+      // 2026.11.23(woojin.jung) 추가 - 업로드할 대화 주제가 하나뿐이면 미리 선택
+      if (availableCollections.length === 1 && !form.collectionName) {
+        form.collectionName = availableCollections[0].qdrant_name || availableCollections[0].collection_name;
+      }
     } catch {
       if (disposed) return;
       collections.value = [];
@@ -381,25 +377,32 @@ export const useAdminDocuments = ({ router }) => {
       const res = await adminApi.documentFile(doc.document_id);
       const contentType = res.headers?.['content-type'] || 'application/octet-stream';
       const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: contentType }));
-      // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 브라우저가 열 수 없는 형식(DWG 등)은 새 탭으로 열면
-      //   blob 주소(UUID) 이름으로 확장자 없이 받아지므로, PDF·이미지만 새 탭으로 열고 나머지는 원래 파일명으로 내려받는다
-      const ext = (doc.filename || '').split('.').pop().toLowerCase();
-      const viewable = contentType.startsWith('application/pdf') || contentType.startsWith('image/') || ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext);
-      if (viewable) {
-        window.open(blobUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = doc.filename || 'download';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      }
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
     } catch (err) {
       uploadError.value = err.response?.data?.detail || err.message || '원본 문서를 열 수 없습니다.';
     } finally {
       openingDocId.value = null;
+    }
+  };
+
+  const drawingResultTarget = ref(null);
+  let drawingReturnFocus = null;
+  const openDrawingResult = (doc) => {
+    if (!upload.drawingEnabled.value || doc?.doc_type !== 'drawing') return;
+    drawingReturnFocus = document.activeElement;
+    drawingResultTarget.value = doc;
+  };
+  const closeDrawingResult = () => {
+    drawingResultTarget.value = null;
+    const returnFocus = drawingReturnFocus;
+    drawingReturnFocus = null;
+    nextTick(() => restoreFocus(returnFocus));
+  };
+  const onDrawingReviewChanged = async () => {
+    await loadDocuments();
+    if (drawingResultTarget.value) {
+      drawingResultTarget.value = documents.value.find((doc) => doc.document_id === drawingResultTarget.value.document_id) || drawingResultTarget.value;
     }
   };
 
@@ -424,15 +427,10 @@ export const useAdminDocuments = ({ router }) => {
     documents,
     collections,
     filterCollection,
+    filterDocumentType,
     filteredDocuments,
-    // 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가
-    drawingOnly,
-    drawingCount,
-    toggleDrawingOnly,
-    drawingResultTarget,
-    openDrawingResult,
-    closeDrawingResult,
-    parserLabel,
+    drawingDocumentCount,
+    setDocumentTypeFilter,
     topicFilters,
     activeTopicLabel,
     setTopicFilter,
@@ -461,6 +459,7 @@ export const useAdminDocuments = ({ router }) => {
     formatTime,
     docTypeLabel,
     docTypeSourceLabel,
+    parserTypeLabel,
     collectionTopicLabel,
     deleteDocTarget,
     deletingId,
@@ -473,6 +472,10 @@ export const useAdminDocuments = ({ router }) => {
     startFilenameResize,
     startFilenameResizeFromHeader,
     openOriginalDocument,
+    drawingResultTarget,
+    openDrawingResult,
+    closeDrawingResult,
+    onDrawingReviewChanged,
     spreadsheetViewer,
     showAlert,
     // 2026.10.19(sooyeon.choi) 추가 - 모델명 인라인 수정

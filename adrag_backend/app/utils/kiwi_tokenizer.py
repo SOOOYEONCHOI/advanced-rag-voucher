@@ -122,6 +122,8 @@ _kiwi_policy = None
 _kiwi_by_policy: dict = {}
 
 
+# 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+# [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (⑧ Kiwi 형태소 분석기 싱글톤 반환, 없으면 생성)
 def get_kiwi(policy: str | None = None):
     """법령 도메인 패턴이 등록된 Kiwi 싱글톤을 반환한다.
 
@@ -148,6 +150,8 @@ def _build_kiwi(policy: str):
     try:
         from kiwipiepy import Kiwi  # type: ignore[import-untyped]
 
+        # 2026.11.24(sooyeon.choi) 추가 - AI+ 시험 소스 코드 확인 위치
+        # [AI+ 시험] Recall@10 - 2) 임베딩 모델 및 하이브리드 검색에 필요한 구성 요소를 불러오는 코드 (⑧ Kiwi 형태소 분석기 로드, 처음 한 번 생성 후 재사용)
         _kiwi = Kiwi()
 
         # 참조: kiwi_tokenizer.py — 법령 도메인 정규식 패턴 등록

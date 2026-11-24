@@ -1,715 +1,178 @@
 <template>
-  <!-- 2026.11.12(sooyeon.choi) 도면 파싱 기능 추가 - 도면 처리 결과·검수 대화상자(바깥 클릭으로 닫지 않음, Esc 닫기, 포커스 가둠) -->
-  <div v-if="target" class="dialog-overlay" @keydown="onKeydown">
-    <div v-focus class="dialog-box drawing-dialog" role="dialog" aria-modal="true" aria-labelledby="drawingResultTitle" tabindex="-1" :inert="confirmOpen || viewerOpen">
-      <div class="drawing-head">
+  <div class="drawing-dialog-overlay" @keydown="onKeydown">
+    <section ref="dialogRef" class="drawing-dialog" role="dialog" aria-modal="true" aria-labelledby="drawingResultTitle" tabindex="-1">
+      <header class="drawing-dialog-head">
         <div>
-          <div id="drawingResultTitle" class="dialog-title"><i class="fa-solid fa-compass-drafting" style="color: #0f766e"></i>도면 처리 결과</div>
-          <p v-if="result" class="drawing-sub">
-            {{ result.product_model || '-' }} · {{ result.filename }} · v{{ result.version_no }}<template v-if="result.uploaded_by"> · 업로더 {{ result.uploaded_by }}</template>
-          </p>
+          <h2 id="drawingResultTitle"><i class="fa-solid fa-compass-drafting"></i> 도면 처리 결과</h2>
+          <p v-if="result">{{ result.product_model || document.product_model || '-' }} · {{ result.filename || document.filename }} · v{{ result.version_no ?? document.version_no ?? 1 }}</p>
         </div>
-        <button type="button" class="drawing-close" aria-label="도면 처리 결과 닫기" @click="$emit('close')"><i class="fa-solid fa-xmark"></i></button>
-      </div>
+        <button class="icon-button" type="button" aria-label="도면 처리 결과 닫기" @click="close"><i class="fa-solid fa-xmark"></i></button>
+      </header>
 
-      <p v-if="loading" class="drawing-state"><i class="fa-solid fa-spinner fa-spin"></i> 처리 결과를 불러오는 중입니다.</p>
-      <p v-else-if="loadError" class="drawing-state error" role="alert">{{ loadError }}</p>
-
+      <div v-if="loading" class="drawing-state"><i class="fa-solid fa-circle-notch fa-spin"></i> 처리 결과를 불러오는 중입니다.</div>
+      <div v-else-if="loadError" class="drawing-state error"><i class="fa-solid fa-circle-exclamation"></i> {{ loadError }}</div>
       <template v-else-if="result">
-        <div v-if="missingLabels.length" class="drawing-banner warn" role="status">
+        <div v-if="missingFields.length" class="drawing-banner warn">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <span>표제란 필수 항목(<strong>{{ missingLabels.join('·') }}</strong>)을 찾지 못했습니다. 원본 도면을 확인한 뒤 검수 완료로 기록해 주세요. 값 수정은 지원하지 않습니다.</span>
+          필수 항목 {{ missingFieldLabels.join(', ') }}을(를) 찾지 못했습니다. 원본 도면을 확인한 뒤 검수해 주세요.
         </div>
-        <div v-else-if="reviewed" class="drawing-banner ok" role="status">
+        <div v-else-if="reviewStatus === 'reviewed'" class="drawing-banner ok">
           <i class="fa-solid fa-circle-check"></i>
-          <span>검수 완료 · {{ result.review.reviewer || '-' }} · {{ result.review.reviewed_at || '-' }}</span>
+          검수 완료<template v-if="result.review?.reviewer"> · {{ result.review.reviewer }}</template><template v-if="result.review?.reviewed_at"> · {{ result.review.reviewed_at }}</template>
         </div>
 
-        <div class="drawing-tabs" role="tablist">
-          <button v-for="tab in tabs" :key="tab.key" type="button" role="tab" class="drawing-tab" :class="{ active: activeTab === tab.key }" :aria-selected="activeTab === tab.key" @click="activeTab = tab.key">
-            {{ tab.label }}
+        <nav class="drawing-tabs" role="tablist" aria-label="도면 처리 결과 항목">
+          <button v-for="tab in tabs" :key="tab.key" type="button" role="tab" :aria-selected="activeTab === tab.key" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+            {{ tab.label }}<span v-if="tab.count !== null" class="tab-count">{{ tab.count }}</span>
           </button>
-        </div>
+        </nav>
 
-        <div class="drawing-body">
-          <!-- 요약 -->
+        <div class="drawing-tab-body">
           <div v-if="activeTab === 'summary'" class="summary-grid">
             <div>
-              <button v-if="previewImageId" type="button" class="thumb-main" aria-label="전체 도면 크게 보기" @click="openViewer(fullImageId || previewImageId, '전체 도면')">
-                <AuthenticatedImage :resource-id="previewImageId" alt="전체 도면" />
+              <button v-if="mainImage" class="main-image" type="button" @click="openViewer(mainImage, '전체 도면')">
+                <AuthenticatedImage :resource-id="mainImage" alt="도면 미리보기" />
               </button>
-              <p v-else class="empty-note">도면 이미지를 만들지 못했습니다. 경고·정보 탭을 확인하세요.</p>
-              <div v-if="cropList.length" class="thumb-row">
-                <button v-for="crop in cropList" :key="crop.region" type="button" class="thumb-crop" @click="openViewer(crop.id, crop.label)">
-                  <AuthenticatedImage :resource-id="crop.id" :alt="crop.label" />
-                  <span>{{ crop.label }}</span>
+              <div v-else class="empty-note">도면 이미지를 만들지 못했습니다.</div>
+              <div v-if="cropImages.length" class="crop-row">
+                <button v-for="crop in cropImages" :key="crop.key" type="button" @click="openViewer(crop.resourceId, crop.label)">
+                  <AuthenticatedImage :resource-id="crop.resourceId" :alt="crop.label" /><span>{{ crop.label }}</span>
                 </button>
               </div>
             </div>
             <div>
-              <h4 class="sec-title first">표제란</h4>
-              <table class="kv">
-                <tbody>
-                  <tr v-for="row in titleRows" :key="row.label">
-                    <th>{{ row.label }}</th>
-                    <td :class="{ missing: row.missing, mono: row.mono }">{{ row.missing ? '미검출' : row.value || '-' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <h4 class="sec-title">검색에 쓸 정보(다음 단계)</h4>
-              <p class="drawing-hint">품번·품명·개정·재질·사양·도면 종류·부품표 품번 {{ bomPartCount }}개를 저장했습니다. 검수한 도면은 다음 단계에서 검색에 적용하면 챗봇 답변에서 볼 수 있습니다.</p>
+              <h3>표제란</h3>
+              <table class="kv-table"><tbody><tr v-for="field in titleFields" :key="field.key"><th>{{ field.label }}</th><td :class="{ missing: field.required && !field.value }">{{ displayValue(field.value) }}</td></tr></tbody></table>
+              <h3>도면 정보</h3>
+              <table class="kv-table"><tbody>
+                <tr><th>도면 종류</th><td>{{ drawingKindLabel }}</td></tr>
+                <tr><th>부품표 품번</th><td>{{ result.metadata?.bom_part_nos?.length ?? 0 }}개</td></tr>
+                <tr><th>업로더</th><td>{{ result.uploaded_by || '-' }}</td></tr>
+              </tbody></table>
             </div>
           </div>
 
-          <!-- 부품표 -->
-          <template v-else-if="activeTab === 'bom'">
-            <template v-if="bomTable">
-              <div class="tab-tools">
-                <span class="drawing-hint">{{ bomTable.rows.length }}행</span>
-                <button v-if="cropIds.bom" type="button" class="btn-text-link" @click="openViewer(cropIds.bom, '부품표')"><i class="fa-solid fa-magnifying-glass-plus"></i> 원본 영역 보기</button>
-              </div>
-              <div class="table-wrap">
-                <table class="grid-table">
-                  <thead>
-                    <tr><th v-for="col in bomTable.columns" :key="col">{{ columnLabel(col) }}</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(row, i) in bomTable.rows" :key="i"><td v-for="col in bomTable.columns" :key="col" :class="{ mono: col === 'part_no' }">{{ row[col] || '' }}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </template>
-            <p v-else class="empty-note">부품표가 없는 도면(가공품)입니다.</p>
-          </template>
+          <ResultTable v-else-if="activeTab === 'bom'" :table="bomTable" empty-text="부품표가 없습니다. 가공품 도면일 수 있습니다." />
+          <ResultTable v-else-if="activeTab === 'revision'" :table="revisionTable" empty-text="개정 이력이 없습니다." />
 
-          <!-- 개정이력 -->
-          <template v-else-if="activeTab === 'revision'">
-            <template v-if="revisionTable && revisionTable.rows.length">
-              <div class="tab-tools">
-                <span class="drawing-hint">{{ revisionTable.rows.length }}행</span>
-                <button v-if="cropIds.revision" type="button" class="btn-text-link" @click="openViewer(cropIds.revision, '개정이력')"><i class="fa-solid fa-magnifying-glass-plus"></i> 원본 영역 보기</button>
-              </div>
-              <div class="table-wrap">
-                <table class="grid-table">
-                  <thead>
-                    <tr><th v-for="col in revisionTable.columns" :key="col">{{ columnLabel(col, 'revision') }}</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(row, i) in revisionTable.rows" :key="i"><td v-for="col in revisionTable.columns" :key="col">{{ row[col] || '' }}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </template>
-            <p v-else class="empty-note">개정 이력이 비어 있습니다.</p>
-          </template>
+          <div v-else-if="activeTab === 'notes'" class="notes-pane">
+            <h3>일반 주기</h3><ul v-if="noteItems.length" class="note-list"><li v-for="(item, index) in noteItems" :key="index">{{ displayValue(item) }}</li></ul><p v-else class="empty-note">추출된 주기가 없습니다.</p>
+            <h3>일반 공차</h3><p class="drawing-text">{{ displayValue(result.notes?.general_tolerance) }}</p>
+            <h3>사양 메모</h3><ul v-if="specMemos.length" class="note-list"><li v-for="(item, index) in specMemos" :key="index">{{ displayValue(item) }}</li></ul><p v-else class="empty-note">추출된 사양 메모가 없습니다.</p>
+            <h3>치수 <small>{{ result.dimension_count ?? dimensions.length }}개</small></h3><div v-if="dimensions.length" class="text-chips"><span v-for="(item, index) in dimensions" :key="index">{{ displayValue(item?.text ?? item) }}</span></div><p v-else class="empty-note">추출된 치수가 없습니다.</p>
+            <h3>기타 글자</h3><div v-if="miscTexts.length" class="text-chips"><span v-for="(item, index) in miscTexts" :key="index">{{ displayValue(item) }}</span></div><p v-else class="empty-note">기타 글자가 없습니다.</p>
+          </div>
 
-          <!-- 주기 -->
-          <template v-else-if="activeTab === 'notes'">
-            <h4 class="sec-title first">주기</h4>
-            <ol v-if="result.notes.items?.length" class="note-list">
-              <li v-for="(item, i) in result.notes.items" :key="i">{{ item }}</li>
-            </ol>
-            <p v-else class="empty-note">주기를 찾지 못했습니다.</p>
-            <h4 class="sec-title">일반공차 규격</h4>
-            <p class="drawing-text">{{ result.notes.general_tolerance || '-' }}</p>
-            <template v-if="result.notes.spec_memos?.length">
-              <h4 class="sec-title">규격 메모</h4>
-              <p v-for="(memo, i) in result.notes.spec_memos" :key="i" class="drawing-text">{{ memo }}</p>
-            </template>
-            <h4 class="sec-title">치수 {{ result.dimension_count }}개</h4>
-            <p class="drawing-text dims">{{ result.dimensions.map((d) => d.text).join(' · ') || '-' }}</p>
-            <template v-if="result.misc_texts?.length">
-              <h4 class="sec-title">기타 글자</h4>
-              <p class="drawing-text">{{ result.misc_texts.join(' · ') }}</p>
-            </template>
-          </template>
+          <div v-else-if="activeTab === 'warnings'">
+            <section class="warning-group"><h3>경고 {{ warningItems.length }}건</h3><div v-if="warningItems.length"><article v-for="(item, index) in warningItems" :key="`${item.code}-${index}`"><code>{{ item.code || 'WARN' }}</code><span>{{ item.message }}</span><b v-if="item.count != null">{{ item.count }}건</b></article></div><p v-else>사람이 확인할 경고가 없습니다.</p></section>
+            <section class="warning-group info"><h3>정보 {{ infoItems.length }}건</h3><div v-if="infoItems.length"><article v-for="(item, index) in infoItems" :key="`${item.code}-${index}`"><code>{{ item.code || 'INFO' }}</code><span>{{ item.message }}</span><b v-if="item.count != null">{{ item.count }}건</b></article></div><p v-else>자동 처리 정보가 없습니다.</p></section>
+          </div>
 
-          <!-- 경고·정보 -->
-          <template v-else-if="activeTab === 'warnings'">
-            <div v-for="group in warningGroups" :key="group.level" class="warn-group">
-              <h4>
-                <i :class="group.level === 'warn' ? 'fa-solid fa-triangle-exclamation warn-icon' : 'fa-solid fa-circle-info info-icon'"></i>
-                {{ group.title }} {{ group.items.length }}
-              </h4>
-              <div v-for="(w, i) in group.items" :key="i" class="warn-item">
-                <code>{{ w.code }}</code>
-                <span>{{ w.message }}</span>
-                <span class="warn-count">{{ w.count ?? '' }}</span>
-              </div>
-              <p v-if="!group.items.length" class="warn-empty">{{ group.empty }}</p>
-            </div>
-          </template>
-
-          <!-- 처리 정보 -->
-          <template v-else>
-            <table class="kv">
-              <tbody>
-                <tr><th>원본 형식</th><td>{{ result.processing.source.format || '-' }} {{ result.processing.source.release || result.processing.source.acadver || '' }}</td></tr>
-                <tr><th>변환기</th><td>{{ converterLabel }}</td></tr>
-                <tr><th>표제란 방식</th><td>{{ result.title_block.method || '-' }}</td></tr>
-                <tr><th>용지 · 축척</th><td>{{ result.sheet.size || '미판정' }} · {{ result.title_block.fields?.scale || '-' }}</td></tr>
-                <tr><th>엔티티 · 글자</th><td>{{ result.processing.stats.entity_count ?? '-' }} · {{ result.processing.stats.text_count ?? '-' }}</td></tr>
-                <tr><th>소요 시간</th><td>{{ timingLabel }}</td></tr>
-                <tr><th>확인용 md</th><td class="mono">{{ result.processing.md_dir || '-' }}</td></tr>
-                <tr><th>검색 데이터</th><td>저장하지 않음(검색 미적용)</td></tr>
-              </tbody>
-            </table>
-          </template>
+          <div v-else class="processing-pane">
+            <table class="kv-table"><tbody>
+              <tr><th>원본 형식</th><td>{{ result.processing?.source?.format || '-' }}</td></tr>
+              <tr><th>CAD 버전</th><td>{{ result.processing?.source?.acadver || result.processing?.source?.release || '-' }}</td></tr>
+              <tr><th>변환기</th><td>{{ converterText }}</td></tr>
+              <tr><th>자동 보정</th><td>{{ result.processing?.source?.converter?.sanitize_fixes ?? 0 }}건</td></tr>
+              <tr><th>표제란 추출</th><td>{{ result.title_block?.method || '-' }}</td></tr>
+              <tr><th>용지</th><td>{{ result.sheet?.size || result.summary?.sheet_size || '-' }}</td></tr>
+              <tr><th>엔티티 / 글자</th><td>{{ result.processing?.stats?.entity_count ?? '-' }} / {{ result.processing?.stats?.text_count ?? '-' }}</td></tr>
+              <tr><th>변환 / 추출 / 렌더</th><td>{{ timingText }}</td></tr>
+              <tr><th>처리 결과 경로</th><td class="mono">{{ result.processing?.md_dir || '-' }}</td></tr>
+            </tbody></table>
+          </div>
         </div>
       </template>
 
-      <div class="dialog-actions">
-        <button type="button" class="btn-search-disabled" disabled title="검수한 도면은 다음 단계에서 검색에 적용됩니다."><i class="fa-solid fa-magnifying-glass"></i> 검색 적용 <small>다음 단계</small></button>
-        <span class="actions-gap"></span>
-        <button
-          v-if="result"
-          type="button"
-          :class="reviewed ? 'btn-cancel' : 'btn-review'"
-          :disabled="!result.can_review || reviewing"
-          :title="result.can_review ? '' : '업로드한 본인 또는 관리자만 현재 버전을 검수할 수 있습니다.'"
-          @click="onReviewClick"
-        >
-          <i v-if="reviewing" class="fa-solid fa-spinner fa-spin"></i>
-          <i v-else :class="reviewed ? 'fa-solid fa-rotate-left' : 'fa-solid fa-check'"></i>
-          {{ reviewed ? '검수 취소' : '검수 완료' }}
+      <footer class="drawing-dialog-actions">
+        <button v-if="result" class="search-disabled" type="button" disabled title="검수한 도면의 검색 적용은 다음 단계에서 지원됩니다."><i class="fa-solid fa-magnifying-glass"></i> 검색 적용 <small>다음 단계</small></button>
+        <span></span>
+        <button v-if="result" class="review-button" :class="{ cancel: reviewStatus === 'reviewed' }" type="button" :disabled="reviewing || !result.can_review" :title="reviewDisabledTitle" @click="requestReviewChange">
+          <i v-if="reviewing" class="fa-solid fa-spinner fa-spin"></i> {{ reviewButtonLabel }}
         </button>
-        <button type="button" class="btn-cancel" @click="$emit('close')">닫기</button>
-      </div>
+        <button class="close-button" type="button" @click="close">닫기</button>
+      </footer>
+    </section>
+
+    <div v-if="confirmMissing" class="nested-overlay" @keydown.stop="onConfirmKeydown">
+      <section ref="confirmRef" class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="missingConfirmTitle" tabindex="-1">
+        <h2 id="missingConfirmTitle"><i class="fa-solid fa-triangle-exclamation"></i> 필수 항목 확인</h2>
+        <p>필수 항목 {{ missingFieldLabels.join(', ') }}을(를) 찾지 못했습니다. 원본 도면에서 확인했습니까?</p>
+        <div><button type="button" class="close-button" @click="confirmMissing = false">취소</button><button type="button" class="review-button" :disabled="reviewing" @click="completeReview(true)">원본 확인함 · 검수 완료</button></div>
+      </section>
     </div>
 
-    <!-- 필수 항목 누락 확인 -->
-    <div v-if="confirmOpen" class="dialog-overlay nested" @keydown="onConfirmKeydown">
-      <div v-focus class="dialog-box confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="drawingConfirmTitle" tabindex="-1">
-        <div id="drawingConfirmTitle" class="dialog-title"><i class="fa-solid fa-triangle-exclamation" style="color: #f97316"></i>필수 항목 확인</div>
-        <p class="drawing-hint">
-          필수 항목(<strong>{{ missingLabels.join('·') }}</strong>)이 비어 있습니다.<br />원본 도면을 확인했으면 검수 완료로 기록합니다. 비어 있는 값은 그대로 저장됩니다.
-        </p>
-        <div class="dialog-actions plain">
-          <button type="button" class="btn-cancel" @click="confirmOpen = false">취소</button>
-          <button type="button" class="btn-review" :disabled="reviewing" @click="submitReview(true)">원본 확인함 · 검수 완료</button>
-        </div>
-      </div>
+    <div v-if="viewer" class="nested-overlay image-overlay" @keydown.stop="onViewerKeydown">
+      <section ref="viewerRef" class="image-viewer" role="dialog" aria-modal="true" aria-label="도면 이미지 확대" tabindex="-1">
+        <header><strong>{{ viewer.label }}</strong><button type="button" aria-label="확대 이미지 닫기" @click="viewer = null"><i class="fa-solid fa-xmark"></i></button></header>
+        <AuthenticatedImage :resource-id="viewer.resourceId" :alt="viewer.label" />
+      </section>
     </div>
-
-    <ImageViewer :open="viewerOpen" :images="viewerImages" :index="0" @close="viewerOpen = false" @toast="(m, t) => $emit('toast', m, t)" />
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { adminApi } from '../api/adminApi';
 import { handleDialogKeydown } from '../utils/dialogKeydown';
 import AuthenticatedImage from './AuthenticatedImage.vue';
-import ImageViewer from './ImageViewer.vue';
+import ResultTable from './DrawingResultTable.vue';
 
-const props = defineProps({
-  // { documentId, versionNo }
-  target: { type: Object, default: null },
-});
-const emit = defineEmits(['close', 'toast', 'reviewed']);
-const vFocus = { mounted: (el) => el.focus() };
+const props = defineProps({ document: { type: Object, required: true } });
+const emit = defineEmits(['close', 'changed', 'toast']);
+const dialogRef = ref(null); const confirmRef = ref(null); const viewerRef = ref(null);
+const loading = ref(true); const loadError = ref(''); const result = ref(null); const activeTab = ref('summary');
+const reviewing = ref(false); const confirmMissing = ref(false); const viewer = ref(null);
+const apiError = (error, fallback) => { const detail = error.response?.data?.detail; return (typeof detail === 'string' ? detail : detail?.message) || error.message || fallback; };
+const resourceId = (value) => typeof value === 'string' ? value : value?.resource_id || '';
+const displayValue = (value) => value === null || value === undefined || value === '' ? '-' : Array.isArray(value) ? value.join(', ') : String(value);
+const findTable = (kind) => (result.value?.tables || []).find((table) => table.kind === kind) || null;
+const bomTable = computed(() => findTable('bom')); const revisionTable = computed(() => findTable('revision'));
+const warningItems = computed(() => (result.value?.warnings || []).filter((item) => item.level === 'warn'));
+const infoItems = computed(() => (result.value?.warnings || []).filter((item) => item.level === 'info'));
+const noteItems = computed(() => result.value?.notes?.items || []); const specMemos = computed(() => result.value?.notes?.spec_memos || []);
+const dimensions = computed(() => result.value?.dimensions || []); const miscTexts = computed(() => result.value?.misc_texts || []);
+const missingFields = computed(() => result.value?.summary?.missing_fields || []);
+const requiredLabels = { part_no: '품번', part_name: '품명', revision: '개정' };
+const missingFieldLabels = computed(() => missingFields.value.map((field) => requiredLabels[field] || field));
+const reviewStatus = computed(() => result.value?.review?.status || 'pending');
+const reviewButtonLabel = computed(() => reviewing.value ? '처리 중...' : reviewStatus.value === 'reviewed' ? '검수 취소' : '검수 완료');
+const reviewDisabledTitle = computed(() => result.value?.can_review ? '' : result.value?.is_current === false ? '현재 버전만 검수할 수 있습니다.' : '소속 부서의 운영관리자만 검수할 수 있습니다.');
+const mainImage = computed(() => resourceId(result.value?.images?.preview || result.value?.images?.full));
+const cropImages = computed(() => [['title_block', '표제란'], ['bom', '부품표'], ['revision', '개정이력']].map(([key, label]) => ({ key, label, resourceId: resourceId(result.value?.images?.crops?.[key]) })).filter((item) => item.resourceId));
+const fieldDefinitions = [['part_no', '품번', true], ['part_name', '품명', true], ['revision', '개정', true], ['date', '날짜'], ['scale', '축척'], ['material', '재질'], ['material_group', '재질 그룹'], ['after_treatment', '후처리'], ['part_spec', 'PART SPEC'], ['drawn', '작성'], ['checked', '검토'], ['approved', '승인']];
+const titleFields = computed(() => fieldDefinitions.map(([key, label, required = false]) => ({ key, label, required, value: result.value?.title_block?.fields?.[key] })));
+const drawingKindLabel = computed(() => ({ assembly: '조립도', part: '부품도' }[result.value?.metadata?.drawing_kind] || result.value?.metadata?.drawing_kind || '-'));
+const converterText = computed(() => { const value = result.value?.processing?.source?.converter; return value ? `${value.name || '-'} ${value.version || ''}${value.elapsed_ms != null ? ` · ${value.elapsed_ms} ms` : ''}`.trim() : '변환 없음(DXF)'; });
+const timingText = computed(() => { const value = result.value?.processing?.timings || {}; return `${value.convert_ms ?? '-'} / ${value.extract_ms ?? '-'} / ${value.render_ms ?? '-'} ms`; });
+const tabs = computed(() => [
+  { key: 'summary', label: '요약', count: null }, { key: 'bom', label: '부품표', count: bomTable.value?.rows?.length ?? 0 },
+  { key: 'revision', label: '개정이력', count: revisionTable.value?.rows?.length ?? 0 }, { key: 'notes', label: '주기·치수', count: noteItems.value.length + dimensions.value.length },
+  { key: 'warnings', label: '경고·정보', count: warningItems.value.length + infoItems.value.length }, { key: 'processing', label: '처리 정보', count: null },
+]);
 
-const TITLE_FIELDS = [
-  ['part_no', '품번', true],
-  ['part_name', '품명'],
-  ['revision', '개정'],
-  ['date', '날짜'],
-  ['scale', '축척'],
-  ['material', '재질'],
-  ['material_group', '재질 그룹'],
-  ['after_treatment', '후처리'],
-  ['part_spec', 'PART SPEC'],
-  ['drawn', '작성'],
-  ['checked', '검토'],
-  ['approved', '승인'],
-];
-const REQUIRED = { part_no: '품번', part_name: '품명', revision: '개정' };
-const COLUMN_LABELS = {
-  item_no: '번호', revision: 'REV', part_no: '품번', part_name: '품명', qty: '수량', material: '재질',
-  material_group: '재질 그룹', part_spec: '사양', after_treatment: '후처리',
-};
-const REVISION_LABELS = { rev: '개정', description: '내용', date: '날짜', drawn: '작성', checked: '검토' };
-const CROP_LABELS = { title_block: '표제란', bom: '부품표', revision: '개정이력', notes: '주기' };
-
-const result = ref(null);
-const loading = ref(false);
-const loadError = ref('');
-const activeTab = ref('summary');
-const reviewing = ref(false);
-const confirmOpen = ref(false);
-const viewerOpen = ref(false);
-const viewerImages = ref([]);
-
-const errorText = (error) => {
-  const detail = error.response?.data?.detail;
-  if (typeof detail === 'string') return detail;
-  return detail?.message || error.message || '요청 처리에 실패했습니다.';
-};
-
-const load = async () => {
-  if (!props.target) return;
-  loading.value = true;
-  loadError.value = '';
-  result.value = null;
-  activeTab.value = 'summary';
-  try {
-    const response = await adminApi.drawingResult(props.target.documentId, props.target.versionNo);
-    result.value = response.data;
-  } catch (error) {
-    loadError.value = errorText(error);
-  } finally {
-    loading.value = false;
-  }
-};
-watch(() => props.target, load, { immediate: true });
-
-const reviewed = computed(() => result.value?.review?.status === 'reviewed');
-const fields = computed(() => result.value?.title_block?.fields || {});
-const missingLabels = computed(() => (result.value?.summary?.missing_fields || []).map((key) => REQUIRED[key] || key));
-const titleRows = computed(() =>
-  TITLE_FIELDS.map(([key, label, mono]) => ({
-    label,
-    value: key === 'revision' && fields.value.rev_iter ? `${fields.value.revision} (개정 ${fields.value.rev_major} · 반복 ${fields.value.rev_iter})` : fields.value[key],
-    missing: Boolean(REQUIRED[key]) && !fields.value[key],
-    mono,
-  })).concat([{ label: '도면 종류', value: result.value?.metadata?.drawing_kind === 'assembly' ? '조립도(부품표 있음)' : '가공품' }]),
-);
-const bomTable = computed(() => result.value?.tables?.find((t) => t.kind === 'bom') || null);
-const revisionTable = computed(() => result.value?.tables?.find((t) => t.kind === 'revision') || null);
-const bomPartCount = computed(() => result.value?.metadata?.bom_part_nos?.length || 0);
-const images = computed(() => result.value?.images || {});
-const previewImageId = computed(() => images.value.preview || images.value.full || '');
-const fullImageId = computed(() => images.value.full || '');
-const cropIds = computed(() => images.value.crops || {});
-const cropList = computed(() =>
-  Object.entries(cropIds.value).map(([region, id]) => ({ region, id, label: CROP_LABELS[region] || region })),
-);
-const warningGroups = computed(() => {
-  const list = result.value?.warnings || [];
-  return [
-    { level: 'warn', title: '경고 — 확인 필요', items: list.filter((w) => w.level === 'warn'), empty: '확인이 필요한 항목이 없습니다.' },
-    { level: 'info', title: '정보 — 자동 조치됨', items: list.filter((w) => w.level !== 'warn'), empty: '없음' },
-  ];
-});
-const tabs = computed(() => {
-  const warn = warningGroups.value[0].items.length;
-  const info = warningGroups.value[1].items.length;
-  return [
-    { key: 'summary', label: '요약' },
-    { key: 'bom', label: '부품표' },
-    { key: 'revision', label: '개정이력' },
-    { key: 'notes', label: '주기·치수' },
-    { key: 'warnings', label: `경고·정보 ${warn}+${info}` },
-    { key: 'processing', label: '처리 정보' },
-  ];
-});
-const converterLabel = computed(() => {
-  const conv = result.value?.processing?.source?.converter || {};
-  if (!conv.name) return '변환 없음(DXF)';
-  return [conv.name, conv.version, conv.sanitize_fixes ? `보정 ${conv.sanitize_fixes}건` : ''].filter(Boolean).join(' · ');
-});
-const timingLabel = computed(() => {
-  const t = result.value?.processing?.timings || {};
-  const sec = (ms) => (ms == null ? '-' : `${(ms / 1000).toFixed(1)} s`);
-  return `변환 ${sec(t.convert_ms)} · 추출 ${sec(t.extract_ms)} · 이미지 ${sec(t.render_ms)}`;
-});
-
-const columnLabel = (col, kind) => (kind === 'revision' ? REVISION_LABELS[col] : COLUMN_LABELS[col]) || col;
-
-const openViewer = (resourceId, title) => {
-  if (!resourceId) return;
-  viewerImages.value = [{ resource_id: resourceId, title, original_filename: result.value?.filename }];
-  viewerOpen.value = true;
-};
-
-const submitReview = async (confirmMissing = false) => {
-  if (!result.value || reviewing.value) return;
-  reviewing.value = true;
-  try {
-    const { documentId, versionNo } = props.target;
-    const response = reviewed.value
-      ? await adminApi.cancelDrawingReview(documentId, versionNo)
-      : await adminApi.reviewDrawing(documentId, versionNo, confirmMissing);
-    result.value = { ...result.value, review: response.data.review };
-    confirmOpen.value = false;
-    emit('toast', reviewed.value ? '검수 완료로 기록했습니다.' : '검수를 취소했습니다.', 'success');
-    emit('reviewed');
-  } catch (error) {
-    emit('toast', errorText(error), 'error');
-  } finally {
-    reviewing.value = false;
-  }
-};
-
-const onReviewClick = () => {
-  if (!reviewed.value && missingLabels.value.length) {
-    confirmOpen.value = true;
-    return;
-  }
-  submitReview(false);
-};
-
-const onKeydown = (event) => {
-  if (confirmOpen.value || viewerOpen.value) return;
-  handleDialogKeydown(event, () => emit('close'));
-};
-const onConfirmKeydown = (event) => handleDialogKeydown(event, () => (confirmOpen.value = false));
+const load = async () => { loading.value = true; loadError.value = ''; try { const response = await adminApi.drawingResult(props.document.document_id, props.document.version_no ?? 1); result.value = response.data; } catch (error) { loadError.value = apiError(error, '도면 처리 결과를 불러오지 못했습니다.'); } finally { loading.value = false; await nextTick(); dialogRef.value?.focus(); } };
+const close = () => emit('close');
+const onKeydown = (event) => { if (confirmMissing.value || viewer.value) return; handleDialogKeydown(event, close); };
+const openViewer = (id, label) => { const full = resourceId(result.value?.images?.full) || id; viewer.value = { resourceId: label === '전체 도면' ? full : id, label }; nextTick(() => viewerRef.value?.focus()); };
+const onViewerKeydown = (event) => handleDialogKeydown(event, () => { viewer.value = null; });
+const onConfirmKeydown = (event) => handleDialogKeydown(event, () => { confirmMissing.value = false; });
+const requestReviewChange = () => { if (reviewStatus.value === 'reviewed') cancelReview(); else if (missingFields.value.length) { confirmMissing.value = true; nextTick(() => confirmRef.value?.focus()); } else completeReview(false); };
+const applyReview = (data) => { result.value.review = data.review || data; emit('changed'); };
+const completeReview = async (confirm) => { reviewing.value = true; try { const response = await adminApi.completeDrawingReview(props.document.document_id, result.value.version_no ?? props.document.version_no ?? 1, confirm ? { confirm_missing: true } : {}); applyReview(response.data); confirmMissing.value = false; emit('toast', '도면 검수를 완료했습니다.', 'success'); } catch (error) { const detail = error.response?.data?.detail; if (error.response?.status === 409 && detail?.code === 'MISSING_FIELDS_CONFIRM_REQUIRED') { confirmMissing.value = true; await nextTick(); confirmRef.value?.focus(); } else emit('toast', apiError(error, '도면 검수를 완료하지 못했습니다.'), 'error'); } finally { reviewing.value = false; } };
+const cancelReview = async () => { reviewing.value = true; try { const response = await adminApi.cancelDrawingReview(props.document.document_id, result.value.version_no ?? props.document.version_no ?? 1); applyReview(response.data); emit('toast', '도면 검수를 취소했습니다.', 'success'); } catch (error) { emit('toast', apiError(error, '도면 검수를 취소하지 못했습니다.'), 'error'); } finally { reviewing.value = false; } };
+onMounted(load);
 </script>
 
 <style scoped>
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(15, 23, 42, 0.45);
-}
-.dialog-overlay.nested {
-  z-index: 1010;
-}
-.dialog-box {
-  display: flex;
-  flex-direction: column;
-  width: min(1040px, 100%);
-  max-height: calc(100vh - 32px);
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
-}
-.confirm-box {
-  width: min(460px, 100%);
-  padding: 1.4rem;
-}
-.drawing-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.2rem 1.4rem 0.6rem;
-}
-.dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.02rem;
-  font-weight: 700;
-  color: #1e293b;
-}
-.drawing-sub {
-  margin: 0.3rem 0 0;
-  font-size: 0.8rem;
-  color: #64748b;
-}
-.drawing-close {
-  border: none;
-  background: none;
-  color: #94a3b8;
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-.drawing-state {
-  padding: 2rem 1.4rem;
-  color: #64748b;
-  font-size: 0.88rem;
-}
-.drawing-state.error {
-  color: #dc2626;
-}
-.drawing-banner {
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-start;
-  margin: 0 1.4rem 0.6rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-.drawing-banner.warn {
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
-}
-.drawing-banner.ok {
-  background: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-}
-.drawing-tabs {
-  display: flex;
-  gap: 0.2rem;
-  padding: 0 1.4rem;
-  border-bottom: 1px solid #e2e8f0;
-  overflow-x: auto;
-}
-.drawing-tab {
-  padding: 0.6rem 0.8rem;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: #64748b;
-  font-size: 0.84rem;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.drawing-tab.active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
-  font-weight: 700;
-}
-.drawing-body {
-  flex: 1;
-  padding: 1.1rem 1.4rem;
-  overflow: auto;
-}
-.summary-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 1.25rem;
-}
-.thumb-main {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: white;
-  cursor: zoom-in;
-  overflow: hidden;
-}
-.thumb-main :deep(img) {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.thumb-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.thumb-crop {
-  padding: 4px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  text-align: left;
-  cursor: zoom-in;
-}
-.thumb-crop :deep(img) {
-  display: block;
-  width: 100%;
-  height: 70px;
-  object-fit: contain;
-}
-.thumb-crop span {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.72rem;
-  color: #64748b;
-}
-.sec-title {
-  margin: 1rem 0 0.4rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #334155;
-}
-.sec-title.first {
-  margin-top: 0;
-}
-.kv {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
-.kv th {
-  width: 110px;
-  padding: 0.38rem 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #64748b;
-  font-weight: 500;
-  text-align: left;
-  vertical-align: top;
-}
-.kv td {
-  padding: 0.38rem 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #1e293b;
-  word-break: break-all;
-}
-.kv td.missing {
-  color: #dc2626;
-  font-weight: 600;
-}
-.mono {
-  font-family: Consolas, monospace;
-}
-.drawing-hint,
-.drawing-text {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.82rem;
-  line-height: 1.55;
-}
-.drawing-text {
-  color: #1e293b;
-}
-.drawing-text.dims {
-  word-break: break-all;
-}
-.tab-tools {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.btn-text-link {
-  border: none;
-  background: none;
-  color: #2563eb;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.table-wrap {
-  overflow-x: auto;
-}
-.grid-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-}
-.grid-table th {
-  padding: 0.45rem 0.55rem;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #475569;
-  font-weight: 600;
-  text-align: left;
-  white-space: nowrap;
-}
-.grid-table td {
-  padding: 0.45rem 0.55rem;
-  border: 1px solid #e2e8f0;
-}
-.empty-note {
-  margin: 0;
-  padding: 1rem;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #64748b;
-  font-size: 0.84rem;
-  text-align: center;
-}
-.note-list {
-  margin: 0;
-  padding-left: 1.2rem;
-  font-size: 0.84rem;
-  line-height: 1.8;
-}
-.warn-group {
-  margin-bottom: 0.8rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.warn-group h4 {
-  margin: 0;
-  padding: 0.55rem 0.8rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-  font-size: 0.82rem;
-}
-.warn-icon {
-  color: #dc2626;
-}
-.info-icon {
-  color: #2563eb;
-}
-.warn-item {
-  display: grid;
-  grid-template-columns: 170px 1fr 60px;
-  gap: 0.75rem;
-  padding: 0.55rem 0.8rem;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 0.8rem;
-}
-.warn-item:last-child {
-  border-bottom: none;
-}
-.warn-item code {
-  font-size: 0.74rem;
-  color: #475569;
-}
-.warn-count {
-  color: #64748b;
-}
-.warn-empty {
-  margin: 0;
-  padding: 0.55rem 0.8rem;
-  color: #94a3b8;
-  font-size: 0.8rem;
-}
-.dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.9rem 1.4rem;
-  border-top: 1px solid #e2e8f0;
-}
-.dialog-actions.plain {
-  padding: 0.6rem 0 0;
-  border-top: none;
-}
-.actions-gap {
-  flex: 1;
-}
-.btn-cancel,
-.btn-review,
-.btn-search-disabled {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.55rem 1rem;
-  border-radius: 8px;
-  font-size: 0.84rem;
-  cursor: pointer;
-}
-.btn-cancel {
-  border: 1px solid #d1d5db;
-  background: white;
-  color: #374151;
-}
-.btn-review {
-  border: none;
-  background: #16a34a;
-  color: white;
-  font-weight: 600;
-}
-.btn-review:disabled,
-.btn-cancel:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-search-disabled {
-  border: 1px dashed #cbd5e1;
-  background: #f8fafc;
-  color: #94a3b8;
-  cursor: not-allowed;
-}
-.btn-search-disabled small {
-  font-size: 0.7rem;
-}
-@media (max-width: 768px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-  .warn-item {
-    grid-template-columns: 1fr;
-  }
-}
+.drawing-dialog-overlay,.nested-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.5)}
+.drawing-dialog{display:flex;flex-direction:column;width:min(1080px,100%);max-height:calc(100dvh - 32px);overflow:hidden;border-radius:14px;background:#fff;box-shadow:0 24px 60px rgba(15,23,42,.3);outline:none}
+.drawing-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;padding:1.2rem 1.4rem .75rem}.drawing-dialog-head h2{margin:0;color:#1e293b;font-size:1.05rem}.drawing-dialog-head h2 i{margin-right:.45rem;color:#0f766e}.drawing-dialog-head p{margin:.35rem 0 0;color:#64748b;font-size:.8rem}.icon-button{border:0;background:none;color:#94a3b8;font-size:1.15rem}
+.drawing-state{margin:1rem 1.4rem;padding:1rem;border-radius:8px;background:#f8fafc;color:#475569}.drawing-state i{margin-right:.4rem}.drawing-state.error{background:#fef2f2;color:#b91c1c}.drawing-banner{margin:0 1.4rem .65rem;padding:.65rem .8rem;border:1px solid;border-radius:8px;font-size:.82rem;line-height:1.5}.drawing-banner i{margin-right:.4rem}.drawing-banner.warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.drawing-banner.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.drawing-tabs{display:flex;overflow-x:auto;padding:0 1.4rem;border-bottom:1px solid #e2e8f0}.drawing-tabs button{display:flex;gap:.35rem;align-items:center;padding:.65rem .8rem;border:0;border-bottom:2px solid transparent;background:none;color:#64748b;white-space:nowrap}.drawing-tabs button.active{border-bottom-color:#2563eb;color:#2563eb;font-weight:700}.tab-count{min-width:1.25rem;padding:.05rem .35rem;border-radius:999px;background:#f1f5f9;font-size:.7rem}
+.drawing-tab-body{flex:1;overflow:auto;padding:1.1rem 1.4rem}.summary-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr);gap:1.25rem}.main-image{width:100%;height:360px;padding:0;overflow:hidden;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;cursor:zoom-in}.crop-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.5rem}.crop-row button{height:100px;padding:4px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-align:left}.crop-row .authenticated-image{height:70px}.crop-row span{display:block;margin-top:2px;color:#64748b;font-size:.72rem}h3{margin:1rem 0 .45rem;color:#334155;font-size:.84rem}h3:first-child{margin-top:0}.kv-table{width:100%;border-collapse:collapse;font-size:.82rem}.kv-table th{width:120px;padding:.4rem .5rem;border-bottom:1px solid #f1f5f9;color:#64748b;text-align:left;font-weight:500;vertical-align:top}.kv-table td{padding:.4rem .5rem;border-bottom:1px solid #f1f5f9;color:#1e293b}.kv-table td.missing{color:#dc2626;font-weight:700}.mono{font-family:Consolas,monospace;overflow-wrap:anywhere}.empty-note{padding:1rem;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc;color:#64748b;text-align:center;font-size:.84rem}.note-list{margin:0;padding-left:1.2rem;color:#334155;line-height:1.8}.drawing-text{color:#334155}.text-chips{display:flex;flex-wrap:wrap;gap:.4rem}.text-chips span{padding:.25rem .5rem;border-radius:5px;background:#f1f5f9;color:#334155;font-size:.8rem}
+.warning-group{margin-bottom:.85rem;overflow:hidden;border:1px solid #fed7aa;border-radius:10px}.warning-group h3{margin:0;padding:.6rem .8rem;background:#fff7ed;color:#9a3412}.warning-group article{display:grid;grid-template-columns:170px 1fr auto;gap:.75rem;padding:.6rem .8rem;border-top:1px solid #f1f5f9;font-size:.8rem}.warning-group code{color:#475569}.warning-group p{margin:0;padding:.7rem .8rem;color:#94a3b8;font-size:.8rem}.warning-group.info{border-color:#bfdbfe}.warning-group.info h3{background:#eff6ff;color:#1d4ed8}
+.drawing-dialog-actions{display:flex;gap:.5rem;align-items:center;padding:.85rem 1.4rem;border-top:1px solid #e2e8f0}.drawing-dialog-actions>span{flex:1}.review-button,.close-button,.search-disabled{padding:.55rem 1rem;border-radius:8px;font-size:.84rem}.review-button{border:0;background:#16a34a;color:#fff;font-weight:600}.review-button.cancel{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}.review-button:disabled{opacity:.5}.close-button{border:1px solid #d1d5db;background:#fff;color:#374151}.search-disabled{border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8}.search-disabled small{margin-left:.3rem}
+.nested-overlay{z-index:90}.confirm-dialog{width:min(480px,100%);padding:1.4rem;border-radius:12px;background:#fff;outline:none}.confirm-dialog h2{margin:0;color:#1e293b;font-size:1rem}.confirm-dialog h2 i{color:#f97316}.confirm-dialog p{color:#475569;line-height:1.6}.confirm-dialog>div{display:flex;justify-content:flex-end;gap:.5rem}.image-overlay{background:rgba(2,6,23,.88)}.image-viewer{display:flex;flex-direction:column;width:min(1400px,100%);height:calc(100dvh - 32px);outline:none}.image-viewer header{display:flex;justify-content:space-between;padding:.6rem;color:#fff}.image-viewer header button{border:0;background:none;color:#fff;font-size:1.2rem}.image-viewer .authenticated-image{flex:1;border-radius:8px;background:#fff}
+@media(max-width:800px){.summary-grid{grid-template-columns:1fr}.main-image{height:280px}.drawing-dialog-actions{flex-wrap:wrap}.search-disabled{display:none}.warning-group article{grid-template-columns:1fr}.crop-row{grid-template-columns:1fr}.crop-row button{height:120px}}
 </style>

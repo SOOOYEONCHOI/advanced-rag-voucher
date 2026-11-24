@@ -25,7 +25,7 @@ NAME_101 = "가" * 101
 
 def _settings(tmp_path):
     return SimpleNamespace(
-        sqlite_db_path=str(tmp_path / "instance" / "db" / "unused.db"), instance_dir=str(tmp_path / "instance"),
+        uploaded_files_base_dir=str(tmp_path / "instance" / "data"), instance_dir=str(tmp_path / "instance"),
         excel_parse_mode="docling",
     )
 
